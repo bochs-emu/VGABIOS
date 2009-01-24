@@ -437,7 +437,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios $Id: vgabios.c,v 1.67 2008-01-27 09:44:12 vruppert Exp $"
+.ascii "VGABios $Id: vgabios.c,v 1.68 2009-01-24 10:02:14 vruppert Exp $"
 .byte 0x0d,0x0a,0x00
 #endif
 ASM_END
@@ -3829,6 +3829,64 @@ void printf(s)
     }
 }
 #endif
+
+ASM_START
+  ; get LFB address from PCI
+  ; in - ax: PCI device vendor
+  ; out - ax: LFB address (high 16 bit)
+  ;; NOTE - may be called in protected mode
+_pci_get_lfb_addr:
+  push bx
+  push cx
+  push dx
+  push eax
+    mov bx, ax
+    xor cx, cx
+    mov dl, #0x00
+    call pci_read_reg
+    cmp ax, #0xffff
+    jz pci_get_lfb_addr_5
+ pci_get_lfb_addr_3:
+    mov dl, #0x00
+    call pci_read_reg
+    cmp ax, bx ;; check vendor
+    jz pci_get_lfb_addr_4
+    add cx, #0x8
+    cmp cx, #0x200 ;; search bus #0 and #1
+    jb pci_get_lfb_addr_3
+ pci_get_lfb_addr_5:
+    xor dx, dx ;; no LFB
+    jmp pci_get_lfb_addr_6
+ pci_get_lfb_addr_4:
+    mov dl, #0x10 ;; I/O space #0
+    call pci_read_reg
+    test ax, #0xfff1
+    jnz pci_get_lfb_addr_5
+    shr eax, #16
+    mov dx, ax ;; LFB address
+ pci_get_lfb_addr_6:
+  pop eax
+  mov ax, dx
+  pop dx
+  pop cx
+  pop bx
+  ret
+
+  ; read PCI register
+  ; in - cx: device/function
+  ; in - dl: register
+  ; out - eax: value
+pci_read_reg:
+  mov eax, #0x00800000
+  mov ax, cx
+  shl eax, #8
+  mov al, dl
+  mov dx, #0xcf8
+  out dx, eax
+  add dl, #4
+  in  eax, dx
+  ret
+ASM_END
 
 #ifdef VBE
 #include "vbe.c"

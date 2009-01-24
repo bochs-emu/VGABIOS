@@ -63,7 +63,7 @@ _vbebios_product_name:
 .byte        0x00
 
 _vbebios_product_revision:
-.ascii       "$Id: vbe.c,v 1.60 2008-03-02 07:47:21 vruppert Exp $"
+.ascii       "$Id: vbe.c,v 1.61 2009-01-24 10:02:14 vruppert Exp $"
 .byte        0x00
 
 _vbebios_info_string:
@@ -80,7 +80,7 @@ _no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii      "VBE Bios $Id: vbe.c,v 1.60 2008-03-02 07:47:21 vruppert Exp $"
+.ascii      "VBE Bios $Id: vbe.c,v 1.61 2009-01-24 10:02:14 vruppert Exp $"
 .byte	0x0a,0x0d, 0x00
 #endif
 
@@ -766,9 +766,9 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
         Bit16u            cur_mode=0;
         Bit16u            cur_ptr=34;
         ModeInfoListItem  *cur_info=&mode_info_list;
-        
+
         status = read_word(ss, AX);
-        
+
 #ifdef DEBUG
         printf("VBE vbe_biosfn_return_vbe_info ES%x DI%x AX%x\n",ES,DI,status);
 #endif
@@ -784,7 +784,7 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
              (vbe_info_block.VbeSignature[1] == 'B') &&
              (vbe_info_block.VbeSignature[2] == 'E') &&
              (vbe_info_block.VbeSignature[3] == '2')) ||
-             
+
             ((vbe_info_block.VbeSignature[0] == 'V') &&
              (vbe_info_block.VbeSignature[1] == 'E') &&
              (vbe_info_block.VbeSignature[2] == 'S') &&
@@ -796,20 +796,20 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
 #endif
         }
 #endif
-                
+
         // VBE Signature
         vbe_info_block.VbeSignature[0] = 'V';
         vbe_info_block.VbeSignature[1] = 'E';
         vbe_info_block.VbeSignature[2] = 'S';
         vbe_info_block.VbeSignature[3] = 'A';
-        
+
         // VBE Version supported
         vbe_info_block.VbeVersion = 0x0200;
-        
+
         // OEM String
         vbe_info_block.OemStringPtr_Seg = 0xc000;
         vbe_info_block.OemStringPtr_Off = &vbebios_copyright;
-        
+
         // Capabilities
         vbe_info_block.Capabilities[0] = VBE_CAPABILITY_8BIT_DAC;
         vbe_info_block.Capabilities[1] = 0;
@@ -824,7 +824,7 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
         vbe_info_block.TotalMemory = VBE_TOTAL_VIDEO_MEMORY_DIV_64K;
 
         if (vbe2_info)
-	{
+        {
                 // OEM Stuff
                 vbe_info_block.OemSoftwareRev = VBE_OEM_SOFTWARE_REV;
                 vbe_info_block.OemVendorNamePtr_Seg = 0xc000;
@@ -837,12 +837,12 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
                 // copy updates in vbe_info_block back
                 memcpyb(ES, DI, ss, &vbe_info_block, sizeof(vbe_info_block));
         }
-	else
-	{
+        else
+        {
                 // copy updates in vbe_info_block back (VBE 1.x compatibility)
                 memcpyb(ES, DI, ss, &vbe_info_block, 256);
-	}
-                
+        }
+
         do
         {
                 if ((cur_info->info.XResolution <= dispi_get_max_xres()) &&
@@ -860,7 +860,7 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
                 }
                 cur_info++;
         } while (cur_info->mode != VBE_VESA_MODE_END_OF_LIST);
-        
+
         // Add vesa mode list terminator
         write_word(ES, DI + cur_ptr, cur_info->mode);
 
@@ -888,32 +888,37 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
         ModeInfoBlock     info;
         ModeInfoListItem  *cur_info;
         Boolean           using_lfb;
+        Bit16u            lfb_addr;
 
 #ifdef DEBUG
         printf("VBE vbe_biosfn_return_mode_information ES%x DI%x CX%x\n",ES,DI,CX);
 #endif
 
         using_lfb=((CX & VBE_MODE_LINEAR_FRAME_BUFFER) == VBE_MODE_LINEAR_FRAME_BUFFER);
-        
+
         CX = (CX & 0x1ff);
-        
+
         cur_info = mode_info_find_mode(CX, using_lfb, &cur_info);
 
         if (cur_info != 0)
         {
 #ifdef DEBUG
                 printf("VBE found mode %x\n",CX);
-#endif        
+#endif
                 memsetb(ss, &info, 0, sizeof(ModeInfoBlock));
                 memcpyb(ss, &info, 0xc000, &(cur_info->info), sizeof(ModeInfoBlockCompact));
                 if (using_lfb) {
                   info.NumberOfBanks = 1;
                 }
+                lfb_addr = pci_get_lfb_addr(0x1234); // experimental vendor
+                if (lfb_addr > 0) {
+                  info.PhysBasePtr = ((Bit32u)lfb_addr << 16);
+                }
                 if (info.WinAAttributes & VBE_WINDOW_ATTRIBUTE_RELOCATABLE) {
                   info.WinFuncPtr = 0xC0000000UL;
                   *(Bit16u *)&(info.WinFuncPtr) = (Bit16u)(dispi_set_bank_farcall);
                 }
-                
+
                 result = 0x4f;
         }
         else
@@ -923,7 +928,7 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
 #endif
                 result = 0x100;
         }
-        
+
         if (result == 0x4f)
         {
                 // copy updates in mode_info_block back
@@ -960,21 +965,21 @@ Bit16u *AX;Bit16u BX; Bit16u ES;Bit16u DI;
         BX = (BX & 0x1ff);
 
         //result=read_word(ss,AX);
-        
+
         // check for non vesa mode
         if (BX<VBE_MODE_VESA_DEFINED)
         {
                 Bit8u   mode;
-                
+
                 dispi_set_enable(VBE_DISPI_DISABLED);
                 // call the vgabios in order to set the video mode
                 // this allows for going back to textmode with a VBE call (some applications expect that to work)
-                
+
                 mode=(BX & 0xff);
                 biosfn_set_video_mode(mode);
                 result = 0x4f;
         }
-        
+
         cur_info = mode_info_find_mode(BX, using_lfb, &cur_info);
 
         if (cur_info != 0)
@@ -986,7 +991,7 @@ Bit16u *AX;Bit16u BX; Bit16u ES;Bit16u DI;
                         cur_info->info.YResolution,
                         cur_info->info.BitsPerPixel);
 #endif
-                
+
                 // first disable current mode (when switching between vesa modi)
                 dispi_set_enable(VBE_DISPI_DISABLED);
 
@@ -1005,15 +1010,15 @@ Bit16u *AX;Bit16u BX; Bit16u ES;Bit16u DI;
                 write_word(BIOSMEM_SEG,BIOSMEM_VBE_MODE,BX);
                 write_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL,(0x60 | no_clear));
 
-                result = 0x4f;                  
+                result = 0x4f;
         }
         else
         {
 #ifdef DEBUG
                 printf("VBE *NOT* found mode %x\n" , BX);
-#endif        
+#endif
                 result = 0x100;
-                
+
                 // FIXME: redirect non VBE modi to normal VGA bios operation
                 //        (switch back to VGA mode
                 if (BX == 3)
@@ -1089,7 +1094,7 @@ void vbe_biosfn_restore_video_state(ES, BX)
 
     enable = read_word(ES, BX);
     BX += 2;
-    
+
     if (!(enable & VBE_DISPI_ENABLED)) {
         outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
         outw(VBE_DISPI_IOPORT_DATA, enable);
