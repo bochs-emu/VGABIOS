@@ -948,7 +948,8 @@ cirrus_vesa_01h_3:
   ;; 32-bit LFB address
   xor ax, ax
   stosw
-  call cirrus_get_lfb_addr
+  mov ax, #0x1013 ;; vendor Cirrus
+  call _pci_get_lfb_addr
   stosw
   or ax, ax
   jz cirrus_vesa_01h_4
@@ -1291,54 +1292,6 @@ cgm_4:
 cgm_2:
   clc ;; video mode is supported
 cgm_3:
-  ret
-
-  ; get LFB address
-  ; out - ax:LFB address (high 16 bit)
-  ;; NOTE - may be called in protected mode
-cirrus_get_lfb_addr:
-  push cx
-  push dx
-  push eax
-    xor cx, cx
-    mov dl, #0x00
-    call cirrus_pci_read
-    cmp ax, #0xffff
-    jz cirrus_get_lfb_addr_5
- cirrus_get_lfb_addr_3:
-    mov dl, #0x00
-    call cirrus_pci_read
-    cmp ax, #0x1013 ;; cirrus
-    jz cirrus_get_lfb_addr_4
-    add cx, #0x8
-    cmp cx, #0x200 ;; search bus #0 and #1
-    jb cirrus_get_lfb_addr_3
- cirrus_get_lfb_addr_5:
-    xor dx, dx ;; no LFB
-    jmp cirrus_get_lfb_addr_6
- cirrus_get_lfb_addr_4:
-    mov dl, #0x10 ;; I/O space #0
-    call cirrus_pci_read
-    test ax, #0xfff1
-    jnz cirrus_get_lfb_addr_5
-    shr eax, #16
-    mov dx, ax ;; LFB address
- cirrus_get_lfb_addr_6:
-  pop eax
-  mov ax, dx
-  pop dx
-  pop cx
-  ret
-
-cirrus_pci_read:
-  mov eax, #0x00800000
-  mov ax, cx
-  shl eax, #8
-  mov al, dl
-  mov dx, #0xcf8
-  out dx, eax
-  add dl, #4
-  in  eax, dx
   ret
 
 ;; out - al:bytes per pixel
