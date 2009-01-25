@@ -38,8 +38,6 @@
 #include "vbe.h"
 #include "vbetables.h"
 
-#define VBE_TOTAL_VIDEO_MEMORY_DIV_64K (VBE_DISPI_TOTAL_VIDEO_MEMORY_MB*1024/64)
-
 // The current OEM Software Revision of this VBE Bios
 #define VBE_OEM_SOFTWARE_REV 0x0002;
 
@@ -63,7 +61,7 @@ _vbebios_product_name:
 .byte        0x00
 
 _vbebios_product_revision:
-.ascii       "$Id: vbe.c,v 1.61 2009-01-24 10:02:14 vruppert Exp $"
+.ascii       "$Id: vbe.c,v 1.62 2009-01-25 15:46:25 vruppert Exp $"
 .byte        0x00
 
 _vbebios_info_string:
@@ -80,7 +78,7 @@ _no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii      "VBE Bios $Id: vbe.c,v 1.61 2009-01-24 10:02:14 vruppert Exp $"
+.ascii      "VBE Bios $Id: vbe.c,v 1.62 2009-01-25 15:46:25 vruppert Exp $"
 .byte	0x0a,0x0d, 0x00
 #endif
 
@@ -715,7 +713,7 @@ vbe_init:
   mov  [bx], al
   pop  bx
   pop  ds
-  mov  ax, # VBE_DISPI_ID4
+  mov  ax, # VBE_DISPI_ID5
   call dispi_set_id
 no_vbe_interface:
 #if defined(USE_BX_INFO) || defined(DEBUG)
@@ -742,7 +740,19 @@ no_vbe_flag:
   mov  ds, ax
   mov  si, #_no_vbebios_info_string
   jmp  _display_string
-ASM_END  
+
+; helper function for memory size calculation
+
+lmulul:
+  and eax, #0x0000FFFF
+  shl ebx, #16
+  or  eax, ebx
+  SEG SS
+  mul eax, dword ptr [di]
+  mov ebx, eax
+  shr ebx, #16
+  ret
+ASM_END
 
 /** Function 00h - Return VBE Controller Information
  * 
@@ -765,6 +775,7 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
         Bit16u            vbe2_info;
         Bit16u            cur_mode=0;
         Bit16u            cur_ptr=34;
+        Bit16u            size_64k;
         ModeInfoListItem  *cur_info=&mode_info_list;
 
         status = read_word(ss, AX);
@@ -820,8 +831,9 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
         vbe_info_block.VideoModePtr_Seg= ES ;
         vbe_info_block.VideoModePtr_Off= DI + 34;
 
-        // VBE Total Memory (in 64b blocks)
-        vbe_info_block.TotalMemory = VBE_TOTAL_VIDEO_MEMORY_DIV_64K;
+        // VBE Total Memory (in 64k blocks)
+        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_VIDEO_MEMORY_64K);
+        vbe_info_block.TotalMemory = inw(VBE_DISPI_IOPORT_DATA);
 
         if (vbe2_info)
         {
@@ -845,8 +857,11 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
 
         do
         {
+                size_64k = (Bit16u)((Bit32u)cur_info->info.XResolution * cur_info->info.XResolution * cur_info->info.BitsPerPixel) >> 19;
+
                 if ((cur_info->info.XResolution <= dispi_get_max_xres()) &&
-                    (cur_info->info.BitsPerPixel <= dispi_get_max_bpp())) {
+                    (cur_info->info.BitsPerPixel <= dispi_get_max_bpp()) &&
+                    (size_64k <= vbe_info_block.TotalMemory)) {
 #ifdef DEBUG
                   printf("VBE found mode %x => %x\n", cur_info->mode,cur_mode);
 #endif
@@ -855,7 +870,7 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
                   cur_ptr+=2;
                 } else {
 #ifdef DEBUG
-                  printf("VBE mode %x (xres=%x / bpp=%02x) not supported by display\n", cur_info->mode,cur_info->info.XResolution,cur_info->info.BitsPerPixel);
+                  printf("VBE mode %x (xres=%x / bpp=%02x) not supported \n", cur_info->mode,cur_info->info.XResolution,cur_info->info.BitsPerPixel);
 #endif
                 }
                 cur_info++;
