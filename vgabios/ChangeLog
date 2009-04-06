@@ -1,3 +1,38 @@
+2009-01-25 16:46  vruppert
+
+	* vbe.c (1.62), vbe.h (1.28), vbetables-gen.c (1.5):
+
+	- added support for a lot more non-standard VBE modes (e.g. widescreen modes)
+	- requires latest Bochs VBE code (16 MB video memory, VBE_DISPI_ID5, VRAM size
+	  in 64k pages stored in VBE register)
+	- check if VBE mode is supported with current VRAM size
+
+2009-01-24 11:02  vruppert
+
+	* clext.c (1.14), vbe.c (1.61), vgabios.c (1.68):
+
+	- use VBE LFB address from PCI base address if present (rewrite of the cirrus
+	  specific function in main vgabios code)
+	- removed unnecessary spaces
+
+2008-12-14 09:29  vruppert
+
+	* clext.c (1.13):
+
+	- added DPMS support to cirrus vgabios (patch from Gleb Natapov)
+
+2008-05-30 17:28  vruppert
+
+	* README (1.16):
+
+	- updated for release 0.6b
+
+2008-05-22 12:55  vruppert
+
+	* ChangeLog (1.27), README (1.15):
+
+	- preparations for release 0.6b
+
 2008-05-11 08:40  vruppert
 
 	* biossums.c (1.6):
