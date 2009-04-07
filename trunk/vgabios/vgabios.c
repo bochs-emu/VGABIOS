@@ -437,7 +437,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios $Id: vgabios.c,v 1.68 2009-01-24 10:02:14 vruppert Exp $"
+.ascii "VGABios $Id: vgabios.c,v 1.69 2009-04-07 18:18:20 vruppert Exp $"
 .byte 0x0d,0x0a,0x00
 #endif
 ASM_END
@@ -2039,7 +2039,9 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
   {
    if(vga_modes[line].class==TEXT)
     {
-     biosfn_scroll(0x01,0x07,0,0,nbrows-1,nbcols-1,page,SCROLL_UP);
+     address=SCREEN_MEM_START(nbcols,nbrows,page)+(xcurs+(ycurs-1)*nbcols)*2;
+     attr=read_byte(vga_modes[line].sstart,address+1);
+     biosfn_scroll(0x01,attr,0,0,nbrows-1,nbcols-1,page,SCROLL_UP);
     }
    else
     {
@@ -2047,7 +2049,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
     }
    ycurs-=1;
   }
- 
+
  // Set the cursor for the page
  cursor=ycurs; cursor<<=8; cursor+=xcurs;
  biosfn_set_cursor_pos(page,cursor);
