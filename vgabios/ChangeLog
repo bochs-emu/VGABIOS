@@ -1,3 +1,15 @@
+2009-04-07 20:18  vruppert
+
+	* vgabios.c (1.69):
+
+	- biosfn_write_teletype: fixed attribute when scrolling in text mode
+
+2009-04-06 20:17  vruppert
+
+	* ChangeLog (1.28), README (1.17):
+
+	- preparing for release 0.6c
+
 2009-01-25 16:46  vruppert
 
 	* vbe.c (1.62), vbe.h (1.28), vbetables-gen.c (1.5):
