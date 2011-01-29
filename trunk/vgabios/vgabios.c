@@ -430,14 +430,14 @@ init_vga_card:
   mov  bx, #msg_vga_init
   push bx
   call _printf
+  inc  sp
+  inc  sp
 #endif
-  inc  sp
-  inc  sp
   ret
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios $Id: vgabios.c,v 1.69 2009-04-07 18:18:20 vruppert Exp $"
+.ascii "VGABios $Id: vgabios.c,v 1.70 2011-01-29 08:42:29 vruppert Exp $"
 .byte 0x0d,0x0a,0x00
 #endif
 ASM_END
