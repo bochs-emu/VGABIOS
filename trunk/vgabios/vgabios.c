@@ -3,7 +3,7 @@
  * vgabios.c
  */
 // ============================================================================================
-//  
+//
 //  Copyright (C) 2001-2008 the LGPL VGABios developers Team
 //
 //  This library is free software; you can redistribute it and/or
@@ -19,21 +19,21 @@
 //  You should have received a copy of the GNU Lesser General Public
 //  License along with this library; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
-// 
+//
 // ============================================================================================
-//  
+//
 //  This VGA Bios is specific to the plex86/bochs Emulated VGA card. 
 //  You can NOT drive any physical vga card with it. 
-//     
+//
 // ============================================================================================
-//  
+//
 //  This file contains code ripped from :
 //   - rombios.c of plex86 
 //
 //  This VGA Bios contains fonts from :
 //   - fntcol16.zip (c) by Joseph Gil avalable at :
 //      ftp://ftp.simtel.net/pub/simtelnet/msdos/screen/fntcol16.zip
-//     These fonts are public domain 
+//     These fonts are public domain
 //
 //  This VGA Bios is based on information taken from :
 //   - Kevin Lawton's vga card emulation for bochs/plex86
@@ -74,6 +74,7 @@ static void           unimplemented();
 static void           unknown();
 
 static Bit8u find_vga_entry();
+static void load_dac_palette();
 
 static void memsetb();
 static void memsetw();
@@ -146,7 +147,7 @@ vgabios_start:
 
 
 vgabios_entry_point:
-           
+
   jmp vgabios_init_func
 
 #ifdef PCIBIOS
@@ -437,7 +438,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios $Id: vgabios.c,v 1.70 2011-01-29 08:42:29 vruppert Exp $"
+.ascii "VGABios $Id: vgabios.c,v 1.71 2011-04-14 16:10:09 vruppert Exp $"
 .byte 0x0d,0x0a,0x00
 #endif
 ASM_END
@@ -817,102 +818,116 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
   }
 }
 
-// ============================================================================================
-// 
-// BIOS functions
-// 
-// ============================================================================================
+static void load_dac_palette(num) Bit8u num;
+{
+  Bit8u *palette;
+  Bit16u i;
 
-static void biosfn_set_video_mode(mode) Bit8u mode; 
-{// mode: Bit 7 is 1 if no clear screen
+  // Set the whole dac always, from 0
+  outb(VGAREG_DAC_WRITE_ADDRESS,0x00);
 
- // Should we clear the screen ?
- Bit8u noclearmem=mode&0x80;
- Bit8u line,mmask,*palette,vpti;
- Bit16u i,twidth,theightm1,cheight;
- Bit8u modeset_ctl,video_ctl,vga_switches;
- Bit16u crtc_addr;
- 
-#ifdef VBE
- if (vbe_has_vbe_display()) { 
-   dispi_set_enable(VBE_DISPI_DISABLED);
-  }
-#endif // def VBE
- 
- // The real mode
- mode=mode&0x7f;
-
- // find the entry in the video modes
- line=find_vga_entry(mode);
-
-#ifdef DEBUG
- printf("mode search %02x found line %02x\n",mode,line);
-#endif
-
- if(line==0xFF)
-  return;
-
- vpti=line_to_vpti[line];
- twidth=video_param_table[vpti].twidth;
- theightm1=video_param_table[vpti].theightm1;
- cheight=video_param_table[vpti].cheight;
- 
- // Read the bios vga control
- video_ctl=read_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL);
-
- // Read the bios vga switches
- vga_switches=read_byte(BIOSMEM_SEG,BIOSMEM_SWITCHES);
-
- // Read the bios mode set control
- modeset_ctl=read_byte(BIOSMEM_SEG,BIOSMEM_MODESET_CTL);
-
- // Then we know the number of lines
-// FIXME
-
- // if palette loading (bit 3 of modeset ctl = 0)
- if((modeset_ctl&0x08)==0)
-  {// Set the PEL mask
-   outb(VGAREG_PEL_MASK,vga_modes[line].pelmask);
-
-   // Set the whole dac always, from 0
-   outb(VGAREG_DAC_WRITE_ADDRESS,0x00);
-
-   // From which palette
-   switch(vga_modes[line].dacmodel)
-    {case 0:
+  // From which palette
+  switch (num)
+  {
+    case 0:
       palette=&palette0;
       break;
-     case 1:
+    case 1:
       palette=&palette1;
       break;
-     case 2:
+    case 2:
       palette=&palette2;
       break;
-     case 3:
+    case 3:
       palette=&palette3;
       break;
-    }
-   // Always 256*3 values
-   for(i=0;i<0x0100;i++)
-    {if(i<=dac_regs[vga_modes[line].dacmodel])
-      {outb(VGAREG_DAC_DATA,palette[(i*3)+0]);
-       outb(VGAREG_DAC_DATA,palette[(i*3)+1]);
-       outb(VGAREG_DAC_DATA,palette[(i*3)+2]);
-      }
-     else
-      {outb(VGAREG_DAC_DATA,0);
-       outb(VGAREG_DAC_DATA,0);
-       outb(VGAREG_DAC_DATA,0);
-      }
-    }
-   if((modeset_ctl&0x02)==0x02)
+  }
+  // Always 256*3 values
+  for (i=0;i<0x0100;i++)
+  {
+    if(i<=dac_regs[num])
     {
-     biosfn_perform_gray_scale_summing(0x00, 0x100);
+      outb(VGAREG_DAC_DATA,palette[(i*3)+0]);
+      outb(VGAREG_DAC_DATA,palette[(i*3)+1]);
+      outb(VGAREG_DAC_DATA,palette[(i*3)+2]);
+    }
+    else
+    {
+      outb(VGAREG_DAC_DATA,0);
+      outb(VGAREG_DAC_DATA,0);
+      outb(VGAREG_DAC_DATA,0);
+    }
+  }
+}
+
+// ============================================================================================
+//
+// BIOS functions
+//
+// ============================================================================================
+
+static void biosfn_set_video_mode(mode) Bit8u mode;
+{// mode: Bit 7 is 1 if no clear screen
+
+  // Should we clear the screen ?
+  Bit8u noclearmem=mode&0x80;
+  Bit8u line,mmask,*palette,vpti;
+  Bit16u i,twidth,theightm1,cheight;
+  Bit8u modeset_ctl,video_ctl,vga_switches;
+  Bit16u crtc_addr;
+
+#ifdef VBE
+  if (vbe_has_vbe_display()) {
+    dispi_set_enable(VBE_DISPI_DISABLED);
+  }
+#endif // def VBE
+
+  // The real mode
+  mode=mode&0x7f;
+
+  // find the entry in the video modes
+  line=find_vga_entry(mode);
+
+#ifdef DEBUG
+  printf("mode search %02x found line %02x\n",mode,line);
+#endif
+
+  if(line==0xFF)
+    return;
+
+  vpti=line_to_vpti[line];
+  twidth=video_param_table[vpti].twidth;
+  theightm1=video_param_table[vpti].theightm1;
+  cheight=video_param_table[vpti].cheight;
+
+  // Read the bios vga control
+  video_ctl=read_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL);
+
+  // Read the bios vga switches
+  vga_switches=read_byte(BIOSMEM_SEG,BIOSMEM_SWITCHES);
+
+  // Read the bios mode set control
+  modeset_ctl=read_byte(BIOSMEM_SEG,BIOSMEM_MODESET_CTL);
+
+  // Then we know the number of lines
+  // FIXME
+
+  // if palette loading (bit 3 of modeset ctl = 0)
+  if((modeset_ctl&0x08)==0)
+  {
+    // Set the PEL mask
+    outb(VGAREG_PEL_MASK,vga_modes[line].pelmask);
+
+    load_dac_palette(vga_modes[line].dacmodel);
+
+    if((modeset_ctl&0x02)==0x02)
+    {
+      biosfn_perform_gray_scale_summing(0x00, 0x100);
     }
   }
 
- // Reset Attribute Ctl flip-flop
- inb(VGAREG_ACTL_RESET);
+  // Reset Attribute Ctl flip-flop
+  inb(VGAREG_ACTL_RESET);
 
  // Set Attribute Ctl
  for(i=0;i<=0x13;i++)
@@ -1012,7 +1027,7 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
 
  // Write the fonts in memory
  if(vga_modes[line].class==TEXT)
-  { 
+  {
 ASM_START
   ;; copy and activate 8x16 font
   mov ax, #0x1104

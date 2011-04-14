@@ -644,6 +644,17 @@ is_text_mode:
   or bh, al
   call biosfn_set_single_palette_reg
 
+  mov al, [si+6]  ;; bpp
+  cmp al, #0x08
+  jnz no_8bpp_mode
+  mov al, #0x03
+  xor ah,ah
+  push ax
+  call _load_dac_palette
+  inc sp
+  inc sp
+no_8bpp_mode:
+
   pop dx
   pop bx
   pop ds

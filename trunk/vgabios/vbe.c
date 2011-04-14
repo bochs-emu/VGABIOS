@@ -61,7 +61,7 @@ _vbebios_product_name:
 .byte        0x00
 
 _vbebios_product_revision:
-.ascii       "$Id: vbe.c,v 1.62 2009-01-25 15:46:25 vruppert Exp $"
+.ascii       "$Id: vbe.c,v 1.63 2011-04-14 16:10:09 vruppert Exp $"
 .byte        0x00
 
 _vbebios_info_string:
@@ -78,7 +78,7 @@ _no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii      "VBE Bios $Id: vbe.c,v 1.62 2009-01-25 15:46:25 vruppert Exp $"
+.ascii      "VBE Bios $Id: vbe.c,v 1.63 2011-04-14 16:10:09 vruppert Exp $"
 .byte	0x0a,0x0d, 0x00
 #endif
 
@@ -1013,6 +1013,11 @@ Bit16u *AX;Bit16u BX; Bit16u ES;Bit16u DI;
                 if (cur_info->info.BitsPerPixel == 4)
                 {
                   biosfn_set_video_mode(0x6a);
+                }
+
+                if (cur_info->info.BitsPerPixel == 8)
+                {
+                  load_dac_palette(3);
                 }
 
                 dispi_set_bpp(cur_info->info.BitsPerPixel);
