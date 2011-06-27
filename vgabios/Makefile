@@ -38,7 +38,7 @@ release:
 	tar czvf ../$(RELEASE).tgz --exclude CVS -C .. $(RELEASE)/
 
 vgabios.bin: vgabios.c vgabios.h vgafonts.h vgatables.h vbe.h vbe.c vbetables.h
-	$(GCC) -E -P vgabios.c $(VGABIOS_VERS) -DVBE $(VGABIOS_DATE) > _vgabios_.c
+	$(GCC) -E -P vgabios.c $(VGABIOS_VERS) -DVBE -DPCIBIOS $(VGABIOS_DATE) > _vgabios_.c
 	$(BCC) -o vgabios.s -C-c -D__i86__ -S -0 _vgabios_.c
 	sed -e 's/^\.text//' -e 's/^\.data//' vgabios.s > _vgabios_.s
 	$(AS86) _vgabios_.s -b vgabios.bin -u -w- -g -0 -j -O -l vgabios.txt
@@ -48,7 +48,7 @@ vgabios.bin: vgabios.c vgabios.h vgafonts.h vgatables.h vbe.h vbe.c vbetables.h
 	ls -l VGABIOS-lgpl-latest.bin
 
 vgabios.debug.bin: vgabios.c vgabios.h vgafonts.h vgatables.h vbe.h vbe.c vbetables.h
-	$(GCC) -E -P vgabios.c $(VGABIOS_VERS) -DVBE -DDEBUG $(VGABIOS_DATE) > _vgabios-debug_.c
+	$(GCC) -E -P vgabios.c $(VGABIOS_VERS) -DVBE -DPCIBIOS -DDEBUG $(VGABIOS_DATE) > _vgabios-debug_.c
 	$(BCC) -o vgabios-debug.s -C-c -D__i86__ -S -0 _vgabios-debug_.c
 	sed -e 's/^\.text//' -e 's/^\.data//' vgabios-debug.s > _vgabios-debug_.s
 	$(AS86) _vgabios-debug_.s -b vgabios.debug.bin -u -w- -g -0 -j -O -l vgabios.debug.txt
