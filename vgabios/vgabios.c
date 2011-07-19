@@ -210,6 +210,9 @@ vgabios_pci_data:
 #ifdef CIRRUS
 .word 0x1013
 .word 0x00b8 // CLGD5446
+#elif defined(PCI_VID) && defined(PCI_DID)
+.word PCI_VID
+.word PCI_DID
 #elif defined(VBE)
 .word 0x1234
 .word 0x1111 // Bochs VBE support
@@ -441,7 +444,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios $Id: vgabios.c,v 1.72 2011-06-27 17:58:32 vruppert Exp $"
+.ascii "VGABios $Id: vgabios.c,v 1.73 2011-07-19 18:25:05 vruppert Exp $"
 .byte 0x0d,0x0a,0x00
 #endif
 ASM_END
