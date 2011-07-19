@@ -444,7 +444,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios $Id: vgabios.c,v 1.73 2011-07-19 18:25:05 vruppert Exp $"
+.ascii "VGABios $Id: vgabios.c,v 1.74 2011-07-19 20:17:32 vruppert Exp $"
 .byte 0x0d,0x0a,0x00
 #endif
 ASM_END
@@ -3868,26 +3868,31 @@ _pci_get_lfb_addr:
     mov dl, #0x00
     call pci_read_reg
     cmp ax, #0xffff
-    jz pci_get_lfb_addr_5
- pci_get_lfb_addr_3:
+    jz pci_get_lfb_addr_fail
+ pci_get_lfb_addr_next_dev:
     mov dl, #0x00
     call pci_read_reg
     cmp ax, bx ;; check vendor
-    jz pci_get_lfb_addr_4
+    jz pci_get_lfb_addr_found
     add cx, #0x8
     cmp cx, #0x200 ;; search bus #0 and #1
-    jb pci_get_lfb_addr_3
- pci_get_lfb_addr_5:
+    jb pci_get_lfb_addr_next_dev
+ pci_get_lfb_addr_fail:
     xor dx, dx ;; no LFB
-    jmp pci_get_lfb_addr_6
- pci_get_lfb_addr_4:
+    jmp pci_get_lfb_addr_return
+ pci_get_lfb_addr_found:
     mov dl, #0x10 ;; I/O space #0
     call pci_read_reg
     test ax, #0xfff1
-    jnz pci_get_lfb_addr_5
+    jz pci_get_lfb_addr_success
+    mov dl, #0x14 ;; I/O space #1
+    call pci_read_reg
+    test ax, #0xfff1
+    jnz pci_get_lfb_addr_fail
+ pci_get_lfb_addr_success:
     shr eax, #16
     mov dx, ax ;; LFB address
- pci_get_lfb_addr_6:
+ pci_get_lfb_addr_return:
   pop eax
   mov ax, dx
   pop dx
