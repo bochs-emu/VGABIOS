@@ -444,7 +444,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios $Id: vgabios.c,v 1.74 2011-07-19 20:17:32 vruppert Exp $"
+.ascii "VGABios $Id: vgabios.c,v 1.75 2011-10-15 14:07:21 vruppert Exp $"
 .byte 0x0d,0x0a,0x00
 #endif
 ASM_END
@@ -1346,7 +1346,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
  else
   {
    // FIXME gfx mode not complete
-   cheight=video_param_table[line_to_vpti[line]].cheight;
+   cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
    switch(vga_modes[line].memmodel)
     {
      case PLANAR4:
@@ -1658,7 +1658,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  else
   {
    // FIXME gfx mode not complete
-   cheight=video_param_table[line_to_vpti[line]].cheight;
+   cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
     {
@@ -1718,7 +1718,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  else
   {
    // FIXME gfx mode not complete
-   cheight=video_param_table[line_to_vpti[line]].cheight;
+   cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
     {
@@ -2026,7 +2026,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
     else
      {
       // FIXME gfx mode not complete
-      cheight=video_param_table[line_to_vpti[line]].cheight;
+      cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
       bpp=vga_modes[line].pixbits;
       switch(vga_modes[line].memmodel)
        {
@@ -2788,33 +2788,97 @@ static void biosfn_load_text_8_16_pat (AL,BL) Bit8u AL;Bit8u BL;
 
 static void biosfn_load_gfx_8_8_chars (ES,BP) Bit16u ES;Bit16u BP;
 {
-#ifdef DEBUG
- unimplemented();
-#endif
+    /* set 0x1F INT pointer */
+    write_word(0x0, 0x1F*4, BP);
+    write_word(0x0, 0x1F*4+2, ES);
+
+    write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 8);
 }
 static void biosfn_load_gfx_user_chars (ES,BP,CX,BL,DL) Bit16u ES;Bit16u BP;Bit16u CX;Bit8u BL;Bit8u DL;
 {
-#ifdef DEBUG
- unimplemented();
-#endif
+    Bit8u mode; Bit8u line;
+
+    /* set 0x43 INT pointer */
+    write_word(0x0, 0x43*4, BP);
+    write_word(0x0, 0x43*4+2, ES);
+
+    switch (BL) {
+    case 0:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, DL-1);
+	break;
+    case 1:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+	break;
+    case 3:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+	break;
+    case 2:
+    default:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+	break;
+    }
+
+    write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, CX);
 }
 static void biosfn_load_gfx_8_14_chars (BL) Bit8u BL;
 {
-#ifdef DEBUG
- unimplemented();
-#endif
+    /* set 0x43 INT pointer */
+    write_word(0x0, 0x43*4, &vgafont14);
+    write_word(0x0, 0x43*4+2, 0xC000);
+
+    switch (BL) {
+    case 1:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+	break;
+    case 3:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+	break;
+    case 2:
+    default:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+	break;
+    }
+    write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 14);
 }
 static void biosfn_load_gfx_8_8_dd_chars (BL) Bit8u BL;
 {
-#ifdef DEBUG
- unimplemented();
-#endif
+    /* set 0x43 INT pointer */
+    write_word(0x0, 0x43*4, &vgafont8);
+    write_word(0x0, 0x43*4+2, 0xC000);
+
+    switch (BL) {
+    case 1:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+	break;
+    case 3:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+	break;
+    case 2:
+    default:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+	break;
+    }
+    write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 8);
 }
 static void biosfn_load_gfx_8_16_chars (BL) Bit8u BL;
 {
-#ifdef DEBUG
- unimplemented();
-#endif
+    /* set 0x43 INT pointer */
+    write_word(0x0, 0x43*4, &vgafont16);
+    write_word(0x0, 0x43*4+2, 0xC000);
+
+    switch (BL) {
+    case 1:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+	break;
+    case 3:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+	break;
+    case 2:
+    default:
+	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+	break;
+    }
+    write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 16);
 }
 // --------------------------------------------------------------------------------------------
 static void biosfn_get_font_info (BH,ES,BP,CX,DX) 
