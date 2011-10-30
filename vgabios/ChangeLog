@@ -1,3 +1,60 @@
+2011-10-15 16:07  vruppert
+
+	* vgabios.c (1.75):
+
+	- implemented vgabios functions with AX=0x112x (patch by Hugo Mercier)
+
+2011-07-19 22:17  vruppert
+
+	* vgabios.c (1.74):
+
+	- update pci_get_lfb_addr for vmware vga (patch by Gerd Hoffmann)
+	  - pci_get_lfb_addr now checks BAR #1 too
+	  - give names to the numbered labels to make the code more readable
+
+2011-07-19 20:25  vruppert
+
+	* vbe.c (1.64), vgabios.c (1.73):
+
+	- VBE: added support for setting PCI vendor and device IDs using defines
+	  (PCI_VID and PCI_DID). Based on a patch by Gerd Hoffmann.
+
+2011-07-19 19:00  vruppert
+
+	* Makefile (1.23):
+
+	- Makefile cleanup patch by Gerd Hoffmann
+	  - use a single rule for building bios binaries
+	  - use target specific variables to set compile flags
+	  This makes it more obvious what the differences between the versions are.
+	  It also makes it easier to add new bios binaries with slightly different
+	  settings.
+
+2011-06-27 19:58  vruppert
+
+	* Makefile (1.22), vgabios.c (1.72):
+
+	- added PCI ROM support to the VBE-specific images
+
+2011-04-14 18:10  vruppert
+
+	* clext.c (1.15), vbe.c (1.63), vgabios.c (1.71):
+
+	- fixed DAC palette in 8 bpp VBE and Cirrus modes (using the same palette
+	  as VGA mode 0x13)
+
+2011-01-31 18:28  vruppert
+
+	* vbetables-gen.c (1.6):
+
+	- added HDTV resolutions (patch by Tristan Schmelcher)
+
+2011-01-29 09:42  vruppert
+
+	* vgabios.c (1.70):
+
+	- fixed vgabios init with logging disabled
+
 2009-04-07 20:18  vruppert
 
 	* vgabios.c (1.69):
