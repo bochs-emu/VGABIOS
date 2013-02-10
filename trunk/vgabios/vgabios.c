@@ -205,6 +205,7 @@ vgabios_website:
 .byte	0x00
 
 #ifdef PCIBIOS
+.align 4 // DWORD alignment required by PCI Firmware Specification
 vgabios_pci_data:
 .ascii "PCIR"
 #ifdef CIRRUS
@@ -444,7 +445,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios $Id: vgabios.c,v 1.75 2011-10-15 14:07:21 vruppert Exp $"
+.ascii "VGABios $Id: vgabios.c,v 1.76 2013-02-10 08:07:03 vruppert Exp $"
 .byte 0x0d,0x0a,0x00
 #endif
 ASM_END
