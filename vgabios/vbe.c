@@ -61,7 +61,7 @@ _vbebios_product_name:
 .byte        0x00
 
 _vbebios_product_revision:
-.ascii       "$Id: vbe.c,v 1.64 2011-07-19 18:25:05 vruppert Exp $"
+.ascii       "$Id: vbe.c,v 1.65 2014-07-08 18:02:25 vruppert Exp $"
 .byte        0x00
 
 _vbebios_info_string:
@@ -78,7 +78,7 @@ _no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii      "VBE Bios $Id: vbe.c,v 1.64 2011-07-19 18:25:05 vruppert Exp $"
+.ascii      "VBE Bios $Id: vbe.c,v 1.65 2014-07-08 18:02:25 vruppert Exp $"
 .byte	0x0a,0x0d, 0x00
 #endif
 
@@ -306,6 +306,26 @@ _dispi_get_max_xres:
   call _dispi_set_enable
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_XRES
+  out  dx, ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  in   ax, dx
+  push ax
+  mov  ax, bx
+  call _dispi_set_enable
+  pop  ax
+  pop  bx
+  pop  dx
+  ret
+
+_dispi_get_max_yres:
+  push dx
+  push bx
+  call dispi_get_enable
+  mov  bx, ax
+  or   ax, # VBE_DISPI_GETCAPS
+  call _dispi_set_enable
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_YRES
   out  dx, ax
   mov  dx, # VBE_DISPI_IOPORT_DATA
   in   ax, dx
@@ -860,6 +880,7 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
                 size_64k = (Bit16u)((Bit32u)cur_info->info.XResolution * cur_info->info.XResolution * cur_info->info.BitsPerPixel) >> 19;
 
                 if ((cur_info->info.XResolution <= dispi_get_max_xres()) &&
+                    (cur_info->info.YResolution <= dispi_get_max_yres()) &&
                     (cur_info->info.BitsPerPixel <= dispi_get_max_bpp()) &&
                     (size_64k <= vbe_info_block.TotalMemory)) {
 #ifdef DEBUG
