@@ -510,7 +510,7 @@ cirrus_vesa:
 #ifdef CIRRUS_DEBUG
   call cirrus_debug_dump
 #endif
-  cmp al, #0x10
+  cmp al, #0x15
   ja cirrus_vesa_not_handled
   push bx
   xor bx, bx
@@ -1239,6 +1239,196 @@ cirrus_vesa_10h_02:
   mov ax, #0x004f
   ret
 
+;; DDC helper functions for VESA 15h
+
+cirrus_ddc_delay:
+  in  al, 0x61
+  and al, #0x10
+  mov ah, al
+cirrus_ddc_delay_01:
+  nop
+  in  al, 0x61
+  and al, #0x10
+  cmp al, ah
+  jz  cirrus_ddc_delay_01
+  ret
+
+cirrus_ddc_set_dck:
+  mov  ah, #0x01
+  db   0xa9 ;; skip next opcode (TEST AX, #0x02b4)
+cirrus_ddc_set_dda:
+  mov  ah, #0x02
+  mov dx, #0x3c4
+  mov al, #0x08
+  out dx, al
+  inc dx
+  in  al, dx
+  or  al, ah
+  out dx, al
+  ret
+
+cirrus_ddc_clr_dck:
+  mov  ah, #0x01
+  db   0xa9 ;; skip next opcode (see above)
+cirrus_ddc_clr_dda:
+  mov  ah, #0x02
+  xor ah, #0xff
+  mov dx, #0x3c4
+  mov al, #0x08
+  out dx, al
+  inc dx
+  in  al, dx
+  and al, ah
+  out dx, al
+  ret
+
+cirrus_ddc_init:
+  mov  dx, #0x3c4
+  mov  ax, #0x4308
+  out  dx, ax
+  call cirrus_ddc_clr_dck
+  in   al, dx
+  and  al, #0x04
+  pushf
+  call cirrus_ddc_set_dck
+  popf
+  ret
+
+cirrus_ddc_start:
+  call cirrus_ddc_clr_dda
+  call cirrus_ddc_clr_dck
+  ret
+
+cirrus_ddc_stop:
+  call cirrus_ddc_set_dck
+  call cirrus_ddc_set_dda
+  ret
+
+cirrus_ddc_get_dda:
+  mov dx, #0x3c4
+  mov al, #0x08
+  out dx, al
+  inc dx
+  in  al, dx
+  and al, #0x80
+  shl  al, #0x01
+  ret
+
+cirrus_ddc_send_bit:
+  push ax
+  pushf
+  call cirrus_ddc_delay
+  popf
+  jc   cirrus_ddc_send_bit_01
+  call cirrus_ddc_clr_dda
+  jnz  cirrus_ddc_send_bit_02
+cirrus_ddc_send_bit_01:
+  call cirrus_ddc_set_dda
+cirrus_ddc_send_bit_02:
+  call cirrus_ddc_set_dck
+  call cirrus_ddc_delay
+  call cirrus_ddc_clr_dck
+  pop  ax
+  ret
+
+cirrus_ddc_read_bit:
+  push ax
+  call cirrus_ddc_delay
+  call cirrus_ddc_set_dck
+  call cirrus_ddc_get_dda
+  pushf
+  call cirrus_ddc_delay
+  call cirrus_ddc_clr_dck
+  popf
+  pop  ax
+  ret
+
+cirrus_ddc_send_byte:
+  push cx
+  mov  cx, #0x08
+cirrus_ddc_send_byte_01:
+  shl  al, #0x01
+  call cirrus_ddc_send_bit
+  loop cirrus_ddc_send_byte_01
+  call cirrus_ddc_set_dda
+  call cirrus_ddc_delay
+  call cirrus_ddc_set_dck
+  call cirrus_ddc_get_dda
+  pushf
+  call cirrus_ddc_clr_dck
+  call cirrus_ddc_clr_dda
+  popf
+  pop  cx
+  ret
+
+cirrus_ddc_read_byte:
+  push cx
+  call cirrus_ddc_set_dda
+  mov  al, #0x00
+  mov  cx, #0x08
+cirrus_ddc_read_byte_01:
+  call cirrus_ddc_read_bit
+  rcl  al, #0x01
+  loop cirrus_ddc_read_byte_01
+  pop  cx
+  ret
+
+cirrus_ddc_send_status:
+  cmp  cx, #0x01
+  jz   cirrus_ddc_send_status_01
+  call cirrus_ddc_clr_dda
+cirrus_ddc_send_status_01:
+  call cirrus_ddc_delay
+  call cirrus_ddc_set_dck
+  call cirrus_ddc_delay
+  call cirrus_ddc_clr_dck
+  ret
+
+cirrus_vesa_15h:
+  cmp bl,#0x01
+  jb cirrus_vesa_get_capabilities
+  je cirrus_vesa_read_EDID
+  jmp cirrus_vesa_unimplemented
+
+cirrus_vesa_get_capabilities:
+  test cx,cx
+  jne cirrus_vesa_unimplemented
+  mov ax, #0x004f
+  mov bx, #0x0202
+  ret
+
+cirrus_vesa_read_EDID:
+  call cirrus_ddc_init
+  jnz  cirrus_vesa_unimplemented
+  call cirrus_ddc_start
+  call cirrus_ddc_delay
+  mov  al, #0xa0
+  call cirrus_ddc_send_byte
+  jc   cirrus_vesa_unimplemented
+  mov  al, #0x00
+  call cirrus_ddc_send_byte
+  jc  cirrus_vesa_unimplemented
+  call cirrus_ddc_stop
+  call cirrus_ddc_start
+  call cirrus_ddc_delay
+  mov  al, #0xa1
+  call cirrus_ddc_send_byte
+  jnz  cirrus_vesa_unimplemented
+  push cx
+  push di
+  mov  cx, #0x100
+  cld
+cirrus_vesa_15h_01:
+  call cirrus_ddc_read_byte
+  stosb
+  call cirrus_ddc_send_status
+  loop cirrus_vesa_15h_01
+  call cirrus_ddc_stop
+  pop  di
+  pop  cx
+  mov  ax, #0x004f
+  ret
+
 cirrus_vesa_unimplemented:
   mov ax, #0x014F ;; not implemented
   ret
@@ -1609,6 +1799,12 @@ cirrus_vesa_handlers:
   dw cirrus_vesa_unimplemented
   ;; 10h
   dw cirrus_vesa_10h
+  dw cirrus_vesa_unimplemented
+  dw cirrus_vesa_unimplemented
+  dw cirrus_vesa_unimplemented
+  ;; 14h
+  dw cirrus_vesa_unimplemented
+  dw cirrus_vesa_15h
 
 
 ASM_END
