@@ -1,3 +1,51 @@
+2018-01-26 11:59  vruppert
+
+	* clext.c (1.17), vbe.c (1.66), vbe.h (1.29), vgabios.c (1.77):
+
+	Added VESA BIOS function 0x4f15 (get EDID) to the Bochs VBE version
+
+2018-01-25 19:52  vruppert
+
+	* clext.c (1.16):
+
+	Added VESA BIOS function 0x4f15 (get EDID) to the Cirrus version
+
+2014-07-09 09:02  vruppert
+
+	* README (1.22):
+
+	Updated temporary changelog
+
+2014-07-08 20:02  vruppert
+
+	* vbe.c (1.65):
+
+	Added check for maximum y resolution for build a correct VBE modes list
+
+2014-05-31 08:44  vruppert
+
+	* README (1.21):
+
+	Updated Qemu link and added temporary changelog
+
+2013-02-10 09:07  vruppert
+
+	* vgabios.c (1.76):
+
+	Ensure PCIR is aligned to 4 bytes (patch by David Woodhouse)
+
+2012-11-19 22:04  vruppert
+
+	* README (1.20):
+
+	update feedback address (patch from Hiroshi Miura <miurahr@linux.com>)
+
+2011-10-30 13:42  vruppert
+
+	* README (1.19):
+
+	- updates for release 0.7a
+
 2011-10-15 16:07  vruppert
 
 	* vgabios.c (1.75):
