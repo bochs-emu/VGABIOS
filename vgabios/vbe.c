@@ -1,6 +1,7 @@
 // ============================================================================================
-//  
-//  Copyright (C) 2002 Jeroen Janssen
+//
+//  Copyright (C) 2002      Jeroen Janssen
+//  Copyright (C) 2003-2018 Volker Ruppert
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -61,7 +62,7 @@ _vbebios_product_name:
 .byte        0x00
 
 _vbebios_product_revision:
-.ascii       "$Id: vbe.c,v 1.65 2014-07-08 18:02:25 vruppert Exp $"
+.ascii       "$Id: vbe.c,v 1.66 2018-01-26 10:59:46 vruppert Exp $"
 .byte        0x00
 
 _vbebios_info_string:
@@ -78,7 +79,7 @@ _no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii      "VBE Bios $Id: vbe.c,v 1.65 2014-07-08 18:02:25 vruppert Exp $"
+.ascii      "VBE Bios $Id: vbe.c,v 1.66 2018-01-26 10:59:46 vruppert Exp $"
 .byte	0x0a,0x0d, 0x00
 #endif
 
@@ -1478,5 +1479,224 @@ vbe_biosfn_return_protected_mode_interface:
   ret
 _fail:
   mov ax, #0x014f
+  ret
+ASM_END
+
+/* DDC helper functions for VESA 15h */
+ASM_START
+vbe_ddc_delay:
+  in   al, 0x61
+  and  al, #0x10
+  mov  ah, al
+vbe_ddc_delay_01:
+  nop
+  in   al, 0x61
+  and  al, #0x10
+  cmp  al, ah
+  jz   vbe_ddc_delay_01
+  ret
+
+vbe_ddc_set_dck:
+  mov  ah, #0x01
+  db   0xa9 ;; skip next opcode (TEST AX, #0x02b4)
+vbe_ddc_set_dda:
+  mov  ah, #0x02
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  al, # VBE_DISPI_INDEX_DDC
+  out  dx, al
+  inc  dx
+  in   al, dx
+  or   al, ah
+  out  dx, al
+  ret
+
+vbe_ddc_clr_dck:
+  mov  ah, #0x01
+  db   0xa9 ;; skip next opcode (see above)
+vbe_ddc_clr_dda:
+  mov  ah, #0x02
+  xor  ah, #0xff
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  al, # VBE_DISPI_INDEX_DDC
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, ah
+  out  dx, al
+  ret
+
+vbe_ddc_init:
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  al, # VBE_DISPI_INDEX_DDC
+  out  dx, al
+  inc  dx
+  mov  al, #0x83
+  out  dx, al
+  nop
+  in   al, dx
+  cmp  al, #0x08f
+  ret
+
+vbe_ddc_start:
+  call vbe_ddc_clr_dda
+  call vbe_ddc_clr_dck
+  ret
+
+vbe_ddc_stop:
+  call vbe_ddc_set_dck
+  call vbe_ddc_set_dda
+  ret
+
+vbe_ddc_get_dda:
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  al, # VBE_DISPI_INDEX_DDC
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0x08
+  shl  al, #0x05
+  ret
+
+vbe_ddc_send_bit:
+  push ax
+  pushf
+  call vbe_ddc_delay
+  popf
+  jc   vbe_ddc_send_bit_01
+  call vbe_ddc_clr_dda
+  jnz  vbe_ddc_send_bit_02
+vbe_ddc_send_bit_01:
+  call vbe_ddc_set_dda
+vbe_ddc_send_bit_02:
+  call vbe_ddc_set_dck
+  call vbe_ddc_delay
+  call vbe_ddc_clr_dck
+  pop  ax
+  ret
+
+vbe_ddc_read_bit:
+  push ax
+  call vbe_ddc_delay
+  call vbe_ddc_set_dck
+  call vbe_ddc_get_dda
+  pushf
+  call vbe_ddc_delay
+  call vbe_ddc_clr_dck
+  popf
+  pop  ax
+  ret
+
+vbe_ddc_send_byte:
+  push cx
+  mov  cx, #0x08
+vbe_ddc_send_byte_01:
+  shl  al, #0x01
+  call vbe_ddc_send_bit
+  loop vbe_ddc_send_byte_01
+  call vbe_ddc_set_dda
+  call vbe_ddc_delay
+  call vbe_ddc_set_dck
+  call vbe_ddc_get_dda
+  pushf
+  call vbe_ddc_clr_dck
+  call vbe_ddc_clr_dda
+  popf
+  pop  cx
+  ret
+
+vbe_ddc_read_byte:
+  push cx
+  call vbe_ddc_set_dda
+  mov  al, #0x00
+  mov  cx, #0x08
+vbe_ddc_read_byte_01:
+  call vbe_ddc_read_bit
+  rcl  al, #0x01
+  loop vbe_ddc_read_byte_01
+  pop  cx
+  ret
+
+vbe_ddc_send_status:
+  cmp  cx, #0x01
+  jz   vbe_ddc_send_status_01
+  call vbe_ddc_clr_dda
+vbe_ddc_send_status_01:
+  call vbe_ddc_delay
+  call vbe_ddc_set_dck
+  call vbe_ddc_delay
+  call vbe_ddc_clr_dck
+  ret
+ASM_END
+
+/** Function 15h - Display Identification Extensions
+ * Input:    AX    = 4F15h
+ *           BL    = 00h     Get capabilities
+ *           BL    = 01h     Read EDID
+ *           CX    =         Controller unit number
+ *           DX    =         EDID block number (if BL = 01h)
+ *           ES:DI =         Null pointer/reserved (if BL = 00h)
+ *           ES:DI =         Pointer to buffer to store EDID block (if BL = 01h)
+ *
+ * Output:   AX    =         Status
+ *           BH    =         Approximate time to get EDID in seconds rounded up (if BL = 00h)
+ *           BL    =         DDC level supported: (if BL = 00h)
+ *                            Bit    Meaning if set
+ *                             0      DDC1 supported
+ *                             1      DDC2 supported
+ *                             2      Screen blanked during transfer
+ *           BH    =         Unchanged (if BL = 01h)
+ *           CX    =         Unchanged
+ *           ES:DI =         Unchanged
+ */
+
+
+ASM_START
+vbe_biosfn_display_identification_extensions:
+  cmp  bl,#0x01
+  jb   vbe_edid_get_capabilities
+  je   vbe_read_EDID
+  jmp  vbe_edid_unimplemented
+
+vbe_edid_get_capabilities:
+  test cx,cx
+  jne  vbe_edid_unimplemented
+  mov  ax, #0x004f
+  mov  bx, #0x0202
+  ret
+
+vbe_read_EDID:
+  call vbe_ddc_init
+  jnz  vbe_edid_unimplemented
+  call vbe_ddc_start
+  call vbe_ddc_delay
+  mov  al, #0xa0
+  call vbe_ddc_send_byte
+  jc   vbe_edid_unimplemented
+  mov  al, #0x00
+  call vbe_ddc_send_byte
+  jc   vbe_edid_unimplemented
+  call vbe_ddc_stop
+  call vbe_ddc_start
+  call vbe_ddc_delay
+  mov  al, #0xa1
+  call vbe_ddc_send_byte
+  jnz  vbe_edid_unimplemented
+  push cx
+  push di
+  mov  cx, #0x100
+  cld
+vbe_read_edid_loop:
+  call vbe_ddc_read_byte
+  stosb
+  call vbe_ddc_send_status
+  loop vbe_read_edid_loop
+  call vbe_ddc_stop
+  pop  di
+  pop  cx
+  mov  ax, #0x004f
+  ret
+
+vbe_edid_unimplemented:
+  mov  ax, #0x014F ;; not implemented
   ret
 ASM_END

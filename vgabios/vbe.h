@@ -17,6 +17,7 @@ void vbe_biosfn_set_mode(AX, BX, ES, DI);
 void vbe_biosfn_save_restore_state(AX, CX, DX, ES, BX);
 void vbe_biosfn_set_get_palette_data(AX);
 void vbe_biosfn_return_protected_mode_interface(AX);
+void vbe_biosfn_display_identification_extensions(AX, BX, CX, DX, ES, DI);
 
 // The official VBE Information Block
 typedef struct VbeInfoBlock
@@ -295,6 +296,7 @@ typedef struct ModeInfoListItem
   #define VBE_DISPI_INDEX_X_OFFSET         0x8
   #define VBE_DISPI_INDEX_Y_OFFSET         0x9
   #define VBE_DISPI_INDEX_VIDEO_MEMORY_64K 0xa
+  #define VBE_DISPI_INDEX_DDC              0xb
 
   #define VBE_DISPI_ID0                    0xB0C0
   #define VBE_DISPI_ID1                    0xB0C1

@@ -1,7 +1,8 @@
 //
 //  QEMU Cirrus CLGD 54xx VGABIOS Extension.
 //
-//  Copyright (c) 2004 Makoto Suzuki (suzu)
+//  Copyright (c) 2004      Makoto Suzuki (suzu)
+//  Copyright (C) 2004-2018 Volker Ruppert
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -1242,15 +1243,15 @@ cirrus_vesa_10h_02:
 ;; DDC helper functions for VESA 15h
 
 cirrus_ddc_delay:
-  in  al, 0x61
-  and al, #0x10
-  mov ah, al
+  in   al, 0x61
+  and  al, #0x10
+  mov  ah, al
 cirrus_ddc_delay_01:
   nop
-  in  al, 0x61
-  and al, #0x10
-  cmp al, ah
-  jz  cirrus_ddc_delay_01
+  in   al, 0x61
+  and  al, #0x10
+  cmp  al, ah
+  jz   cirrus_ddc_delay_01
   ret
 
 cirrus_ddc_set_dck:
@@ -1258,13 +1259,13 @@ cirrus_ddc_set_dck:
   db   0xa9 ;; skip next opcode (TEST AX, #0x02b4)
 cirrus_ddc_set_dda:
   mov  ah, #0x02
-  mov dx, #0x3c4
-  mov al, #0x08
-  out dx, al
-  inc dx
-  in  al, dx
-  or  al, ah
-  out dx, al
+  mov  dx, #0x3c4
+  mov  al, #0x08
+  out  dx, al
+  inc  dx
+  in   al, dx
+  or   al, ah
+  out  dx, al
   ret
 
 cirrus_ddc_clr_dck:
@@ -1272,14 +1273,14 @@ cirrus_ddc_clr_dck:
   db   0xa9 ;; skip next opcode (see above)
 cirrus_ddc_clr_dda:
   mov  ah, #0x02
-  xor ah, #0xff
-  mov dx, #0x3c4
-  mov al, #0x08
-  out dx, al
-  inc dx
-  in  al, dx
-  and al, ah
-  out dx, al
+  xor  ah, #0xff
+  mov  dx, #0x3c4
+  mov  al, #0x08
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, ah
+  out  dx, al
   ret
 
 cirrus_ddc_init:
@@ -1305,12 +1306,12 @@ cirrus_ddc_stop:
   ret
 
 cirrus_ddc_get_dda:
-  mov dx, #0x3c4
-  mov al, #0x08
-  out dx, al
-  inc dx
-  in  al, dx
-  and al, #0x80
+  mov  dx, #0x3c4
+  mov  al, #0x08
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0x80
   shl  al, #0x01
   ret
 
@@ -1386,15 +1387,15 @@ cirrus_ddc_send_status_01:
 
 cirrus_vesa_15h:
   cmp bl,#0x01
-  jb cirrus_vesa_get_capabilities
-  je cirrus_vesa_read_EDID
+  jb  cirrus_vesa_get_capabilities
+  je  cirrus_vesa_read_EDID
   jmp cirrus_vesa_unimplemented
 
 cirrus_vesa_get_capabilities:
   test cx,cx
-  jne cirrus_vesa_unimplemented
-  mov ax, #0x004f
-  mov bx, #0x0202
+  jne  cirrus_vesa_unimplemented
+  mov  ax, #0x004f
+  mov  bx, #0x0202
   ret
 
 cirrus_vesa_read_EDID:
@@ -1407,7 +1408,7 @@ cirrus_vesa_read_EDID:
   jc   cirrus_vesa_unimplemented
   mov  al, #0x00
   call cirrus_ddc_send_byte
-  jc  cirrus_vesa_unimplemented
+  jc   cirrus_vesa_unimplemented
   call cirrus_ddc_stop
   call cirrus_ddc_start
   call cirrus_ddc_delay
@@ -1430,7 +1431,7 @@ cirrus_vesa_15h_01:
   ret
 
 cirrus_vesa_unimplemented:
-  mov ax, #0x014F ;; not implemented
+  mov  ax, #0x014F ;; not implemented
   ret
 
 
