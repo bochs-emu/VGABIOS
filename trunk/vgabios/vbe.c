@@ -62,7 +62,7 @@ _vbebios_product_name:
 .byte        0x00
 
 _vbebios_product_revision:
-.ascii       "$Id: vbe.c,v 1.66 2018-01-26 10:59:46 vruppert Exp $"
+.ascii       "$Id: vbe.c,v 1.67 2019-12-27 19:39:02 vruppert Exp $"
 .byte        0x00
 
 _vbebios_info_string:
@@ -79,7 +79,7 @@ _no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii      "VBE Bios $Id: vbe.c,v 1.66 2018-01-26 10:59:46 vruppert Exp $"
+.ascii      "VBE Bios $Id: vbe.c,v 1.67 2019-12-27 19:39:02 vruppert Exp $"
 .byte	0x0a,0x0d, 0x00
 #endif
 
@@ -1683,7 +1683,7 @@ vbe_read_EDID:
   jnz  vbe_edid_unimplemented
   push cx
   push di
-  mov  cx, #0x100
+  mov  cx, #0x0080
   cld
 vbe_read_edid_loop:
   call vbe_ddc_read_byte
