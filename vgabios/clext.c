@@ -1417,7 +1417,7 @@ cirrus_vesa_read_EDID:
   jnz  cirrus_vesa_unimplemented
   push cx
   push di
-  mov  cx, #0x100
+  mov  cx, #0x0080
   cld
 cirrus_vesa_15h_01:
   call cirrus_ddc_read_byte
