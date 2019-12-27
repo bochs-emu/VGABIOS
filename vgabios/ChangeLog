@@ -1,3 +1,9 @@
+2019-12-27 20:39  vruppert
+
+	* clext.c (1.18), vbe.c (1.67):
+
+	Fixed VESA BIOS function 0x4F15 (get EDID) for both the VBE and Cirrus version
+
 2018-01-26 11:59  vruppert
 
 	* clext.c (1.17), vbe.c (1.66), vbe.h (1.29), vgabios.c (1.77):
