@@ -1,8 +1,11 @@
+/*
+ * $Id$
+ */
 //
 //  QEMU Cirrus CLGD 54xx VGABIOS Extension.
 //
 //  Copyright (c) 2004      Makoto Suzuki (suzu)
-//  Copyright (C) 2004-2018 Volker Ruppert
+//  Copyright (C) 2004-2019 Volker Ruppert
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public

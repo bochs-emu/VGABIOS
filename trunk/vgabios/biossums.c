@@ -1,7 +1,7 @@
-/* biossums.c  --- written by Eike W. for the Bochs BIOS */
-/* adapted for the LGPL'd VGABIOS by vruppert */
-
-/*  This library is free software; you can redistribute it and/or
+/*
+ * $Id$
+ *
+ *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
  *  License as published by the Free Software Foundation; either
  *  version 2 of the License, or (at your option) any later version.
@@ -15,6 +15,11 @@
  *  License along with this library; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
+
+/* biossums.c --- written by Eike W. for the Bochs BIOS
+ * adapted for the LGPL'd VGABIOS by vruppert
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

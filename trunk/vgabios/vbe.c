@@ -1,7 +1,10 @@
+/*
+ * $Id$
+ */
 // ============================================================================================
 //
 //  Copyright (C) 2002      Jeroen Janssen
-//  Copyright (C) 2003-2018 Volker Ruppert
+//  Copyright (C) 2003-2019 Volker Ruppert
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -62,7 +65,7 @@ _vbebios_product_name:
 .byte        0x00
 
 _vbebios_product_revision:
-.ascii       "$Id: vbe.c,v 1.67 2019-12-27 19:39:02 vruppert Exp $"
+.ascii       "$Id$"
 .byte        0x00
 
 _vbebios_info_string:
@@ -79,7 +82,7 @@ _no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii      "VBE Bios $Id: vbe.c,v 1.67 2019-12-27 19:39:02 vruppert Exp $"
+.ascii      "VBE Bios $Id$"
 .byte	0x0a,0x0d, 0x00
 #endif
 
