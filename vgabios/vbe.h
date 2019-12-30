@@ -1,3 +1,7 @@
+/*
+ * $Id$
+ */
+
 #ifndef vbe_h_included
 #define vbe_h_included
 

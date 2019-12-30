@@ -1,10 +1,9 @@
-// ============================================================================================
 /*
- * vgabios.c
+ * $Id$
  */
 // ============================================================================================
 //
-//  Copyright (C) 2001-2008 the LGPL VGABios developers Team
+//  Copyright (C) 2001-2019 the LGPL VGABios developers Team
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -450,7 +449,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios $Id: vgabios.c,v 1.77 2018-01-26 10:59:46 vruppert Exp $"
+.ascii "VGABios $Id$"
 .byte 0x0d,0x0a,0x00
 #endif
 ASM_END
