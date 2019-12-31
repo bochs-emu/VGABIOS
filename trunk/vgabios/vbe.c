@@ -18,15 +18,15 @@
 //
 //  You should have received a copy of the GNU Lesser General Public
 //  License along with this library; if not, write to the Free Software
-//  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
-// 
+//  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+//
 // ============================================================================================
-//  
+//
 //  This VBE is part of the VGA Bios specific to the plex86/bochs Emulated VGA card. 
 //  You can NOT drive any physical vga card with it. 
 //
 // ============================================================================================
-//  
+//
 //  This VBE Bios is based on information taken from :
 //   - VESA BIOS EXTENSION (VBE) Core Functions Standard Version 3.0 located at www.vesa.org
 //
@@ -1446,28 +1446,31 @@ ASM_END
 
 
 /** Function 09h - Set/Get Palette Data
- * 
  * Input:
- *              AX      = 4F09h
+ *           AX    = 4F09h
+ *           BL    = 00h     Set palette data
+ *           BL    = 01h     Get palette data
+ *           CX    =         Number of palette registers to read/write
+ *           DX    =         First of palette registers to read/write
+ *           ES:DI =         Pointer to buffer with table of palette values
+ *
  * Output:
  *              AX      = VBE Return Status
  *
- * FIXME: incomplete API description, Input & Output
  */
 void vbe_biosfn_set_get_palette_data(AX)
 {
 }
 
 /** Function 0Ah - Return VBE Protected Mode Interface
- * Input:    AX   = 4F0Ah   VBE 2.0 Protected Mode Interface
- *           BL   = 00h          Return protected mode table
+ * Input:    AX    = 4F0Ah   VBE 2.0 Protected Mode Interface
+ *           BL    = 00h     Return protected mode table
  *
- *
- * Output:   AX   =         Status
- *           ES   =         Real Mode Segment of Table
- *           DI   =         Offset of Table
- *           CX   =         Length of Table including protected mode code
- *                          (for copying purposes)
+ * Output:   AX    =         Status
+ *           ES    =         Real Mode Segment of Table
+ *           DI    =         Offset of Table
+ *           CX    =         Length of Table including protected mode code
+ *                           (for copying purposes)
  */
 ASM_START
 vbe_biosfn_return_protected_mode_interface:
