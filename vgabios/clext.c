@@ -457,7 +457,7 @@ cirrus_unhandled:
 
 cirrus_return:
 #ifdef CIRRUS_DEBUG
-  call cirrus_debug_dump
+  call cirrus_ret_debug_dump
 #endif
   pop bp
   popf
@@ -465,7 +465,7 @@ cirrus_return:
 
 cirrus_set_video_mode:
 #ifdef CIRRUS_DEBUG
-  call cirrus_debug_dump
+  call cirrus_call_debug_dump
 #endif
   push si
   push ax
@@ -492,13 +492,13 @@ cirrus_set_video_mode:
   jmp cirrus_unhandled
 
 cirrus_extbios:
-#ifdef CIRRUS_DEBUG
-  call cirrus_debug_dump
-#endif
   cmp bl, #0x80
   jb cirrus_unhandled
   cmp bl, #0xAF
   ja cirrus_unhandled
+#ifdef CIRRUS_DEBUG
+  call cirrus_call_debug_dump
+#endif
   push bx
   and bx, #0x7F
   shl bx, 1
@@ -511,7 +511,7 @@ cirrus_extbios:
 
 cirrus_vesa:
 #ifdef CIRRUS_DEBUG
-  call cirrus_debug_dump
+  call cirrus_call_debug_dump
 #endif
   cmp al, #0x15
   ja cirrus_vesa_not_handled
@@ -531,13 +531,24 @@ cirrus_vesa_not_handled:
   jmp cirrus_return
 
 #ifdef CIRRUS_DEBUG
-cirrus_debug_dump:
+cirrus_call_debug_dump:
   push es
   push ds
   pusha
   push cs
   pop ds
-  call _cirrus_debugmsg
+  call _cirrus_call_debugmsg
+  popa
+  pop ds
+  pop es
+  ret
+cirrus_ret_debug_dump:
+  push es
+  push ds
+  pusha
+  push cs
+  pop ds
+  call _cirrus_ret_debugmsg
   popa
   pop ds
   pop es
@@ -1842,10 +1853,15 @@ ASM_END
 
 
 #ifdef CIRRUS_DEBUG
-static void cirrus_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
+static void cirrus_call_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
   Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
 {
- if((GET_AH()!=0x0E)&&(GET_AH()!=0x02)&&(GET_AH()!=0x09)&&(AX!=0x4F05))
-  printf("vgabios call ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
+  printf("vgabios cirrus call ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
+}
+
+static void cirrus_ret_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
+  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
+{
+  printf("vgabios cirrus ret  ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
 }
 #endif
