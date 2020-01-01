@@ -17,6 +17,8 @@ RELDATE = `date '+%d %b %Y'`
 RELVERS = `pwd | sed "s-.*/--" | sed "s/vgabios//" | sed "s/-//"`
 
 VGABIOS_DATE = "-DVGABIOS_DATE=\"$(RELDATE)\""
+RELEASE_BIN_LIST=README VGABIOS-lgpl-latest.bin VGABIOS-lgpl-latest.debug.bin \
+                 VGABIOS-lgpl-latest.cirrus.bin VGABIOS-lgpl-latest.cirrus.debug.bin
 
 all: bios cirrus-bios
 
@@ -67,10 +69,7 @@ release:
 	VGABIOS_VERS=\"-DVGABIOS_VERS=\\\"$(RELVERS)\\\"\" make bios cirrus-bios
 	/bin/rm -f  *.o *.s *.ld86 \
           temp.awk.* vgabios.*.orig _vgabios_.*.c core *.bak .#*
-	cp VGABIOS-lgpl-latest.bin ../$(RELEASE).bin
-	cp VGABIOS-lgpl-latest.debug.bin ../$(RELEASE).debug.bin
-	cp VGABIOS-lgpl-latest.cirrus.bin ../$(RELEASE).cirrus.bin
-	cp VGABIOS-lgpl-latest.cirrus.debug.bin ../$(RELEASE).cirrus.debug.bin
+	tar czvf ../$(RELEASE)-bin.tgz $(RELEASE_BIN_LIST)
 	tar czvf ../$(RELEASE).tgz --exclude .svn -C .. $(RELEASE)/
 
 biossums: biossums.c
