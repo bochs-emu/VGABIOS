@@ -3,7 +3,7 @@
  */
 // ============================================================================================
 //
-//  Copyright (C) 2001-2019 the LGPL VGABios developers Team
+//  Copyright (C) 2001-2020 The LGPL VGABios developers Team
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -169,7 +169,7 @@ vgabios_name:
 
 vgabios_version:
 #ifndef VGABIOS_VERS
-.ascii	"current-cvs"
+.ascii	"current-svn"
 #else
 .ascii VGABIOS_VERS
 #endif
