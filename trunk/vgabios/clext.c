@@ -5,7 +5,7 @@
 //  QEMU Cirrus CLGD 54xx VGABIOS Extension.
 //
 //  Copyright (c) 2004      Makoto Suzuki (suzu)
-//  Copyright (C) 2004-2019 Volker Ruppert
+//  Copyright (C) 2004-2020 Volker Ruppert
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -406,6 +406,23 @@ cirrus_init:
   mov dx, #0x3CE
   out dx, ax
   mov ax, #0x0031
+  out dx, ax
+  mov dx, #0x3C4
+  mov ax, #0x4a0b ; VCLK #0 setup
+  out dx, ax
+  mov ax, #0x2b1b
+  out dx, ax
+  mov ax, #0x5b0c ; VCLK #1 setup
+  out dx, ax
+  mov ax, #0x2f1c
+  out dx, ax
+  mov ax, #0x420d ; VCLK #2 setup
+  out dx, ax
+  mov ax, #0x1f1d
+  out dx, ax
+  mov ax, #0x7e0e ; VCLK #3 setup
+  out dx, ax
+  mov ax, #0x331e
   out dx, ax
 no_cirrus:
   ret

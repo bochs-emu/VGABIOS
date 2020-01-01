@@ -1,3 +1,7 @@
+#
+#  Copyright (C) 2001-2020 The LGPL VGABios developers Team
+#
+
 SHELL = /bin/sh
 
 CC      = gcc
@@ -67,7 +71,7 @@ release:
 	cp VGABIOS-lgpl-latest.debug.bin ../$(RELEASE).debug.bin
 	cp VGABIOS-lgpl-latest.cirrus.bin ../$(RELEASE).cirrus.bin
 	cp VGABIOS-lgpl-latest.cirrus.debug.bin ../$(RELEASE).cirrus.debug.bin
-	tar czvf ../$(RELEASE).tgz --exclude CVS -C .. $(RELEASE)/
+	tar czvf ../$(RELEASE).tgz --exclude .svn -C .. $(RELEASE)/
 
 biossums: biossums.c
 	$(CC) -o biossums biossums.c
