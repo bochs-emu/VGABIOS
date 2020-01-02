@@ -2361,12 +2361,11 @@ ASM_START
 biosfn_set_single_dac_reg:
   push  ax
   push  dx
+  mov   ah, dh
   mov   dx, # VGAREG_DAC_WRITE_ADDRESS
   mov   al, bl
   out   dx, al
   mov   dx, # VGAREG_DAC_DATA
-  pop   ax
-  push  ax
   mov   al, ah
   out   dx, al
   mov   al, ch
@@ -2382,34 +2381,30 @@ ASM_END
 ASM_START
 biosfn_set_all_dac_reg:
   push  ax
-  push  bx
   push  cx
   push  dx
+  push  si
+  push  ds
+  mov   si, dx
+  mov   ax, es
+  mov   ds, ax
   mov   dx, # VGAREG_DAC_WRITE_ADDRESS
   mov   al, bl
   out   dx, al
-  pop   dx
-  push  dx
-  mov   bx, dx
   mov   dx, # VGAREG_DAC_DATA
+  cld
 set_dac_loop:
-  seg   es
-  mov   al, [bx]
+  lodsb
   out   dx, al
-  inc   bx
-  seg   es
-  mov   al, [bx]
+  lodsb
   out   dx, al
-  inc   bx
-  seg   es
-  mov   al, [bx]
+  lodsb
   out   dx, al
-  inc   bx
-  dec   cx
-  jnz   set_dac_loop
+  loop  set_dac_loop
+  pop   ds
+  pop   si
   pop   dx
   pop   cx
-  pop   bx
   pop   ax
   ret
 ASM_END
@@ -2467,17 +2462,15 @@ biosfn_read_single_dac_reg:
   mov   dx, # VGAREG_DAC_READ_ADDRESS
   mov   al, bl
   out   dx, al
-  pop   ax
-  mov   ah, al
   mov   dx, # VGAREG_DAC_DATA
   in    al, dx
-  xchg  al, ah
-  push  ax
+  mov   ah, al
   in    al, dx
   mov   ch, al
   in    al, dx
   mov   cl, al
   pop   dx
+  mov   dh, ah
   pop   ax
   ret
 ASM_END
@@ -2486,34 +2479,26 @@ ASM_END
 ASM_START
 biosfn_read_all_dac_reg:
   push  ax
-  push  bx
   push  cx
   push  dx
+  push  di
+  mov   di, dx
   mov   dx, # VGAREG_DAC_READ_ADDRESS
   mov   al, bl
   out   dx, al
-  pop   dx
-  push  dx
-  mov   bx, dx
   mov   dx, # VGAREG_DAC_DATA
+  cld
 read_dac_loop:
   in    al, dx
-  seg   es
-  mov   [bx], al
-  inc   bx
+  stosb
   in    al, dx
-  seg   es
-  mov   [bx], al
-  inc   bx
+  stosb
   in    al, dx
-  seg   es
-  mov   [bx], al
-  inc   bx
-  dec   cx
-  jnz   read_dac_loop
+  stosb
+  loop  read_dac_loop
+  pop   di
   pop   dx
   pop   cx
-  pop   bx
   pop   ax
   ret
 ASM_END
