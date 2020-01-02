@@ -1470,6 +1470,7 @@ vbe_set_palette_data:
   mov   dx, # VGAREG_DAC_WRITE_ADDRESS
   out   dx, al
   push  ds
+  push  si
   mov   ax, es
   mov   ds, ax
   mov   si, di
@@ -1484,13 +1485,16 @@ vbe_set_dac_loop:
   lodsb
   out   dx, al
   loop  vbe_set_dac_loop
+  pop   si
   pop   ds
+  mov   ax, #0x004f
   ret
 vbe_get_palette_data:
   mov   al, dl
   mov   dx, # VGAREG_DAC_READ_ADDRESS
   out   dx, al
   mov   dx, # VGAREG_DAC_DATA
+  push  di
   cld
 vbe_get_dac_loop:
   mov   al, #0x00
@@ -1502,6 +1506,8 @@ vbe_get_dac_loop:
   in    al, dx
   stosb
   loop  vbe_get_dac_loop
+  pop   di
+  mov   ax, #0x004f
   ret
 ASM_END
 
