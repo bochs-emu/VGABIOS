@@ -53,15 +53,15 @@ extern char vbebios_product_revision;
 ASM_START
 // FIXME: 'merge' these (c) etc strings with the vgabios.c strings?
 _vbebios_copyright:
-.ascii       "Bochs/Plex86 VBE(C) 2003 http://savannah.nongnu.org/projects/vgabios/"
+.ascii       "Bochs VBE (C) 2002-2020 http://savannah.nongnu.org/projects/vgabios/"
 .byte        0x00
 
 _vbebios_vendor_name:
-.ascii       "Bochs/Plex86 Developers"
+.ascii       "LGPL VGABIOS Developers"
 .byte        0x00
 
 _vbebios_product_name:
-.ascii       "Bochs/Plex86 VBE Adapter"
+.ascii       "Bochs VBE Adapter"
 .byte        0x00
 
 _vbebios_product_revision:
