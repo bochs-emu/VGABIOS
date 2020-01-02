@@ -19,7 +19,7 @@ Install
 -------
 To compile the VGA Bios you will need the following packages:
 - make
-- gcc (for preprocessing only)
+- gcc (for 'biossums', 'vbetables-gen' and VGABIOS preprocessing)
 - dev86 (bcc, as86)
 
 Untar the archive, and type 'make'. You should get this set of binary files:
