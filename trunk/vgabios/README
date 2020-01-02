@@ -18,6 +18,7 @@ Suzuki (suzu).
 Install
 -------
 To compile the VGA Bios you will need the following packages:
+- make
 - gcc (for preprocessing only)
 - dev86 (bcc, as86)
 
@@ -92,8 +93,10 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
-vgabios-CVS : Dec 27 2019
+vgabios-SVN : Jan 02 2020
   - Volker
+    - added VESA BIOS function 0x4f09 (set/get palette data) to the Bochs VBE
+      version.
     - added VESA BIOS function 0x4f15 (get EDID) to both the Bochs VBE and
       the Cirrus version.
     - fixed building VBE modes list (check maximum y resolution)

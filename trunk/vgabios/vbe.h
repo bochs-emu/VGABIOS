@@ -14,14 +14,10 @@ void dispi_set_enable(enable);
  *
  *  See the function descriptions in vbe.c for more information
  */
-Boolean vbe_has_vbe_display();
 void vbe_biosfn_return_controller_information(AX, ES, DI);
 void vbe_biosfn_return_mode_information(AX, CX, ES, DI);
 void vbe_biosfn_set_mode(AX, BX, ES, DI);
 void vbe_biosfn_save_restore_state(AX, CX, DX, ES, BX);
-void vbe_biosfn_set_get_palette_data(AX);
-void vbe_biosfn_return_protected_mode_interface(AX);
-void vbe_biosfn_display_identification_extensions(AX, BX, CX, DX, ES, DI);
 
 // The official VBE Information Block
 typedef struct VbeInfoBlock
