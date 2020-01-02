@@ -4,7 +4,7 @@
 // ============================================================================================
 //
 //  Copyright (C) 2002      Jeroen Janssen
-//  Copyright (C) 2003-2019 Volker Ruppert
+//  Copyright (C) 2003-2020 Volker Ruppert
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -1458,9 +1458,52 @@ ASM_END
  *              AX      = VBE Return Status
  *
  */
-void vbe_biosfn_set_get_palette_data(AX)
-{
-}
+ASM_START
+vbe_biosfn_set_get_palette_data:
+  cmp  bl,#0x01
+  jb   vbe_set_palette_data
+  je   vbe_get_palette_data
+  mov ax, #0x024f ; unimplemented
+  ret
+vbe_set_palette_data:
+  mov   al, dl
+  mov   dx, # VGAREG_DAC_WRITE_ADDRESS
+  out   dx, al
+  push  ds
+  mov   ax, es
+  mov   ds, ax
+  mov   si, di
+  mov   dx, # VGAREG_DAC_DATA
+  cld
+vbe_set_dac_loop:
+  lodsb
+  lodsb
+  out   dx, al
+  lodsb
+  out   dx, al
+  lodsb
+  out   dx, al
+  loop  vbe_set_dac_loop
+  pop   ds
+  ret
+vbe_get_palette_data:
+  mov   al, dl
+  mov   dx, # VGAREG_DAC_READ_ADDRESS
+  out   dx, al
+  mov   dx, # VGAREG_DAC_DATA
+  cld
+vbe_get_dac_loop:
+  mov   al, #0x00
+  stosb
+  in    al, dx
+  stosb
+  in    al, dx
+  stosb
+  in    al, dx
+  stosb
+  loop  vbe_get_dac_loop
+  ret
+ASM_END
 
 /** Function 0Ah - Return VBE Protected Mode Interface
  * Input:    AX    = 4F0Ah   VBE 2.0 Protected Mode Interface
