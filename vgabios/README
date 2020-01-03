@@ -93,15 +93,14 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
-vgabios-SVN : Jan 02 2020
+vgabios-0.7b : Jan 03 2020
   - Volker
     - added VESA BIOS function 0x4f09 (set/get palette data) to the Bochs VBE
-      version.
+      version
     - added VESA BIOS function 0x4f15 (get EDID) to both the Bochs VBE and
-      the Cirrus version.
+      the Cirrus version
     - fixed building VBE modes list (check maximum y resolution)
     - ensure PCIR is aligned to 4 bytes (patch by David Woodhouse)
-    - README: update feedback address and Qemu link
 
 vgabios-0.7a : Oct 30 2011
   - Volker
