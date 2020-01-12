@@ -987,13 +987,12 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
  * Input:
  *              AX      = 4F02h
  *              BX      = Desired Mode to set
- *              ES:DI   = Pointer to CRTCInfoBlock structure
  * Output:
  *              AX      = VBE Return Status
  * 
  */
-void vbe_biosfn_set_mode(AX, BX, ES, DI)
-Bit16u *AX;Bit16u BX; Bit16u ES;Bit16u DI;
+void vbe_biosfn_set_mode(AX, BX)
+Bit16u *AX;Bit16u BX;
 {
         Bit16u            ss = get_SS();
         Bit16u            result;
@@ -1056,6 +1055,11 @@ Bit16u *AX;Bit16u BX; Bit16u ES;Bit16u DI;
                 dispi_set_enable(VBE_DISPI_ENABLED | no_clear | lfb_flag);
                 vga_compat_setup();
 
+                write_word(BIOSMEM_SEG,BIOSMEM_NB_COLS,cur_info->info.XResolution>>3);
+                write_word(BIOSMEM_SEG,BIOSMEM_NB_ROWS,(cur_info->info.YResolution>>4)-1);
+                write_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT,16);
+                write_word(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE,0);
+                write_word(BIOSMEM_SEG,BIOSMEM_CURSOR_POS,0);
                 write_word(BIOSMEM_SEG,BIOSMEM_VBE_MODE,BX);
                 write_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL,(0x60 | no_clear));
 
@@ -1144,10 +1148,11 @@ void vbe_biosfn_restore_video_state(ES, BX)
     enable = read_word(ES, BX);
     BX += 2;
 
+    outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
     if (!(enable & VBE_DISPI_ENABLED)) {
-        outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
         outw(VBE_DISPI_IOPORT_DATA, enable);
     } else {
+        outw(VBE_DISPI_IOPORT_DATA, 0); // disable VBE if active
         outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_XRES);
         outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
         BX += 2;
@@ -1159,6 +1164,7 @@ void vbe_biosfn_restore_video_state(ES, BX)
         BX += 2;
         outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
         outw(VBE_DISPI_IOPORT_DATA, enable);
+        vga_compat_setup();
 
         for(i = VBE_DISPI_INDEX_BANK; i <= VBE_DISPI_INDEX_Y_OFFSET; i++) {
             outw(VBE_DISPI_IOPORT_INDEX, i);

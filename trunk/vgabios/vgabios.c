@@ -791,7 +791,7 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
           vbe_biosfn_return_mode_information(&AX,CX,ES,DI);
           break;
          case 0x02:
-          vbe_biosfn_set_mode(&AX,BX,ES,DI);
+          vbe_biosfn_set_mode(&AX,BX);
           break;
          case 0x04:
           vbe_biosfn_save_restore_state(&AX, CX, DX, ES, &BX);
