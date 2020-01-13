@@ -994,91 +994,77 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
 void vbe_biosfn_set_mode(AX, BX)
 Bit16u *AX;Bit16u BX;
 {
-        Bit16u            ss = get_SS();
-        Bit16u            result;
-        ModeInfoListItem  *cur_info;
-        Boolean           using_lfb;
-        Bit8u             no_clear;
-        Bit8u             lfb_flag;
+    Bit16u            ss = get_SS();
+    Bit16u            result;
+    ModeInfoListItem  *cur_info;
+    Boolean           using_lfb;
+    Bit8u             no_clear;
+    Bit8u             lfb_flag;
 
-        using_lfb=((BX & VBE_MODE_LINEAR_FRAME_BUFFER) == VBE_MODE_LINEAR_FRAME_BUFFER);
-        lfb_flag=using_lfb?VBE_DISPI_LFB_ENABLED:0;
-        no_clear=((BX & VBE_MODE_PRESERVE_DISPLAY_MEMORY) == VBE_MODE_PRESERVE_DISPLAY_MEMORY)?VBE_DISPI_NOCLEARMEM:0;
+    using_lfb=((BX & VBE_MODE_LINEAR_FRAME_BUFFER) == VBE_MODE_LINEAR_FRAME_BUFFER);
+    lfb_flag=using_lfb?VBE_DISPI_LFB_ENABLED:0;
+    no_clear=((BX & VBE_MODE_PRESERVE_DISPLAY_MEMORY) == VBE_MODE_PRESERVE_DISPLAY_MEMORY)?VBE_DISPI_NOCLEARMEM:0;
 
-        BX = (BX & 0x1ff);
+    BX = (BX & 0x1ff);
 
-        //result=read_word(ss,AX);
+    // check for non vesa mode
+    if (BX<VBE_MODE_VESA_DEFINED) {
+        Bit8u   mode;
 
-        // check for non vesa mode
-        if (BX<VBE_MODE_VESA_DEFINED)
-        {
-                Bit8u   mode;
+        dispi_set_enable(VBE_DISPI_DISABLED);
+        // call the vgabios in order to set the video mode
+        // this allows for going back to textmode with a VBE call (some applications expect that to work)
 
-                dispi_set_enable(VBE_DISPI_DISABLED);
-                // call the vgabios in order to set the video mode
-                // this allows for going back to textmode with a VBE call (some applications expect that to work)
-
-                mode=(BX & 0xff);
-                biosfn_set_video_mode(mode);
-                result = 0x4f;
-        }
+        mode=(BX & 0xff);
+        biosfn_set_video_mode(mode);
+        result = 0x4f;
+    } else {
 
         cur_info = mode_info_find_mode(BX, using_lfb, &cur_info);
 
-        if (cur_info != 0)
-        {
+        if (cur_info != 0) {
 #ifdef DEBUG
-                printf("VBE found mode %x, setting:\n", BX);
-                printf("\txres%x yres%x bpp%x\n",
-                        cur_info->info.XResolution,
-                        cur_info->info.YResolution,
-                        cur_info->info.BitsPerPixel);
+            printf("VBE found mode %x, setting:\n", BX);
+            printf("\txres%x yres%x bpp%x\n",
+                   cur_info->info.XResolution,
+                   cur_info->info.YResolution,
+                   cur_info->info.BitsPerPixel);
 #endif
 
-                // first disable current mode (when switching between vesa modi)
-                dispi_set_enable(VBE_DISPI_DISABLED);
+            // first disable current mode (when switching between vesa modi)
+            dispi_set_enable(VBE_DISPI_DISABLED);
 
-                if (cur_info->info.BitsPerPixel == 4)
-                {
-                  biosfn_set_video_mode(0x6a);
-                }
+            if (cur_info->info.BitsPerPixel == 4) {
+                biosfn_set_video_mode(0x6a);
+            } else if (cur_info->info.BitsPerPixel == 8) {
+                load_dac_palette(3);
+            }
 
-                if (cur_info->info.BitsPerPixel == 8)
-                {
-                  load_dac_palette(3);
-                }
+            dispi_set_bpp(cur_info->info.BitsPerPixel);
+            dispi_set_xres(cur_info->info.XResolution);
+            dispi_set_yres(cur_info->info.YResolution);
+            dispi_set_bank(0);
+            dispi_set_enable(VBE_DISPI_ENABLED | no_clear | lfb_flag);
+            vga_compat_setup();
 
-                dispi_set_bpp(cur_info->info.BitsPerPixel);
-                dispi_set_xres(cur_info->info.XResolution);
-                dispi_set_yres(cur_info->info.YResolution);
-                dispi_set_bank(0);
-                dispi_set_enable(VBE_DISPI_ENABLED | no_clear | lfb_flag);
-                vga_compat_setup();
+            write_word(BIOSMEM_SEG,BIOSMEM_NB_COLS,cur_info->info.XResolution>>3);
+            write_word(BIOSMEM_SEG,BIOSMEM_NB_ROWS,(cur_info->info.YResolution>>4)-1);
+            write_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT,16);
+            write_word(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE,0);
+            write_word(BIOSMEM_SEG,BIOSMEM_CURSOR_POS,0);
+            write_word(BIOSMEM_SEG,BIOSMEM_VBE_MODE,BX);
+            write_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL,(0x60 | no_clear));
 
-                write_word(BIOSMEM_SEG,BIOSMEM_NB_COLS,cur_info->info.XResolution>>3);
-                write_word(BIOSMEM_SEG,BIOSMEM_NB_ROWS,(cur_info->info.YResolution>>4)-1);
-                write_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT,16);
-                write_word(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE,0);
-                write_word(BIOSMEM_SEG,BIOSMEM_CURSOR_POS,0);
-                write_word(BIOSMEM_SEG,BIOSMEM_VBE_MODE,BX);
-                write_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL,(0x60 | no_clear));
-
-                result = 0x4f;
-        }
-        else
-        {
+            result = 0x4f;
+        } else {
 #ifdef DEBUG
-                printf("VBE *NOT* found mode %x\n" , BX);
+            printf("VBE *NOT* found mode %x\n" , BX);
 #endif
-                result = 0x100;
-
-                // FIXME: redirect non VBE modi to normal VGA bios operation
-                //        (switch back to VGA mode
-                if (BX == 3)
-                        result = 0x4f;
+            result = 0x0100;
         }
+    }
 
-        write_word(ss, AX, result);
+    write_word(ss, AX, result);
 }
 
 /** Function 03h - Return Current VBE Mode
@@ -1101,6 +1087,7 @@ vbe_biosfn_return_current_mode:
   mov  bx, # BIOSMEM_VBE_MODE
   mov  ax, [bx]
   mov  bx, ax
+  test bx, bx
   jnz  vbe_03_ok
 no_vbe_mode:
   mov  bx, # BIOSMEM_CURRENT_MODE
@@ -1116,7 +1103,7 @@ ASM_END
 
 Bit16u vbe_biosfn_read_video_state_size()
 {
-    return 9 * 2;
+    return (VBE_DISPI_INDEX_Y_OFFSET - 1) * 2;
 }
 
 void vbe_biosfn_save_video_state(ES, BX)
@@ -1131,7 +1118,7 @@ void vbe_biosfn_save_video_state(ES, BX)
     if (!(enable & VBE_DISPI_ENABLED)) 
         return;
     for(i = VBE_DISPI_INDEX_XRES; i <= VBE_DISPI_INDEX_Y_OFFSET; i++) {
-        if (i != VBE_DISPI_INDEX_ENABLE) {
+        if ((i != VBE_DISPI_INDEX_ENABLE) && (i != VBE_DISPI_INDEX_VIRT_HEIGHT)) {
             outw(VBE_DISPI_IOPORT_INDEX, i);
             write_word(ES, BX, inw(VBE_DISPI_IOPORT_DATA));
             BX += 2;
@@ -1152,7 +1139,7 @@ void vbe_biosfn_restore_video_state(ES, BX)
     if (!(enable & VBE_DISPI_ENABLED)) {
         outw(VBE_DISPI_IOPORT_DATA, enable);
     } else {
-        outw(VBE_DISPI_IOPORT_DATA, 0); // disable VBE if active
+        outw(VBE_DISPI_IOPORT_DATA, VBE_DISPI_DISABLED); // disable VBE if active
         outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_XRES);
         outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
         BX += 2;
@@ -1167,9 +1154,11 @@ void vbe_biosfn_restore_video_state(ES, BX)
         vga_compat_setup();
 
         for(i = VBE_DISPI_INDEX_BANK; i <= VBE_DISPI_INDEX_Y_OFFSET; i++) {
-            outw(VBE_DISPI_IOPORT_INDEX, i);
-            outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
-            BX += 2;
+            if (i != VBE_DISPI_INDEX_VIRT_HEIGHT) {
+                outw(VBE_DISPI_IOPORT_INDEX, i);
+                outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
+                BX += 2;
+            }
         }
     }
 }
@@ -1456,6 +1445,7 @@ ASM_END
  *           AX    = 4F09h
  *           BL    = 00h     Set palette data
  *           BL    = 01h     Get palette data
+ *           BL    = 80h     Set palette data during Vertical Retrace
  *           CX    =         Number of palette registers to read/write
  *           DX    =         First of palette registers to read/write
  *           ES:DI =         Pointer to buffer with table of palette values
@@ -1466,10 +1456,12 @@ ASM_END
  */
 ASM_START
 vbe_biosfn_set_get_palette_data:
-  cmp  bl,#0x01
-  jb   vbe_set_palette_data
-  je   vbe_get_palette_data
-  mov ax, #0x024f ; unimplemented
+  cmp   bl, #0x80
+  je    vbe_set_palette_data
+  cmp   bl, #0x01
+  jb    vbe_set_palette_data
+  je    vbe_get_palette_data
+  mov   ax, #0x024f ; unimplemented
   ret
 vbe_set_palette_data:
   mov   al, dl
