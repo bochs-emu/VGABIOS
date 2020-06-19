@@ -21,13 +21,13 @@
 //
 // ============================================================================================
 //
-//  This VGA Bios is specific to the plex86/bochs Emulated VGA card. 
-//  You can NOT drive any physical vga card with it. 
+//  This VGA Bios is specific to the plex86/bochs Emulated VGA card.
+//  You can NOT drive any physical vga card with it.
 //
 // ============================================================================================
 //
 //  This file contains code ripped from :
-//   - rombios.c of plex86 
+//   - rombios.c of plex86
 //
 //  This VGA Bios contains fonts from :
 //   - fntcol16.zip (c) by Joseph Gil avalable at :
@@ -74,6 +74,7 @@ static void           unknown();
 
 static Bit8u find_vga_entry();
 static void load_dac_palette();
+static void set_cursor_pos();
 
 static void memsetb();
 static void memsetw();
@@ -82,8 +83,6 @@ static void memcpyw();
 
 static void biosfn_set_video_mode();
 static void biosfn_set_cursor_shape();
-static void biosfn_set_cursor_pos();
-static void biosfn_get_cursor_pos();
 static void biosfn_set_active_page();
 static void biosfn_scroll();
 static void biosfn_read_char_attr();
@@ -140,9 +139,9 @@ ASM_START
 use16 386
 
 vgabios_start:
-.byte	0x55, 0xaa	/* BIOS signature, required for BIOS extensions */
+.byte 0x55, 0xaa /* BIOS signature, required for BIOS extensions */
 
-.byte	0x40		/* BIOS extension length in units of 512 bytes */
+.byte 0x40       /* BIOS extension length in units of 512 bytes */
 
 
 vgabios_entry_point:
@@ -245,9 +244,9 @@ vgabios_init_func:
 ;; init basic bios vars
   call init_bios_area
 
-#ifdef VBE  
+#ifdef VBE
 ;; init vbe functions
-  call vbe_init  
+  call vbe_init
 #endif
 
 ;; set int10 vect
@@ -267,9 +266,9 @@ vgabios_init_func:
 ;; show info
   call _display_info
 
-#ifdef VBE  
+#ifdef VBE
 ;; show vbe info
-  call vbe_display_info  
+  call vbe_display_info
 #endif
 
 #ifdef CIRRUS
@@ -297,6 +296,16 @@ vgabios_int10_handler:
   pop ds
   pop es
 #endif
+  cmp   ah, #0x02
+  jne   int10_test_03
+  call  biosfn_set_cursor_pos
+  jmp   int10_end
+int10_test_03:
+  cmp   ah, #0x03
+  jne   int10_test_0F
+  call  biosfn_get_cursor_pos
+  jmp   int10_end
+int10_test_0F:
   cmp   ah, #0x0f
   jne   int10_test_1A
   call  biosfn_get_video_mode
@@ -426,7 +435,7 @@ ASM_END
 #include "vgafonts.h"
 
 /*
- * Boot time harware inits 
+ * Boot time harware inits
  */
 ASM_START
 init_vga_card:
@@ -461,7 +470,7 @@ ASM_END
 
 // --------------------------------------------------------------------------------------------
 /*
- *  Boot time bios area inits 
+ *  Boot time bios area inits
  */
 ASM_START
 init_bios_area:
@@ -484,7 +493,7 @@ init_bios_area:
   mov   al, #0x10
   mov   [bx], al
 
-;; Clear the screen 
+;; Clear the screen
   mov   bx, # BIOSMEM_VIDEO_CTL
   mov   al, #0x60
   mov   [bx], al
@@ -553,7 +562,7 @@ ASM_START
  call _display_string
  mov si,#vgabios_version
  call _display_string
- 
+
  ;;mov si,#vgabios_copyright
  ;;call _display_string
  ;;mov si,#crlf
@@ -577,7 +586,7 @@ ASM_START
  not cx
  xor al,al
  cld
- repne 
+ repne
   scasb
  not cx
  dec cx
@@ -586,7 +595,7 @@ ASM_START
  mov ax,#0x0300
  mov bx,#0x0000
  int #0x10
- 
+
  pop cx
  mov ax,#0x1301
  mov bx,#0x000b
@@ -620,7 +629,7 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
    case 0x00:
      biosfn_set_video_mode(GET_AL());
      switch(GET_AL()&0x7F)
-      {case 6: 
+      {case 6:
         SET_AL(0x3F);
         break;
        case 0:
@@ -638,12 +647,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
      break;
    case 0x01:
      biosfn_set_cursor_shape(GET_CH(),GET_CL());
-     break;
-   case 0x02:
-     biosfn_set_cursor_pos(GET_BH(),DX);
-     break;
-   case 0x03:
-     biosfn_get_cursor_pos(GET_BH(),&CX,&DX);
      break;
    case 0x04:
      // Read light pen pos (unimplemented)
@@ -730,7 +733,7 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
         unknown();
 #endif
       }
-     
+
      break;
    case 0x12:
      switch(GET_BL())
@@ -779,11 +782,10 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
      SET_AL(0x1C);
      break;
 
-#ifdef VBE 
+#ifdef VBE
    case 0x4f:
      if (vbe_has_vbe_display()) {
-       switch(GET_AL())
-       {
+       switch(GET_AL()) {
          case 0x00:
           vbe_biosfn_return_controller_information(&AX,ES,DI);
           break;
@@ -796,35 +798,18 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
          case 0x04:
           vbe_biosfn_save_restore_state(&AX, CX, DX, ES, &BX);
           break;
-         case 0x09:
-          //FIXME
-#ifdef DEBUG
-          unimplemented();
-#endif
-          // function failed
-          AX=0x100;
-          break;
-         case 0x0A:
-          //FIXME
-#ifdef DEBUG
-          unimplemented();
-#endif
-          // function failed
-          AX=0x100;
-          break;
          default:
 #ifdef DEBUG
           unknown();
-#endif   		 
+#endif
           // function failed
           AX=0x100;
-          }
-        }
-        else {
-          // No VBE display
-          AX=0x0100;
-          }
-        break;
+       }
+     } else {
+       // No VBE display
+       AX=0x0100;
+     }
+     break;
 #endif
 
 #ifdef DEBUG
@@ -967,7 +952,7 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
    outb(VGAREG_GRDC_DATA,video_param_table[vpti].grdc_regs[i]);
   }
 
- // Set CRTC address VGA or MDA 
+ // Set CRTC address VGA or MDA
  crtc_addr=vga_modes[line].memmodel==MTEXT?VGAREG_MDA_CRTC_ADDRESS:VGAREG_VGA_CRTC_ADDRESS;
 
  // Disable CRTC write protection
@@ -1027,7 +1012,7 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
  // FIXME
  write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MSR,0x00); // Unavailable on vanilla vga, but...
  write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_PAL,0x00); // Unavailable on vanilla vga, but...
- 
+
  // Set cursor shape
  if(vga_modes[line].class==TEXT)
   {
@@ -1036,7 +1021,7 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
 
  // Set cursor pos for page 0..7
  for(i=0;i<8;i++)
-  biosfn_set_cursor_pos(i,0x0000);
+  set_cursor_pos(i,0x0000);
 
  // Set active page 0
  biosfn_set_active_page(0x00);
@@ -1080,8 +1065,8 @@ ASM_END
 }
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_set_cursor_shape (CH,CL) 
-Bit8u CH;Bit8u CL; 
+static void biosfn_set_cursor_shape (CH,CL)
+Bit8u CH;Bit8u CL;
 {Bit16u cheight,curs,crtc_addr;
  Bit8u modeset_ctl;
 
@@ -1115,61 +1100,114 @@ Bit8u CH;Bit8u CL;
 }
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_set_cursor_pos (page, cursor) 
-Bit8u page;Bit16u cursor;
-{
- Bit8u xcurs,ycurs,current;
- Bit16u nbcols,nbrows,address,crtc_addr;
+ASM_START
+biosfn_set_cursor_pos:
+  push  ds
+  push  ax
+  cmp   bh, #0x07
+  ja    invalid_page_1
+  mov   ax, # BIOSMEM_SEG
+  mov   ds, ax
+  push  cx
+  mov   cl, bh
+  mov   al, bh
+  xor   ah, ah
+  push  bx
+  mov   bx, # BIOSMEM_CURSOR_POS
+  shl   ax, #1
+  add   bx, ax
+  mov   [bx], dx
+  mov   bx, # BIOSMEM_CURRENT_PAGE
+  cmp   cl, [bx]
+  jnz   not_set_hw_cursor
+  mov   bx, # BIOSMEM_NB_COLS
+  mov   ah, [bx]
+  mov   ch, ah
+  mov   bx, # BIOSMEM_NB_ROWS
+  mov   al, [bx]
+  inc   al
+  mul   al, ah
+  or    al, #0xff
+  inc   ax
+  mov   bl, cl
+  xor   bh, bh
+  push  dx
+  mul   ax, bx
+  pop   dx
+  push  ax
+  mov   al, dh
+  mul   al, ch
+  xor   dh, dh
+  add   ax, dx
+  pop   bx
+  add   ax, bx
+  push  ax
+  mov   bx, # BIOSMEM_CRTC_ADDRESS
+  mov   dx, [bx]
+  mov   al, #0x0e
+  out   dx, ax
+  pop   ax
+  mov   ah, al
+  mov   al, #0x0f
+  out   dx, ax
+not_set_hw_cursor:
+  pop   bx
+  pop   cx
+invalid_page_1:
+  pop   ax
+  pop   ds
+  ret
 
- // Should not happen...
- if(page>7)return;
-
- // Bios cursor pos
- write_word(BIOSMEM_SEG, BIOSMEM_CURSOR_POS+2*page, cursor);
-
- // Set the hardware cursor
- current=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE);
- if(page==current)
-  {
-   // Get the dimensions
-   nbcols=read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
-   nbrows=read_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1;
-
-   xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
- 
-   // Calculate the address knowing nbcols nbrows and page num
-   address=SCREEN_IO_START(nbcols,nbrows,page)+xcurs+ycurs*nbcols;
-   
-   // CRTC regs 0x0e and 0x0f
-   crtc_addr=read_word(BIOSMEM_SEG,BIOSMEM_CRTC_ADDRESS);
-   outb(crtc_addr,0x0e);
-   outb(crtc_addr+1,(address&0xff00)>>8);
-   outb(crtc_addr,0x0f);
-   outb(crtc_addr+1,address&0x00ff);
-  }
-}
+; this function is called from C code
+_set_cursor_pos:
+  push bp
+  mov  bp, sp
+  mov  ax, 4[bp]
+  mov  bh, al
+  mov  dx, 6[bp]
+  call biosfn_set_cursor_pos
+  pop  bp
+  ret
+ASM_END
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_get_cursor_pos (page,shape, pos) 
-Bit8u page;Bit16u *shape;Bit16u *pos;
-{
- Bit16u ss=get_SS();
-
- // Default
- write_word(ss, shape, 0);
- write_word(ss, pos, 0);
-
- if(page>7)return;
- // FIXME should handle VGA 14/16 lines
- write_word(ss,shape,read_word(BIOSMEM_SEG,BIOSMEM_CURSOR_TYPE));
- write_word(ss,pos,read_word(BIOSMEM_SEG,BIOSMEM_CURSOR_POS+page*2));
-}
+ASM_START
+biosfn_get_cursor_pos:
+  push  ds
+  push  ax
+  cmp   bh, #0x07
+  ja    invalid_page_2
+  mov   ax, # BIOSMEM_SEG
+  mov   ds, ax
+  xor   ax, ax
+  mov   al, bh
+  push  bx
+  mov   bx, # BIOSMEM_CURSOR_TYPE
+  mov   cx, [bx]
+  mov   bx, # BIOSMEM_CURSOR_POS
+  shl   ax, #1
+  add   bx, ax
+  mov   dx, [bx]
+  pop   bx
+invalid_page_2:
+  pop   ax
+  pop   ds
+  ret
+ASM_END
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_set_active_page (page) 
+static Bit16u get_cursor_pos (page)
 Bit8u page;
 {
- Bit16u cursor,dummy,crtc_addr;
+ if(page>7)return 0;
+ return read_word(BIOSMEM_SEG,BIOSMEM_CURSOR_POS+page*2);
+}
+
+// --------------------------------------------------------------------------------------------
+static void biosfn_set_active_page (page)
+Bit8u page;
+{
+ Bit16u cursor,crtc_addr;
  Bit16u nbcols,nbrows,address;
  Bit8u mode,line;
 
@@ -1180,15 +1218,15 @@ Bit8u page;
  line=find_vga_entry(mode);
  if(line==0xFF)return;
 
- // Get pos curs pos for the right page 
- biosfn_get_cursor_pos(page,&dummy,&cursor);
+ // Get pos curs pos for the right page
+ cursor=get_cursor_pos(page);
 
  if(vga_modes[line].class==TEXT)
   {
    // Get the dimensions
    nbcols=read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
    nbrows=read_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1;
- 
+
    // Calculate the address knowing nbcols nbrows and page num
    address=SCREEN_MEM_START(nbcols,nbrows,page);
    write_word(BIOSMEM_SEG,BIOSMEM_CURRENT_START,address);
@@ -1216,7 +1254,7 @@ Bit8u page;
 #endif
 
  // Display the cursor, now the page is active
- biosfn_set_cursor_pos(page,cursor);
+ set_cursor_pos(page,cursor);
 }
 
 // --------------------------------------------------------------------------------------------
@@ -1436,12 +1474,12 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
 }
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_read_char_attr (page,car) 
+static void biosfn_read_char_attr (page,car)
 Bit8u page;Bit16u *car;
 {Bit16u ss=get_SS();
  Bit8u xcurs,ycurs,mode,line;
  Bit16u nbcols,nbrows,address;
- Bit16u cursor,dummy;
+ Bit16u cursor;
 
  // Get the mode
  mode=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE);
@@ -1449,7 +1487,7 @@ Bit8u page;Bit16u *car;
  if(line==0xFF)return;
 
  // Get the cursor pos for the page
- biosfn_get_cursor_pos(page,&dummy,&cursor);
+ cursor=get_cursor_pos(page);
  xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
 
  // Get the dimensions
@@ -1637,12 +1675,12 @@ Bit8u car;Bit8u attr;Bit8u xcurs;Bit8u ycurs;Bit8u nbcols;
 }
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_write_char_attr (car,page,attr,count) 
+static void biosfn_write_char_attr (car,page,attr,count)
 Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
 {
  Bit8u cheight,xcurs,ycurs,mode,line,bpp;
  Bit16u nbcols,nbrows,address;
- Bit16u cursor,dummy;
+ Bit16u cursor,carattr;
 
  // Get the mode
  mode=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE);
@@ -1650,7 +1688,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  if(line==0xFF)return;
 
  // Get the cursor pos for the page
- biosfn_get_cursor_pos(page,&dummy,&cursor);
+ cursor=get_cursor_pos(page);
  xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
 
  // Get the dimensions
@@ -1662,8 +1700,8 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
    // Compute the address
    address=SCREEN_MEM_START(nbcols,nbrows,page)+(xcurs+ycurs*nbcols)*2;
 
-   dummy=((Bit16u)attr<<8)+car;
-   memsetw(vga_modes[line].sstart,address,dummy,count);
+   carattr=((Bit16u)attr<<8)+car;
+   memsetw(vga_modes[line].sstart,address,carattr,count);
   }
  else
   {
@@ -1700,7 +1738,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
 {
  Bit8u cheight,xcurs,ycurs,mode,line,bpp;
  Bit16u nbcols,nbrows,address;
- Bit16u cursor,dummy;
+ Bit16u cursor;
 
  // Get the mode
  mode=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE);
@@ -1708,7 +1746,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  if(line==0xFF)return;
 
  // Get the cursor pos for the page
- biosfn_get_cursor_pos(page,&dummy,&cursor);
+ cursor=get_cursor_pos(page);
  xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
 
  // Get the dimensions
@@ -1968,13 +2006,13 @@ static void biosfn_read_pixel (BH,CX,DX,AX) Bit8u BH;Bit16u CX;Bit16u DX;Bit16u 
 }
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_write_teletype (car, page, attr, flag) 
+static void biosfn_write_teletype (car, page, attr, flag)
 Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
 {// flag = WITH_ATTR / NO_ATTR
 
  Bit8u cheight,xcurs,ycurs,mode,line,bpp;
  Bit16u nbcols,nbrows,address;
- Bit16u cursor,dummy;
+ Bit16u cursor;
 
  // special case if page is 0xff, use current page
  if(page==0xff)
@@ -1986,7 +2024,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
  if(line==0xFF)return;
 
  // Get the cursor pos for the page
- biosfn_get_cursor_pos(page,&dummy,&cursor);
+ cursor=get_cursor_pos(page);
  xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
 
  // Get the dimensions
@@ -2015,7 +2053,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
     do
      {
       biosfn_write_teletype(' ',page,attr,flag);
-      biosfn_get_cursor_pos(page,&dummy,&cursor);
+      cursor=get_cursor_pos(page);
       xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
      }while(xcurs%8==0);
     break;
@@ -2024,10 +2062,10 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
 
     if(vga_modes[line].class==TEXT)
      {
-      // Compute the address  
+      // Compute the address
       address=SCREEN_MEM_START(nbcols,nbrows,page)+(xcurs+ycurs*nbcols)*2;
 
-      // Write the char 
+      // Write the char
       write_byte(vga_modes[line].sstart,address,car);
 
       if(flag==WITH_ATTR)
@@ -2083,7 +2121,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
 
  // Set the cursor for the page
  cursor=ycurs; cursor<<=8; cursor+=xcurs;
- biosfn_set_cursor_pos(page,cursor);
+ set_cursor_pos(page,cursor);
 }
 
 // --------------------------------------------------------------------------------------------
@@ -2567,7 +2605,7 @@ get_dac_16_page:
 ASM_END
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_perform_gray_scale_summing (start,count) 
+static void biosfn_perform_gray_scale_summing (start,count)
 Bit16u start;Bit16u count;
 {Bit8u r,g,b;
  Bit16u i;
@@ -2576,7 +2614,7 @@ Bit16u start;Bit16u count;
  inb(VGAREG_ACTL_RESET);
  outb(VGAREG_ACTL_ADDRESS,0x00);
 
- for( index = 0; index < count; index++ ) 
+ for( index = 0; index < count; index++ )
   {
    // set read address and switch to read mode
    outb(VGAREG_DAC_READ_ADDRESS,start);
@@ -2589,7 +2627,7 @@ Bit16u start;Bit16u count;
    i = ( ( 77*r + 151*g + 28*b ) + 0x80 ) >> 8;
 
    if(i>0x3f)i=0x3f;
- 
+
    // set write address and switch to write mode
    outb(VGAREG_DAC_WRITE_ADDRESS,start);
    // write new intensity value
@@ -2597,7 +2635,7 @@ Bit16u start;Bit16u count;
    outb( VGAREG_DAC_DATA, i&0xff );
    outb( VGAREG_DAC_DATA, i&0xff );
    start++;
-  }  
+  }
  inb(VGAREG_ACTL_RESET);
  outb(VGAREG_ACTL_ADDRESS,0x20);
 }
@@ -2876,10 +2914,10 @@ static void biosfn_load_gfx_8_16_chars (BL) Bit8u BL;
     write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 16);
 }
 // --------------------------------------------------------------------------------------------
-static void biosfn_get_font_info (BH,ES,BP,CX,DX) 
+static void biosfn_get_font_info (BH,ES,BP,CX,DX)
 Bit8u BH;Bit16u *ES;Bit16u *BP;Bit16u *CX;Bit16u *DX;
 {Bit16u ss=get_SS();
- 
+
  switch(BH)
   {case 0x00:
     write_word(ss,ES,read_word(0x00,0x1f*4));
@@ -3133,14 +3171,14 @@ static void biosfn_enable_video_refresh_control (AL) Bit8u AL;
 }
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_write_string (flag,page,attr,count,row,col,seg,offset) 
+static void biosfn_write_string (flag,page,attr,count,row,col,seg,offset)
 Bit8u flag;Bit8u page;Bit8u attr;Bit16u count;Bit8u row;Bit8u col;Bit16u seg;Bit16u offset;
 {
- Bit16u newcurs,oldcurs,dummy;
- Bit8u car,carattr;
+ Bit16u newcurs,oldcurs;
+ Bit8u car;
 
  // Read curs info for the page
- biosfn_get_cursor_pos(page,&dummy,&oldcurs);
+ oldcurs=get_cursor_pos(page);
 
  // if row=0xff special case : use current cursor position
  if(row==0xff)
@@ -3149,8 +3187,8 @@ Bit8u flag;Bit8u page;Bit8u attr;Bit16u count;Bit8u row;Bit8u col;Bit16u seg;Bit
   }
 
  newcurs=row; newcurs<<=8; newcurs+=col;
- biosfn_set_cursor_pos(page,newcurs);
- 
+ set_cursor_pos(page,newcurs);
+
  while(count--!=0)
   {
    car=read_byte(seg,offset++);
@@ -3159,10 +3197,10 @@ Bit8u flag;Bit8u page;Bit8u attr;Bit16u count;Bit8u row;Bit8u col;Bit16u seg;Bit
 
    biosfn_write_teletype(car,page,attr,WITH_ATTR);
   }
- 
- // Set back curs pos 
+
+ // Set back curs pos
  if((flag&0x01)==0)
-  biosfn_set_cursor_pos(page,oldcurs);
+  set_cursor_pos(page,oldcurs);
 }
 
 // --------------------------------------------------------------------------------------------
@@ -3221,7 +3259,7 @@ msg_alt_dcc:
 ASM_END
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_read_state_info (BX,ES,DI) 
+static void biosfn_read_state_info (BX,ES,DI)
 Bit16u BX;Bit16u ES;Bit16u DI;
 {
  // Address of static functionality table
@@ -3231,7 +3269,7 @@ Bit16u BX;Bit16u ES;Bit16u DI;
  // Hard coded copy from BIOS area. Should it be cleaner ?
  memcpyb(ES,DI+0x04,BIOSMEM_SEG,0x49,30);
  memcpyb(ES,DI+0x22,BIOSMEM_SEG,0x84,3);
- 
+
  write_byte(ES,DI+0x25,read_byte(BIOSMEM_SEG,BIOSMEM_DCC_INDEX));
  write_byte(ES,DI+0x26,0);
  write_byte(ES,DI+0x27,16);
@@ -3242,13 +3280,13 @@ Bit16u BX;Bit16u ES;Bit16u DI;
  write_byte(ES,DI+0x2c,0);
  write_byte(ES,DI+0x31,3);
  write_byte(ES,DI+0x32,0);
- 
+
  memsetb(ES,DI+0x33,0,13);
 }
 
 // --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
-static Bit16u biosfn_read_video_state_size2 (CX) 
+static Bit16u biosfn_read_video_state_size2 (CX)
      Bit16u CX;
 {
     Bit16u size;
@@ -3265,14 +3303,14 @@ static Bit16u biosfn_read_video_state_size2 (CX)
     return size;
 }
 
-static void biosfn_read_video_state_size (CX, BX) 
+static void biosfn_read_video_state_size (CX, BX)
      Bit16u CX; Bit16u *BX;
 {
     Bit16u ss=get_SS();
     write_word(ss, BX, biosfn_read_video_state_size2(CX));
 }
 
-static Bit16u biosfn_save_video_state (CX,ES,BX) 
+static Bit16u biosfn_save_video_state (CX,ES,BX)
      Bit16u CX;Bit16u ES;Bit16u BX;
 {
     Bit16u i, v, crtc_addr, ar_index;
@@ -3357,7 +3395,7 @@ static Bit16u biosfn_save_video_state (CX,ES,BX)
     return BX;
 }
 
-static Bit16u biosfn_restore_video_state (CX,ES,BX) 
+static Bit16u biosfn_restore_video_state (CX,ES,BX)
      Bit16u CX;Bit16u ES;Bit16u BX;
 {
     Bit16u i, crtc_addr, v, addr1, ar_index;
@@ -3369,7 +3407,7 @@ static Bit16u biosfn_restore_video_state (CX,ES,BX)
         crtc_addr = read_word(ES, BX + 0x40);
         addr1 = BX;
         BX += 5;
-        
+
         for(i=1;i<=4;i++){
             outb(VGAREG_SEQU_ADDRESS, i);
             outb(VGAREG_SEQU_DATA, read_byte(ES, BX)); BX++;
@@ -3396,7 +3434,7 @@ static Bit16u biosfn_restore_video_state (CX,ES,BX)
         // enable write protection if needed
         outb(crtc_addr, 0x11);
         outb(crtc_addr+1, read_byte(ES, BX - 0x18 + 0x11));
-        
+
         // Set Attribute Ctl
         ar_index = read_byte(ES, addr1 + 0x03);
         inb(VGAREG_ACTL_RESET);
@@ -3406,14 +3444,14 @@ static Bit16u biosfn_restore_video_state (CX,ES,BX)
         }
         outb(VGAREG_ACTL_ADDRESS, ar_index);
         inb(VGAREG_ACTL_RESET);
-        
+
         for(i=0;i<=8;i++) {
             outb(VGAREG_GRDC_ADDRESS,i);
             outb(VGAREG_GRDC_DATA, read_byte(ES, BX)); BX++;
         }
         BX += 2; /* crtc_addr */
         BX += 4; /* plane latches */
-        
+
         outb(VGAREG_SEQU_ADDRESS, read_byte(ES, addr1)); addr1++;
         outb(crtc_addr, read_byte(ES, addr1)); addr1++;
         outb(VGAREG_GRDC_ADDRESS, read_byte(ES, addr1)); addr1++;
@@ -3463,9 +3501,9 @@ static Bit16u biosfn_restore_video_state (CX,ES,BX)
 // Video Utils
 //
 // ============================================================================================
- 
+
 // --------------------------------------------------------------------------------------------
-static Bit8u find_vga_entry(mode) 
+static Bit8u find_vga_entry(mode)
 Bit8u mode;
 {
  Bit8u i,line=0xFF;
@@ -3985,7 +4023,7 @@ ASM_END
 
 // --------------------------------------------------------------------------------------------
 
-ASM_START 
+ASM_START
 ;; DATA_SEG_DEFS_HERE
 ASM_END
 
