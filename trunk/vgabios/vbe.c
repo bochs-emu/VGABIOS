@@ -22,8 +22,8 @@
 //
 // ============================================================================================
 //
-//  This VBE is part of the VGA Bios specific to the plex86/bochs Emulated VGA card. 
-//  You can NOT drive any physical vga card with it. 
+//  This VBE is part of the VGA Bios specific to the plex86/bochs Emulated VGA card.
+//  You can NOT drive any physical vga card with it.
 //
 // ============================================================================================
 //
@@ -134,7 +134,7 @@ vesa_pm_set_display_start:
   mov  ax, #0x0100
   ret
 vesa_pm_set_display_start1:
-; convert offset to (X, Y) coordinate 
+; convert offset to (X, Y) coordinate
 ; (would be simpler to change Bochs VBE API...)
   push eax
   push ecx
@@ -779,7 +779,7 @@ lmulul:
 ASM_END
 
 /** Function 00h - Return VBE Controller Information
- * 
+ *
  * Input:
  *              AX      = 4F00h
  *              ES:DI   = Pointer to buffer in which to place VbeInfoBlock structure
@@ -787,7 +787,7 @@ ASM_END
  *                        the info block is 512 bytes in size)
  * Output:
  *              AX      = VBE Return Status
- * 
+ *
  */
 void vbe_biosfn_return_controller_information(AX, ES, DI)
 Bit16u *AX;Bit16u ES;Bit16u DI;
@@ -911,14 +911,14 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
 
 
 /** Function 01h - Return VBE Mode Information
- * 
+ *
  * Input:
  *              AX      = 4F01h
  *              CX      = Mode Number
  *              ES:DI   = Pointer to buffer in which to place ModeInfoBlock structure
  * Output:
  *              AX      = VBE Return Status
- * 
+ *
  */
 void vbe_biosfn_return_mode_information(AX, CX, ES, DI)
 Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
@@ -983,13 +983,13 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
 }
 
 /** Function 02h - Set VBE Mode
- * 
+ *
  * Input:
  *              AX      = 4F02h
  *              BX      = Desired Mode to set
  * Output:
  *              AX      = VBE Return Status
- * 
+ *
  */
 void vbe_biosfn_set_mode(AX, BX)
 Bit16u *AX;Bit16u BX;
@@ -1068,13 +1068,13 @@ Bit16u *AX;Bit16u BX;
 }
 
 /** Function 03h - Return Current VBE Mode
- * 
+ *
  * Input:
  *              AX      = 4F03h
  * Output:
  *              AX      = VBE Return Status
  *              BX      = Current VBE Mode
- * 
+ *
  */
 ASM_START
 vbe_biosfn_return_current_mode:
@@ -1115,7 +1115,7 @@ void vbe_biosfn_save_video_state(ES, BX)
     enable = inw(VBE_DISPI_IOPORT_DATA);
     write_word(ES, BX, enable);
     BX += 2;
-    if (!(enable & VBE_DISPI_ENABLED)) 
+    if (!(enable & VBE_DISPI_ENABLED))
         return;
     for(i = VBE_DISPI_INDEX_XRES; i <= VBE_DISPI_INDEX_Y_OFFSET; i++) {
         if ((i != VBE_DISPI_INDEX_ENABLE) && (i != VBE_DISPI_INDEX_VIRT_HEIGHT)) {
@@ -1164,7 +1164,7 @@ void vbe_biosfn_restore_video_state(ES, BX)
 }
 
 /** Function 04h - Save/Restore State
- * 
+ *
  * Input:
  *              AX      = 4F04h
  *              DL      = 00h Return Save/Restore State buffer size
@@ -1175,7 +1175,7 @@ void vbe_biosfn_restore_video_state(ES, BX)
  * Output:
  *              AX      = VBE Return Status
  *              BX      = Number of 64-byte blocks to hold the state buffer (if DL=00h)
- * 
+ *
  */
 void vbe_biosfn_save_restore_state(AX, CX, DX, ES, BX)
 Bit16u *AX; Bit16u CX; Bit16u DX; Bit16u ES; Bit16u *BX;
@@ -1221,7 +1221,7 @@ Bit16u *AX; Bit16u CX; Bit16u DX; Bit16u ES; Bit16u *BX;
 }
 
 /** Function 05h - Display Window Control
- * 
+ *
  * Input:
  *              AX      = 4F05h
  *     (16-bit) BH      = 00h Set memory window
@@ -1234,7 +1234,7 @@ Bit16u *AX; Bit16u CX; Bit16u DX; Bit16u ES; Bit16u *BX;
  * Note:
  *              If this function is called while in a linear frame buffer mode,
  *              this function must fail with completion code AH=03h
- * 
+ *
  * Output:
  *              AX      = VBE Return Status
  *              DX      = Window number in window granularity units
@@ -1279,13 +1279,13 @@ ASM_END
  *              CX      = If BL=00h Desired Width in Pixels
  *                        If BL=02h Desired Width in Bytes
  *                        (Ignored for Get Functions)
- * 
- * Output: 
+ *
+ * Output:
  *              AX      = VBE Return Status
  *              BX      = Bytes Per Scan Line
  *              CX      = Actual Pixels Per Scan Line
  *                        (truncated to nearest complete pixel)
- *              DX      = Maximum Number of Scan Lines 
+ *              DX      = Maximum Number of Scan Lines
  */
 ASM_START
 vbe_biosfn_set_get_logical_scan_line_length:
@@ -1333,7 +1333,7 @@ ASM_END
 
 
 /** Function 07h - Set/Get Display Start
- * 
+ *
  * Input(16-bit):
  *              AX      = 4F07h
  *              BH      = 00h Reserved and must be 00h
@@ -1360,13 +1360,13 @@ ASM_END
  *                        If BL=04h 0 if flip has not occurred, not 0 if it has
  *              DX      = If BL=01h First Displayed Scan Line
  *
- * Input(32-bit): 
+ * Input(32-bit):
  *              BH      = 00h Reserved and must be 00h
  *              BL      = 00h Set Display Start
  *                      = 80h Set Display Start during Vertical Retrace
  *              CX      = Bits 0-15 of display start address
  *              DX      = Bits 16-31 of display start address
- *              ES      = Selector for memory mapped registers 
+ *              ES      = Selector for memory mapped registers
  */
 ASM_START
 vbe_biosfn_set_get_display_start:
@@ -1393,10 +1393,10 @@ get_display_start:
   mov  ax, #0x004f
   ret
 ASM_END
-  
+
 
 /** Function 08h - Set/Get Dac Palette Format
- * 
+ *
  * Input:
  *              AX      = 4F08h
  *              BL      = 00h set DAC palette width
