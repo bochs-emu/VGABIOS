@@ -1120,23 +1120,14 @@ biosfn_set_cursor_pos:
   mov   bx, # BIOSMEM_CURRENT_PAGE
   cmp   cl, [bx]
   jnz   not_set_hw_cursor
+  mov   bx, # BIOSMEM_CURRENT_START
+  mov   ax, [bx]
+  shr   ax, #1
+  push  ax
   mov   bx, # BIOSMEM_NB_COLS
   mov   ah, [bx]
-  mov   ch, ah
-  mov   bx, # BIOSMEM_NB_ROWS
-  mov   al, [bx]
-  inc   al
-  mul   al, ah
-  or    al, #0xff
-  inc   ax
-  mov   bl, cl
-  xor   bh, bh
-  push  dx
-  mul   ax, bx
-  pop   dx
-  push  ax
   mov   al, dh
-  mul   al, ch
+  mul   al, ah
   xor   dh, dh
   add   ax, dx
   pop   bx
@@ -1193,22 +1184,37 @@ invalid_page_2:
   pop   ax
   pop   ds
   ret
-ASM_END
 
-// --------------------------------------------------------------------------------------------
-static Bit16u get_cursor_pos (page)
-Bit8u page;
-{
- if(page>7)return 0;
- return read_word(BIOSMEM_SEG,BIOSMEM_CURSOR_POS+page*2);
-}
+; this function is called from C code
+_get_cursor_pos:
+  push  bp
+  mov   bp, sp
+  push  ds
+  mov   ax, # BIOSMEM_SEG
+  mov   ds, ax
+  mov   ax, 4[bp]
+  cmp   al, #0x07
+  jbe   page_ok
+  xor   ax, ax
+  jz    page_ret
+page_ok:
+  xor   ah, ah
+  shl   ax, #1
+  mov   bx, # BIOSMEM_CURSOR_POS
+  add   bx, ax
+  mov   ax, [bx]
+page_ret:
+  pop   ds
+  pop   bp
+  ret
+ASM_END
 
 // --------------------------------------------------------------------------------------------
 static void biosfn_set_active_page (page)
 Bit8u page;
 {
  Bit16u cursor,crtc_addr;
- Bit16u nbcols,nbrows,address;
+ Bit16u pgsize,address;
  Bit8u mode,line;
 
  if(page>7)return;
@@ -1223,16 +1229,15 @@ Bit8u page;
 
  if(vga_modes[line].class==TEXT)
   {
-   // Get the dimensions
-   nbcols=read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
-   nbrows=read_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1;
+   // Get the page size
+   pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
 
-   // Calculate the address knowing nbcols nbrows and page num
-   address=SCREEN_MEM_START(nbcols,nbrows,page);
+   // Calculate the mem address
+   address=pgsize*page;
    write_word(BIOSMEM_SEG,BIOSMEM_CURRENT_START,address);
 
-   // Start address
-   address=SCREEN_IO_START(nbcols,nbrows,page);
+   // Now the CRTC start address
+   address>>=1;
   }
  else
   {
@@ -1333,7 +1338,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
 
  Bit8u mode,line,cheight,bpp,cols;
  Bit16u nbcols,nbrows,i;
- Bit16u address;
+ Bit16u address,pgsize;
 
  if(rul>rlr)return;
  if(cul>clr)return;
@@ -1358,8 +1363,10 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
 
  if(vga_modes[line].class==TEXT)
   {
+   // Get the page size
+   pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
    // Compute the address
-   address=SCREEN_MEM_START(nbcols,nbrows,page);
+   address=pgsize*page;
 #ifdef DEBUG
    printf("Scroll, address %04x (%04x %04x %02x)\n",address,nbrows,nbcols,page);
 #endif
@@ -1478,7 +1485,7 @@ static void biosfn_read_char_attr (page,car)
 Bit8u page;Bit16u *car;
 {Bit16u ss=get_SS();
  Bit8u xcurs,ycurs,mode,line;
- Bit16u nbcols,nbrows,address;
+ Bit16u nbcols,pgsize,address;
  Bit16u cursor;
 
  // Get the mode
@@ -1491,13 +1498,14 @@ Bit8u page;Bit16u *car;
  xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
 
  // Get the dimensions
- nbrows=read_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1;
  nbcols=read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
 
  if(vga_modes[line].class==TEXT)
   {
+   // Get the page size
+   pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
    // Compute the address
-   address=SCREEN_MEM_START(nbcols,nbrows,page)+(xcurs+ycurs*nbcols)*2;
+   address=pgsize*page+(xcurs+ycurs*nbcols)*2;
 
    write_word(ss,car,read_word(vga_modes[line].sstart,address));
   }
@@ -1515,21 +1523,14 @@ static void write_gfx_char_pl4(car,attr,xcurs,ycurs,nbcols,cheight)
 Bit8u car;Bit8u attr;Bit8u xcurs;Bit8u ycurs;Bit8u nbcols;Bit8u cheight;
 {
  Bit8u i,j,mask;
- Bit8u *fdata;
+ Bit8u fdata;
+ Bit16u fseg,foffs;
  Bit16u addr,dest,src;
 
- switch(cheight)
-  {case 14:
-    fdata = &vgafont14;
-    break;
-   case 16:
-    fdata = &vgafont16;
-    break;
-   default:
-    fdata = &vgafont8;
-  }
  addr=xcurs+ycurs*cheight*nbcols;
- src = car * cheight;
+ foffs = read_word(0x0, 0x43*4);
+ fseg = read_word(0x0, 0x43*4+2);
+ src = foffs + car * cheight;
  outw(VGAREG_SEQU_ADDRESS, 0x0f02);
  outw(VGAREG_GRDC_ADDRESS, 0x0205);
  if(attr&0x80)
@@ -1542,13 +1543,14 @@ Bit8u car;Bit8u attr;Bit8u xcurs;Bit8u ycurs;Bit8u nbcols;Bit8u cheight;
   }
  for(i=0;i<cheight;i++)
   {
+   fdata = read_byte(fseg, src + i);
    dest=addr+i*nbcols;
    for(j=0;j<8;j++)
     {
      mask=0x80>>j;
      outw(VGAREG_GRDC_ADDRESS, (mask << 8) | 0x08);
      read_byte(0xa000,dest);
-     if(fdata[src+i]&mask)
+     if(fdata&mask)
       {
        write_byte(0xa000,dest,attr&0x0f);
       }
@@ -1679,7 +1681,7 @@ static void biosfn_write_char_attr (car,page,attr,count)
 Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
 {
  Bit8u cheight,xcurs,ycurs,mode,line,bpp;
- Bit16u nbcols,nbrows,address;
+ Bit16u nbcols,pgsize,address;
  Bit16u cursor,carattr;
 
  // Get the mode
@@ -1692,13 +1694,14 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
 
  // Get the dimensions
- nbrows=read_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1;
  nbcols=read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
 
  if(vga_modes[line].class==TEXT)
   {
+   // Get the page size
+   pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
    // Compute the address
-   address=SCREEN_MEM_START(nbcols,nbrows,page)+(xcurs+ycurs*nbcols)*2;
+   address=pgsize*page+(xcurs+ycurs*nbcols)*2;
 
    carattr=((Bit16u)attr<<8)+car;
    memsetw(vga_modes[line].sstart,address,carattr,count);
@@ -1737,7 +1740,7 @@ static void biosfn_write_char_only (car,page,attr,count)
 Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
 {
  Bit8u cheight,xcurs,ycurs,mode,line,bpp;
- Bit16u nbcols,nbrows,address;
+ Bit16u nbcols,pgsize,address;
  Bit16u cursor;
 
  // Get the mode
@@ -1750,13 +1753,14 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
 
  // Get the dimensions
- nbrows=read_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1;
  nbcols=read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
 
  if(vga_modes[line].class==TEXT)
   {
+   // Get the page size
+   pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
    // Compute the address
-   address=SCREEN_MEM_START(nbcols,nbrows,page)+(xcurs+ycurs*nbcols)*2;
+   address=pgsize*page+(xcurs+ycurs*nbcols)*2;
 
    while(count-->0)
     {write_byte(vga_modes[line].sstart,address,car);
@@ -2011,7 +2015,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
 {// flag = WITH_ATTR / NO_ATTR
 
  Bit8u cheight,xcurs,ycurs,mode,line,bpp;
- Bit16u nbcols,nbrows,address;
+ Bit16u nbcols,nbrows,pgsize,address;
  Bit16u cursor;
 
  // special case if page is 0xff, use current page
@@ -2062,8 +2066,10 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
 
     if(vga_modes[line].class==TEXT)
      {
+      // Get the page size
+      pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
       // Compute the address
-      address=SCREEN_MEM_START(nbcols,nbrows,page)+(xcurs+ycurs*nbcols)*2;
+      address=pgsize*page+(xcurs+ycurs*nbcols)*2;
 
       // Write the char
       write_byte(vga_modes[line].sstart,address,car);
@@ -2108,7 +2114,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
   {
    if(vga_modes[line].class==TEXT)
     {
-     address=SCREEN_MEM_START(nbcols,nbrows,page)+(xcurs+(ycurs-1)*nbcols)*2;
+     address=pgsize*page+(xcurs+(ycurs-1)*nbcols)*2;
      attr=read_byte(vga_modes[line].sstart,address+1);
      biosfn_scroll(0x01,attr,0,0,nbrows-1,nbcols-1,page,SCROLL_UP);
     }
@@ -2725,7 +2731,7 @@ static void set_scan_lines(lines) Bit8u lines;
  rows = vde / lines;
  write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, rows-1);
  cols = read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
- write_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE, rows * cols * 2);
+ write_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE, SCREEN_SIZE(rows, cols));
 }
 
 static void biosfn_load_text_user_pat (AL,ES,BP,CX,DX,BL,BH) Bit8u AL;Bit16u ES;Bit16u BP;Bit16u CX;Bit16u DX;Bit8u BL;Bit8u BH;
