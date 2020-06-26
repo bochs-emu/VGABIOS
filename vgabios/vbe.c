@@ -778,6 +778,7 @@ lmulul:
   ret
 ASM_END
 
+
 /** Function 00h - Return VBE Controller Information
  *
  * Input:
@@ -1708,32 +1709,32 @@ vbe_biosfn_display_identification_extensions:
   cmp  bl,#0x01
   jb   vbe_edid_get_capabilities
   je   vbe_read_EDID
-  jmp  vbe_edid_unimplemented
+  jmp  vbe_unimplemented
 
 vbe_edid_get_capabilities:
   test cx,cx
-  jne  vbe_edid_unimplemented
+  jne  vbe_unimplemented
   mov  ax, #0x004f
   mov  bx, #0x0202
   ret
 
 vbe_read_EDID:
   call vbe_ddc_init
-  jnz  vbe_edid_unimplemented
+  jnz  vbe_unimplemented
   call vbe_ddc_start
   call vbe_ddc_delay
   mov  al, #0xa0
   call vbe_ddc_send_byte
-  jc   vbe_edid_unimplemented
+  jc   vbe_unimplemented
   mov  al, #0x00
   call vbe_ddc_send_byte
-  jc   vbe_edid_unimplemented
+  jc   vbe_unimplemented
   call vbe_ddc_stop
   call vbe_ddc_start
   call vbe_ddc_delay
   mov  al, #0xa1
   call vbe_ddc_send_byte
-  jnz  vbe_edid_unimplemented
+  jnz  vbe_unimplemented
   push cx
   push di
   mov  cx, #0x0080
@@ -1749,7 +1750,67 @@ vbe_read_edid_loop:
   mov  ax, #0x004f
   ret
 
-vbe_edid_unimplemented:
+vbe_unimplemented:
   mov  ax, #0x014F ;; not implemented
   ret
+
+; Handle INT 10h AH 4Fh
+vbe_main_handler:
+  cmp  al, #0x15
+  jbe  vbe_call_table
+  mov  ax, #0x014F ;; unsupported
+  jmp  int10_end
+vbe_call_table:
+  push bx
+  xor  bx, bx
+  mov  bl, al
+  shl  bx, 1
+ db 0x2e ;; cs:
+  mov  bp, vbe_handlers[bx]
+  pop  bx
+  push #int10_end
+  push bp
+  ret
+
+vbe_normal:
+  push es
+  push ds
+  pusha
+  mov   bx, #0xc000
+  mov   ds, bx
+  call _int10_func
+  popa
+  pop ds
+  pop es
+  ret
+
+vbe_handlers:
+  ;; 00h
+  dw vbe_normal
+  dw vbe_normal
+  dw vbe_normal
+  dw vbe_biosfn_return_current_mode
+  ;; 04h
+  dw vbe_normal
+  dw vbe_biosfn_display_window_control
+  dw vbe_biosfn_set_get_logical_scan_line_length
+  dw vbe_biosfn_set_get_display_start
+  ;; 08h
+  dw vbe_biosfn_set_get_dac_palette_format
+  dw vbe_biosfn_set_get_palette_data
+  dw vbe_biosfn_return_protected_mode_interface
+  dw vbe_unimplemented
+  ;; 0Ch
+  dw vbe_unimplemented
+  dw vbe_unimplemented
+  dw vbe_unimplemented
+  dw vbe_unimplemented
+  ;; 10h
+  dw vbe_unimplemented
+  dw vbe_unimplemented
+  dw vbe_unimplemented
+  dw vbe_unimplemented
+  ;; 14h
+  dw vbe_unimplemented
+  dw vbe_biosfn_display_identification_extensions
 ASM_END
