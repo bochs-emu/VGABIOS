@@ -82,7 +82,6 @@ static void memcpyb();
 static void memcpyw();
 
 static void biosfn_set_video_mode();
-static void biosfn_set_cursor_shape();
 static void biosfn_set_active_page();
 static void biosfn_scroll();
 static void biosfn_read_char_attr();
@@ -296,6 +295,17 @@ vgabios_int10_handler:
   pop ds
   pop es
 #endif
+#ifdef VBE
+  cmp   ah, #0x4f
+  jne   int10_test_01
+  jmp   vbe_main_handler
+#endif
+int10_test_01:
+  cmp   ah, #0x01
+  jne   int10_test_02
+  call  biosfn_set_cursor_shape
+  jmp   int10_end
+int10_test_02:
   cmp   ah, #0x02
   jne   int10_test_03
   call  biosfn_set_cursor_pos
@@ -361,58 +371,9 @@ int10_test_101B:
   cmp   ax, #0x101b
   je    int10_normal
   cmp   ah, #0x10
-#ifndef VBE
   jne   int10_normal
-#else
-  jne   int10_test_4F
-#endif
   call  biosfn_group_10
   jmp   int10_end
-#ifdef VBE
-int10_test_4F:
-  cmp   ah, #0x4f
-  jne   int10_normal
-  cmp   al, #0x03
-  jne   int10_test_vbe_05
-  call  vbe_biosfn_return_current_mode
-  jmp   int10_end
-int10_test_vbe_05:
-  cmp   al, #0x05
-  jne   int10_test_vbe_06
-  call  vbe_biosfn_display_window_control
-  jmp   int10_end
-int10_test_vbe_06:
-  cmp   al, #0x06
-  jne   int10_test_vbe_07
-  call  vbe_biosfn_set_get_logical_scan_line_length
-  jmp   int10_end
-int10_test_vbe_07:
-  cmp   al, #0x07
-  jne   int10_test_vbe_08
-  call  vbe_biosfn_set_get_display_start
-  jmp   int10_end
-int10_test_vbe_08:
-  cmp   al, #0x08
-  jne   int10_test_vbe_09
-  call  vbe_biosfn_set_get_dac_palette_format
-  jmp   int10_end
-int10_test_vbe_09:
-  cmp   al, #0x09
-  jne   int10_test_vbe_0A
-  call  vbe_biosfn_set_get_palette_data
-  jmp   int10_end
-int10_test_vbe_0A:
-  cmp   al, #0x0A
-  jne   int10_test_vbe_15
-  call  vbe_biosfn_return_protected_mode_interface
-  jmp   int10_end
-int10_test_vbe_15:
-  cmp   al, #0x15
-  jne   int10_normal
-  call  vbe_biosfn_display_identification_extensions
-  jmp   int10_end
-#endif
-
 int10_normal:
   push es
   push ds
@@ -645,11 +606,8 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
         SET_AL(0x20);
       }
      break;
-   case 0x01:
-     biosfn_set_cursor_shape(GET_CH(),GET_CL());
-     break;
    case 0x04:
-     // Read light pen pos (unimplemented)
+     // Read light pen pos (unsupported on VGA)
 #ifdef DEBUG
      unimplemented();
 #endif
@@ -798,12 +756,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
          case 0x04:
           vbe_biosfn_save_restore_state(&AX, CX, DX, ES, &BX);
           break;
-         default:
-#ifdef DEBUG
-          unknown();
-#endif
-          // function failed
-          AX=0x100;
        }
      } else {
        // No VBE display
@@ -1016,7 +968,10 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
  // Set cursor shape
  if(vga_modes[line].class==TEXT)
   {
-   biosfn_set_cursor_shape(0x06,0x07);
+ASM_START
+  mov  cx, #0x0607
+  call biosfn_set_cursor_shape
+ASM_END
   }
 
  // Set cursor pos for page 0..7
@@ -1065,42 +1020,68 @@ ASM_END
 }
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_set_cursor_shape (CH,CL)
-Bit8u CH;Bit8u CL;
-{Bit16u cheight,curs,crtc_addr;
- Bit8u modeset_ctl;
-
- CH&=0x3f;
- CL&=0x1f;
-
- curs=(CH<<8)+CL;
- write_word(BIOSMEM_SEG,BIOSMEM_CURSOR_TYPE,curs);
-
- modeset_ctl=read_byte(BIOSMEM_SEG,BIOSMEM_MODESET_CTL);
- cheight = read_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
- if((modeset_ctl&0x01) && (cheight>8) && (CL<8) && (CH<0x20))
-  {
-   if(CL!=(CH+1))
-    {
-     CH = ((CH+1) * cheight / 8) -1;
-    }
-   else
-    {
-     CH = ((CL+1) * cheight / 8) - 2;
-    }
-   CL = ((CL+1) * cheight / 8) - 1;
-  }
-
- // CTRC regs 0x0a and 0x0b
- crtc_addr=read_word(BIOSMEM_SEG,BIOSMEM_CRTC_ADDRESS);
- outb(crtc_addr,0x0a);
- outb(crtc_addr+1,CH);
- outb(crtc_addr,0x0b);
- outb(crtc_addr+1,CL);
-}
-
-// --------------------------------------------------------------------------------------------
 ASM_START
+biosfn_set_cursor_shape:
+  push  ds
+  push  ax
+  push  bx
+  push  dx
+  mov   ax, # BIOSMEM_SEG
+  mov   ds, ax
+  and   cx, #0x3f1f
+  mov   bx, # BIOSMEM_CURSOR_TYPE
+  mov   [bx], cx
+  mov   bx, # BIOSMEM_MODESET_CTL
+  mov   al, [bx]
+  and   al, #0x01
+  jz    no_resize
+  mov   bx, # BIOSMEM_CHAR_HEIGHT
+  mov   dl, [bx]
+  cmp   dl, #0x08
+  jb    no_resize
+  cmp   cl, #0x08
+  jnb   no_resize
+  cmp   ch, #0x20
+  jnb   no_resize
+  mov   al, ch
+  inc   al
+  cmp   cl, al
+  jz    line_cursor
+  mul   al, dl
+  shr   ax, #3
+  jmp   setup_ch
+line_cursor:
+  mov   al, cl
+  inc   al
+  mul   al, dl
+  shr   ax, #3
+  dec   al
+setup_ch:
+  dec   al
+  mov   ch, al
+recalc_cl:
+  mov   al, cl
+  inc   al
+  mul   al, dl
+  shr   ax, #3
+  dec   al
+  mov   cl, al
+no_resize:
+  mov   bx, # BIOSMEM_CRTC_ADDRESS
+  mov   dx, [bx]
+  mov   al, #0x0a
+  mov   ah, ch
+  out   dx, ax
+  inc   al
+  mov   ah, cl
+  out   dx, ax
+  pop   dx
+  pop   bx
+  pop   ax
+  pop   ds
+  ret
+
+; --------------------------------------------------------------------------------------------
 biosfn_set_cursor_pos:
   push  ds
   push  ax
@@ -1159,10 +1140,8 @@ _set_cursor_pos:
   call biosfn_set_cursor_pos
   pop  bp
   ret
-ASM_END
 
-// --------------------------------------------------------------------------------------------
-ASM_START
+;--------------------------------------------------------------------------------------------
 biosfn_get_cursor_pos:
   push  ds
   push  ax
@@ -1331,6 +1310,35 @@ Bit8u xstart;Bit8u ystart;Bit8u cols;Bit8u nbcols;Bit8u cheight;Bit8u attr;
 }
 
 // --------------------------------------------------------------------------------------------
+static void vgamem_copy_lin(xstart,ysrc,ydest,cols,nbcols,cheight)
+Bit8u xstart;Bit8u ysrc;Bit8u ydest;Bit8u cols;Bit8u nbcols;Bit8u cheight;
+{
+ Bit16u src,dest;
+ Bit8u i;
+
+ src=(ysrc*cheight*nbcols+xstart)*8;
+ dest=(ydest*cheight*nbcols+xstart)*8;
+ for(i=0;i<cheight;i++)
+  {
+   memcpyb(0xa000,dest+i*nbcols*8,0xa000,src+i*nbcols*8,cols*8);
+  }
+}
+
+// --------------------------------------------------------------------------------------------
+static void vgamem_fill_lin(xstart,ystart,cols,nbcols,cheight,attr)
+Bit8u xstart;Bit8u ystart;Bit8u cols;Bit8u nbcols;Bit8u cheight;Bit8u attr;
+{
+ Bit16u dest;
+ Bit8u i;
+
+ dest=(ystart*cheight*nbcols+xstart)*8;
+ for(i=0;i<cheight;i++)
+  {
+   memsetb(0xa000,dest+i*nbcols*8,attr,cols*8);
+  }
+}
+
+// --------------------------------------------------------------------------------------------
 static void biosfn_scroll (nblines,attr,rul,cul,rlr,clr,page,dir)
 Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8u dir;
 {
@@ -1400,20 +1408,33 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
   }
  else
   {
-   // FIXME gfx mode not complete
+   // FIXME gfx mode (Bochs VBE and Cirrus not supported)
    cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
-   switch(vga_modes[line].memmodel)
+   if(nblines==0&&rul==0&&cul==0&&rlr==nbrows-1&&clr==nbcols-1)
     {
-     case PLANAR4:
-     case PLANAR1:
-       if(nblines==0&&rul==0&&cul==0&&rlr==nbrows-1&&clr==nbcols-1)
-        {
+     switch(vga_modes[line].memmodel)
+      {
+       case PLANAR4:
+       case PLANAR1:
          outw(VGAREG_GRDC_ADDRESS, 0x0205);
          memsetb(vga_modes[line].sstart,0,attr,nbrows*nbcols*cheight);
          outw(VGAREG_GRDC_ADDRESS, 0x0005);
-        }
-       else
-        {// if Scroll up
+         break;
+       case CGA:
+         bpp=vga_modes[line].pixbits;
+         memsetb(vga_modes[line].sstart,0,attr,nbrows*nbcols*cheight*bpp);
+         break;
+       case LINEAR8:
+         memsetb(vga_modes[line].sstart,0,attr,nbrows*nbcols*cheight*8);
+         break;
+      }
+    }
+   else
+    {
+     switch(vga_modes[line].memmodel)
+      {
+       case PLANAR4:
+       case PLANAR1:
          if(dir==SCROLL_UP)
           {for(i=rul;i<=rlr;i++)
             {
@@ -1433,16 +1454,9 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
              if (i>rlr) break;
             }
           }
-        }
-       break;
-     case CGA:
-       bpp=vga_modes[line].pixbits;
-       if(nblines==0&&rul==0&&cul==0&&rlr==nbrows-1&&clr==nbcols-1)
-        {
-         memsetb(vga_modes[line].sstart,0,attr,nbrows*nbcols*cheight*bpp);
-        }
-       else
-        {
+         break;
+       case CGA:
+         bpp=vga_modes[line].pixbits;
          if(bpp==2)
           {
            cul<<=1;
@@ -1469,13 +1483,34 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
              if (i>rlr) break;
             }
           }
-        }
-       break;
+         break;
+       case LINEAR8:
+         if(dir==SCROLL_UP)
+          {for(i=rul;i<=rlr;i++)
+            {
+             if((i+nblines>rlr)||(nblines==0))
+              vgamem_fill_lin(cul,i,cols,nbcols,cheight,attr);
+             else
+              vgamem_copy_lin(cul,i+nblines,i,cols,nbcols,cheight);
+            }
+          }
+         else
+          {for(i=rlr;i>=rul;i--)
+            {
+             if((i<rul+nblines)||(nblines==0))
+              vgamem_fill_lin(cul,i,cols,nbcols,cheight,attr);
+             else
+              vgamem_copy_lin(cul,i,i-nblines,cols,nbcols,cheight);
+             if (i>rlr) break;
+            }
+          }
+         break;
 #ifdef DEBUG
-     default:
-       printf("Scroll in graphics mode ");
-       unimplemented();
+       default:
+         printf("Scroll in graphics mode ");
+         unimplemented();
 #endif
+      }
     }
   }
 }
@@ -1649,24 +1684,27 @@ Bit8u car;Bit8u attr;Bit8u xcurs;Bit8u ycurs;Bit8u nbcols;Bit8u bpp;
 }
 
 // --------------------------------------------------------------------------------------------
-static void write_gfx_char_lin(car,attr,xcurs,ycurs,nbcols)
-Bit8u car;Bit8u attr;Bit8u xcurs;Bit8u ycurs;Bit8u nbcols;
+static void write_gfx_char_lin(car,attr,xcurs,ycurs,nbcols,cheight)
+Bit8u car;Bit8u attr;Bit8u xcurs;Bit8u ycurs;Bit8u nbcols;Bit8u cheight;
 {
  Bit8u i,j,mask,data;
- Bit8u *fdata;
+ Bit8u fdata;
+ Bit16u fseg,foffs;
  Bit16u addr,dest,src;
 
- fdata = &vgafont8;
- addr=xcurs*8+ycurs*nbcols*64;
- src = car * 8;
- for(i=0;i<8;i++)
+ addr=xcurs*8+ycurs*nbcols*cheight*8;
+ foffs = read_word(0x0, 0x43*4);
+ fseg = read_word(0x0, 0x43*4+2);
+ src = foffs + car * cheight;
+ for(i=0;i<cheight;i++)
   {
+   fdata = read_byte(fseg, src + i);
    dest=addr+i*nbcols*8;
    mask = 0x80;
    for(j=0;j<8;j++)
     {
      data = 0x00;
-     if (fdata[src+i] & mask)
+     if (fdata & mask)
       {
        data = attr;
       }
@@ -1708,7 +1746,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
   }
  else
   {
-   // FIXME gfx mode not complete
+   // FIXME gfx mode (Bochs VBE and Cirrus not supported)
    cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
@@ -1723,7 +1761,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
          write_gfx_char_cga(car,attr,xcurs,ycurs,nbcols,bpp);
          break;
        case LINEAR8:
-         write_gfx_char_lin(car,attr,xcurs,ycurs,nbcols);
+         write_gfx_char_lin(car,attr,xcurs,ycurs,nbcols,cheight);
          break;
 #ifdef DEBUG
        default:
@@ -1769,7 +1807,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
   }
  else
   {
-   // FIXME gfx mode not complete
+   // FIXME gfx mode (Bochs VBE and Cirrus not supported)
    cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
@@ -1784,7 +1822,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
          write_gfx_char_cga(car,attr,xcurs,ycurs,nbcols,bpp);
          break;
        case LINEAR8:
-         write_gfx_char_lin(car,attr,xcurs,ycurs,nbcols);
+         write_gfx_char_lin(car,attr,xcurs,ycurs,nbcols,cheight);
          break;
 #ifdef DEBUG
        default:
@@ -2079,7 +2117,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
      }
     else
      {
-      // FIXME gfx mode not complete
+      // FIXME gfx mode (Bochs VBE and Cirrus not supported)
       cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
       bpp=vga_modes[line].pixbits;
       switch(vga_modes[line].memmodel)
@@ -2092,7 +2130,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
           write_gfx_char_cga(car,attr,xcurs,ycurs,nbcols,bpp);
           break;
         case LINEAR8:
-          write_gfx_char_lin(car,attr,xcurs,ycurs,nbcols);
+          write_gfx_char_lin(car,attr,xcurs,ycurs,nbcols,cheight);
           break;
 #ifdef DEBUG
         default:
@@ -2716,11 +2754,23 @@ static void set_scan_lines(lines) Bit8u lines;
  outb(crtc_addr+1, crtc_r9);
  if(lines==8)
   {
-   biosfn_set_cursor_shape(0x06,0x07);
+ASM_START
+  mov  cx, #0x0607
+  call biosfn_set_cursor_shape
+ASM_END
   }
  else
   {
-   biosfn_set_cursor_shape(lines-4,lines-3);
+ASM_START
+  push bp
+  mov  bp, sp
+  mov  ch, _set_scan_lines.lines + 2[bp]
+  sub  ch, #0x04 ; CH = lines-4
+  mov  cl, ch
+  inc  cl        ; CL = lines-3
+  call biosfn_set_cursor_shape
+  pop  bp
+ASM_END
   }
  write_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT, lines);
  outb(crtc_addr, 0x12);
@@ -2833,6 +2883,7 @@ static void biosfn_load_gfx_8_8_chars (ES,BP) Bit16u ES;Bit16u BP;
 
     write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 8);
 }
+
 static void biosfn_load_gfx_user_chars (ES,BP,CX,BL,DL) Bit16u ES;Bit16u BP;Bit16u CX;Bit8u BL;Bit8u DL;
 {
     Bit8u mode; Bit8u line;
@@ -2842,23 +2893,23 @@ static void biosfn_load_gfx_user_chars (ES,BP,CX,BL,DL) Bit16u ES;Bit16u BP;Bit1
     write_word(0x0, 0x43*4+2, ES);
 
     switch (BL) {
-    case 0:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, DL-1);
-	break;
-    case 1:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
-	break;
-    case 3:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
-	break;
-    case 2:
-    default:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
-	break;
+     case 0:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, DL-1);
+      break;
+     case 1:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+      break;
+     case 3:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+      break;
+     case 2:
+     default:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+      break;
     }
-
     write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, CX);
 }
+
 static void biosfn_load_gfx_8_14_chars (BL) Bit8u BL;
 {
     /* set 0x43 INT pointer */
@@ -2866,19 +2917,20 @@ static void biosfn_load_gfx_8_14_chars (BL) Bit8u BL;
     write_word(0x0, 0x43*4+2, 0xC000);
 
     switch (BL) {
-    case 1:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
-	break;
-    case 3:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
-	break;
-    case 2:
-    default:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
-	break;
+     case 1:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+      break;
+     case 3:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+      break;
+     case 2:
+     default:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+      break;
     }
     write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 14);
 }
+
 static void biosfn_load_gfx_8_8_dd_chars (BL) Bit8u BL;
 {
     /* set 0x43 INT pointer */
@@ -2886,19 +2938,20 @@ static void biosfn_load_gfx_8_8_dd_chars (BL) Bit8u BL;
     write_word(0x0, 0x43*4+2, 0xC000);
 
     switch (BL) {
-    case 1:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
-	break;
-    case 3:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
-	break;
-    case 2:
-    default:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
-	break;
+     case 1:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+      break;
+     case 3:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+      break;
+     case 2:
+     default:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+      break;
     }
     write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 8);
 }
+
 static void biosfn_load_gfx_8_16_chars (BL) Bit8u BL;
 {
     /* set 0x43 INT pointer */
@@ -2906,19 +2959,20 @@ static void biosfn_load_gfx_8_16_chars (BL) Bit8u BL;
     write_word(0x0, 0x43*4+2, 0xC000);
 
     switch (BL) {
-    case 1:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
-	break;
-    case 3:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
-	break;
-    case 2:
-    default:
-	write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
-	break;
+     case 1:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+      break;
+     case 3:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+      break;
+     case 2:
+     default:
+      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+      break;
     }
     write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 16);
 }
+
 // --------------------------------------------------------------------------------------------
 static void biosfn_get_font_info (BH,ES,BP,CX,DX)
 Bit8u BH;Bit16u *ES;Bit16u *BP;Bit16u *CX;Bit16u *DX;
