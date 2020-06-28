@@ -1085,15 +1085,16 @@ no_resize:
 biosfn_set_cursor_pos:
   push  ds
   push  ax
+  push  dx
   cmp   bh, #0x07
   ja    invalid_page_1
   mov   ax, # BIOSMEM_SEG
   mov   ds, ax
   push  cx
+  push  bx
   mov   cl, bh
   mov   al, bh
   xor   ah, ah
-  push  bx
   mov   bx, # BIOSMEM_CURSOR_POS
   shl   ax, #1
   add   bx, ax
@@ -1126,6 +1127,7 @@ not_set_hw_cursor:
   pop   bx
   pop   cx
 invalid_page_1:
+  pop   dx
   pop   ax
   pop   ds
   ret
