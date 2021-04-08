@@ -4,7 +4,7 @@
 // ============================================================================================
 //
 //  Copyright (C) 2002      Jeroen Janssen
-//  Copyright (C) 2003-2020 Volker Ruppert
+//  Copyright (C) 2003-2021 Volker Ruppert
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -53,7 +53,7 @@ extern char vbebios_product_revision;
 ASM_START
 // FIXME: 'merge' these (c) etc strings with the vgabios.c strings?
 _vbebios_copyright:
-.ascii       "Bochs VBE (C) 2002-2020 http://savannah.nongnu.org/projects/vgabios/"
+.ascii       "Bochs VBE (C) 2002-2021 http://savannah.nongnu.org/projects/vgabios/"
 .byte        0x00
 
 _vbebios_vendor_name:
@@ -1048,13 +1048,13 @@ Bit16u *AX;Bit16u BX;
             dispi_set_enable(VBE_DISPI_ENABLED | no_clear | lfb_flag);
             vga_compat_setup();
 
-            write_word(BIOSMEM_SEG,BIOSMEM_NB_COLS,cur_info->info.XResolution>>3);
-            write_word(BIOSMEM_SEG,BIOSMEM_NB_ROWS,(cur_info->info.YResolution>>4)-1);
-            write_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT,16);
-            write_word(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE,0);
-            write_word(BIOSMEM_SEG,BIOSMEM_CURSOR_POS,0);
-            write_word(BIOSMEM_SEG,BIOSMEM_VBE_MODE,BX);
-            write_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL,(0x60 | no_clear));
+            write_bda_word(BIOSMEM_NB_COLS,cur_info->info.XResolution>>3);
+            write_bda_word(BIOSMEM_NB_ROWS,(cur_info->info.YResolution>>4)-1);
+            write_bda_word(BIOSMEM_CHAR_HEIGHT,16);
+            write_bda_word(BIOSMEM_CURRENT_PAGE,0);
+            write_bda_word(BIOSMEM_CURSOR_POS,0);
+            write_bda_word(BIOSMEM_VBE_MODE,BX);
+            write_bda_byte(BIOSMEM_VIDEO_CTL,(0x60 | no_clear));
 
             result = 0x4f;
         } else {
