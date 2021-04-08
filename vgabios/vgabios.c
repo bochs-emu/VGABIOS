@@ -3,7 +3,7 @@
  */
 // ============================================================================================
 //
-//  Copyright (C) 2001-2020 The LGPL VGABios developers Team
+//  Copyright (C) 2001-2021 The LGPL VGABios developers Team
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -57,9 +57,13 @@
 
 /* Declares */
 static Bit8u          read_byte();
+static Bit8u          read_bda_byte();
 static Bit16u         read_word();
+static Bit16u         read_bda_word();
 static void           write_byte();
+static void           write_bda_byte();
 static void           write_word();
+static void           write_bda_word();
 static Bit8u          inb();
 static Bit16u         inw();
 static void           outb();
@@ -179,7 +183,7 @@ vgabios_date:
 .byte	0x00
 
 vgabios_copyright:
-.ascii	"(C) 2002-2020 the LGPL VGABios developers Team"
+.ascii	"(C) 2002-2021 the LGPL VGABios developers Team"
 .byte	0x0a,0x0d
 .byte	0x00
 
@@ -854,13 +858,13 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
   cheight=video_param_table[vpti].cheight;
 
   // Read the bios vga control
-  video_ctl=read_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL);
+  video_ctl=read_bda_byte(BIOSMEM_VIDEO_CTL);
 
   // Read the bios vga switches
-  vga_switches=read_byte(BIOSMEM_SEG,BIOSMEM_SWITCHES);
+  vga_switches=read_bda_byte(BIOSMEM_SWITCHES);
 
   // Read the bios mode set control
-  modeset_ctl=read_byte(BIOSMEM_SEG,BIOSMEM_MODESET_CTL);
+  modeset_ctl=read_bda_byte(BIOSMEM_MODESET_CTL);
 
   // Then we know the number of lines
   // FIXME
@@ -946,24 +950,24 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
   }
 
  // Set the BIOS mem
- write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE,mode);
- write_word(BIOSMEM_SEG,BIOSMEM_NB_COLS,twidth);
- write_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE,*(Bit16u *)&video_param_table[vpti].slength_l);
- write_word(BIOSMEM_SEG,BIOSMEM_CRTC_ADDRESS,crtc_addr);
- write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS,theightm1);
- write_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT,cheight);
- write_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL,(0x60|noclearmem));
- write_byte(BIOSMEM_SEG,BIOSMEM_SWITCHES,0xF9);
- write_byte(BIOSMEM_SEG,BIOSMEM_MODESET_CTL,read_byte(BIOSMEM_SEG,BIOSMEM_MODESET_CTL)&0x7f);
+ write_bda_byte(BIOSMEM_CURRENT_MODE,mode);
+ write_bda_word(BIOSMEM_NB_COLS,twidth);
+ write_bda_word(BIOSMEM_PAGE_SIZE,*(Bit16u *)&video_param_table[vpti].slength_l);
+ write_bda_word(BIOSMEM_CRTC_ADDRESS,crtc_addr);
+ write_bda_byte(BIOSMEM_NB_ROWS,theightm1);
+ write_bda_word(BIOSMEM_CHAR_HEIGHT,cheight);
+ write_bda_byte(BIOSMEM_VIDEO_CTL,(0x60|noclearmem));
+ write_bda_byte(BIOSMEM_SWITCHES,0xF9);
+ write_bda_byte(BIOSMEM_MODESET_CTL,read_bda_byte(BIOSMEM_MODESET_CTL)&0x7f);
 
  // FIXME We nearly have the good tables. to be reworked
- write_byte(BIOSMEM_SEG,BIOSMEM_DCC_INDEX,0x08);    // 8 is VGA should be ok for now
- write_word(BIOSMEM_SEG,BIOSMEM_VS_POINTER, video_save_pointer_table);
- write_word(BIOSMEM_SEG,BIOSMEM_VS_POINTER+2, 0xc000);
+ write_bda_byte(BIOSMEM_DCC_INDEX,0x08);    // 8 is VGA should be ok for now
+ write_bda_word(BIOSMEM_VS_POINTER, video_save_pointer_table);
+ write_bda_word(BIOSMEM_VS_POINTER+2, 0xc000);
 
  // FIXME
- write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MSR,0x00); // Unavailable on vanilla vga, but...
- write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_PAL,0x00); // Unavailable on vanilla vga, but...
+ write_bda_byte(BIOSMEM_CURRENT_MSR,0x00); // Unavailable on vanilla vga, but...
+ write_bda_byte(BIOSMEM_CURRENT_PAL,0x00); // Unavailable on vanilla vga, but...
 
  // Set cursor shape
  if(vga_modes[line].class==TEXT)
@@ -1201,7 +1205,7 @@ Bit8u page;
  if(page>7)return;
 
  // Get the mode
- mode=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE);
+ mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
  if(line==0xFF)return;
 
@@ -1211,11 +1215,11 @@ Bit8u page;
  if(vga_modes[line].class==TEXT)
   {
    // Get the page size
-   pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
+   pgsize=read_bda_word(BIOSMEM_PAGE_SIZE);
 
    // Calculate the mem address
    address=pgsize*page;
-   write_word(BIOSMEM_SEG,BIOSMEM_CURRENT_START,address);
+   write_bda_word(BIOSMEM_CURRENT_START,address);
 
    // Now the CRTC start address
    address>>=1;
@@ -1226,14 +1230,14 @@ Bit8u page;
   }
 
  // CRTC regs 0x0c and 0x0d
- crtc_addr=read_word(BIOSMEM_SEG,BIOSMEM_CRTC_ADDRESS);
+ crtc_addr=read_bda_word(BIOSMEM_CRTC_ADDRESS);
  outb(crtc_addr,0x0c);
  outb(crtc_addr+1,(address&0xff00)>>8);
  outb(crtc_addr,0x0d);
  outb(crtc_addr+1,address&0x00ff);
 
  // And change the BIOS page
- write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE,page);
+ write_bda_byte(BIOSMEM_CURRENT_PAGE,page);
 
 #ifdef DEBUG
  printf("Set active page %02x address %04x\n",page,address);
@@ -1354,17 +1358,17 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
  if(cul>clr)return;
 
  // Get the mode
- mode=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE);
+ mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
  if(line==0xFF)return;
 
  // Get the dimensions
- nbrows=read_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1;
- nbcols=read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
+ nbrows=read_bda_byte(BIOSMEM_NB_ROWS)+1;
+ nbcols=read_bda_word(BIOSMEM_NB_COLS);
 
  // Get the current page
  if(page==0xFF)
-  page=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE);
+  page=read_bda_byte(BIOSMEM_CURRENT_PAGE);
 
  if(rlr>=nbrows)rlr=nbrows-1;
  if(clr>=nbcols)clr=nbcols-1;
@@ -1374,7 +1378,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
  if(vga_modes[line].class==TEXT)
   {
    // Get the page size
-   pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
+   pgsize=read_bda_word(BIOSMEM_PAGE_SIZE);
    // Compute the address
    address=pgsize*page;
 #ifdef DEBUG
@@ -1411,7 +1415,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
  else
   {
    // FIXME gfx mode (Bochs VBE and Cirrus not supported)
-   cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
+   cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    if(nblines==0&&rul==0&&cul==0&&rlr==nbrows-1&&clr==nbcols-1)
     {
      switch(vga_modes[line].memmodel)
@@ -1526,7 +1530,7 @@ Bit8u page;Bit16u *car;
  Bit16u cursor;
 
  // Get the mode
- mode=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE);
+ mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
  if(line==0xFF)return;
 
@@ -1535,12 +1539,12 @@ Bit8u page;Bit16u *car;
  xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
 
  // Get the dimensions
- nbcols=read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
+ nbcols=read_bda_word(BIOSMEM_NB_COLS);
 
  if(vga_modes[line].class==TEXT)
   {
    // Get the page size
-   pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
+   pgsize=read_bda_word(BIOSMEM_PAGE_SIZE);
    // Compute the address
    address=pgsize*page+(xcurs+ycurs*nbcols)*2;
 
@@ -1725,7 +1729,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  Bit16u cursor,carattr;
 
  // Get the mode
- mode=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE);
+ mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
  if(line==0xFF)return;
 
@@ -1734,12 +1738,12 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
 
  // Get the dimensions
- nbcols=read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
+ nbcols=read_bda_word(BIOSMEM_NB_COLS);
 
  if(vga_modes[line].class==TEXT)
   {
    // Get the page size
-   pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
+   pgsize=read_bda_word(BIOSMEM_PAGE_SIZE);
    // Compute the address
    address=pgsize*page+(xcurs+ycurs*nbcols)*2;
 
@@ -1749,7 +1753,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  else
   {
    // FIXME gfx mode (Bochs VBE and Cirrus not supported)
-   cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
+   cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
     {
@@ -1784,7 +1788,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  Bit16u cursor;
 
  // Get the mode
- mode=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE);
+ mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
  if(line==0xFF)return;
 
@@ -1793,12 +1797,12 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
 
  // Get the dimensions
- nbcols=read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
+ nbcols=read_bda_word(BIOSMEM_NB_COLS);
 
  if(vga_modes[line].class==TEXT)
   {
    // Get the page size
-   pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
+   pgsize=read_bda_word(BIOSMEM_PAGE_SIZE);
    // Compute the address
    address=pgsize*page+(xcurs+ycurs*nbcols)*2;
 
@@ -1810,7 +1814,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  else
   {
    // FIXME gfx mode (Bochs VBE and Cirrus not supported)
-   cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
+   cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
     {
@@ -1924,7 +1928,7 @@ static void biosfn_write_pixel (BH,AL,CX,DX) Bit8u BH;Bit8u AL;Bit16u CX;Bit16u 
  Bit16u addr;
 
  // Get the mode
- mode=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE);
+ mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
  if(line==0xFF)return;
  if(vga_modes[line].class==TEXT)return;
@@ -1933,7 +1937,7 @@ static void biosfn_write_pixel (BH,AL,CX,DX) Bit8u BH;Bit8u AL;Bit16u CX;Bit16u 
   {
    case PLANAR4:
    case PLANAR1:
-     addr = CX/8+DX*read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
+     addr = CX/8+DX*read_bda_word(BIOSMEM_NB_COLS);
      mask = 0x80 >> (CX & 0x07);
      outw(VGAREG_GRDC_ADDRESS, (mask << 8) | 0x08);
      outw(VGAREG_GRDC_ADDRESS, 0x0205);
@@ -1986,7 +1990,7 @@ ASM_END
      write_byte(0xb800,addr,data);
      break;
    case LINEAR8:
-     addr=CX+DX*(read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS)*8);
+     addr=CX+DX*(read_bda_word(BIOSMEM_NB_COLS)*8);
      write_byte(0xa000,addr,AL);
      break;
 #ifdef DEBUG
@@ -2004,7 +2008,7 @@ static void biosfn_read_pixel (BH,CX,DX,AX) Bit8u BH;Bit16u CX;Bit16u DX;Bit16u 
  Bit16u ss=get_SS();
 
  // Get the mode
- mode=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE);
+ mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
  if(line==0xFF)return;
  if(vga_modes[line].class==TEXT)return;
@@ -2013,7 +2017,7 @@ static void biosfn_read_pixel (BH,CX,DX,AX) Bit8u BH;Bit16u CX;Bit16u DX;Bit16u 
   {
    case PLANAR4:
    case PLANAR1:
-     addr = CX/8+DX*read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
+     addr = CX/8+DX*read_bda_word(BIOSMEM_NB_COLS);
      mask = 0x80 >> (CX & 0x07);
      attr = 0x00;
      for(i=0;i<4;i++)
@@ -2037,7 +2041,7 @@ static void biosfn_read_pixel (BH,CX,DX,AX) Bit8u BH;Bit16u CX;Bit16u DX;Bit16u 
       }
      break;
    case LINEAR8:
-     addr=CX+DX*(read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS)*8);
+     addr=CX+DX*(read_bda_word(BIOSMEM_NB_COLS)*8);
      attr=read_byte(0xa000,addr);
      break;
    default:
@@ -2060,10 +2064,10 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
 
  // special case if page is 0xff, use current page
  if(page==0xff)
-  page=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE);
+  page=read_bda_byte(BIOSMEM_CURRENT_PAGE);
 
  // Get the mode
- mode=read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE);
+ mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
  if(line==0xFF)return;
 
@@ -2072,8 +2076,8 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
  xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
 
  // Get the dimensions
- nbrows=read_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1;
- nbcols=read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
+ nbrows=read_bda_byte(BIOSMEM_NB_ROWS)+1;
+ nbcols=read_bda_word(BIOSMEM_NB_COLS);
 
  switch(car)
   {
@@ -2107,7 +2111,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
     if(vga_modes[line].class==TEXT)
      {
       // Get the page size
-      pgsize=read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE);
+      pgsize=read_bda_word(BIOSMEM_PAGE_SIZE);
       // Compute the address
       address=pgsize*page+(xcurs+ycurs*nbcols)*2;
 
@@ -2120,7 +2124,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
     else
      {
       // FIXME gfx mode (Bochs VBE and Cirrus not supported)
-      cheight=read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT);
+      cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
       bpp=vga_modes[line].pixbits;
       switch(vga_modes[line].memmodel)
        {
@@ -2749,7 +2753,7 @@ static void set_scan_lines(lines) Bit8u lines;
  Bit16u crtc_addr,cols,page,vde;
  Bit8u crtc_r9,ovl,rows;
 
- crtc_addr = read_word(BIOSMEM_SEG,BIOSMEM_CRTC_ADDRESS);
+ crtc_addr = read_bda_word(BIOSMEM_CRTC_ADDRESS);
  outb(crtc_addr, 0x09);
  crtc_r9 = inb(crtc_addr+1);
  crtc_r9 = (crtc_r9 & 0xe0) | (lines - 1);
@@ -2774,16 +2778,16 @@ ASM_START
   pop  bp
 ASM_END
   }
- write_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT, lines);
+ write_bda_word(BIOSMEM_CHAR_HEIGHT, lines);
  outb(crtc_addr, 0x12);
  vde = inb(crtc_addr+1);
  outb(crtc_addr, 0x07);
  ovl = inb(crtc_addr+1);
  vde += (((ovl & 0x02) << 7) + ((ovl & 0x40) << 3) + 1);
  rows = vde / lines;
- write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, rows-1);
- cols = read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
- write_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE, SCREEN_SIZE(rows, cols));
+ write_bda_byte(BIOSMEM_NB_ROWS, rows-1);
+ cols = read_bda_word(BIOSMEM_NB_COLS);
+ write_bda_word(BIOSMEM_PAGE_SIZE, SCREEN_SIZE(rows, cols));
 }
 
 static void biosfn_load_text_user_pat (AL,ES,BP,CX,DX,BL,BH) Bit8u AL;Bit16u ES;Bit16u BP;Bit16u CX;Bit16u DX;Bit8u BL;Bit8u BH;
@@ -2883,7 +2887,7 @@ static void biosfn_load_gfx_8_8_chars (ES,BP) Bit16u ES;Bit16u BP;
     write_word(0x0, 0x1F*4, BP);
     write_word(0x0, 0x1F*4+2, ES);
 
-    write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 8);
+    write_bda_byte( BIOSMEM_CHAR_HEIGHT, 8);
 }
 
 static void biosfn_load_gfx_user_chars (ES,BP,CX,BL,DL) Bit16u ES;Bit16u BP;Bit16u CX;Bit8u BL;Bit8u DL;
@@ -2896,20 +2900,20 @@ static void biosfn_load_gfx_user_chars (ES,BP,CX,BL,DL) Bit16u ES;Bit16u BP;Bit1
 
     switch (BL) {
      case 0:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, DL-1);
+      write_bda_byte(BIOSMEM_NB_ROWS, DL-1);
       break;
      case 1:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+      write_bda_byte(BIOSMEM_NB_ROWS, 13);
       break;
      case 3:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+      write_bda_byte(BIOSMEM_NB_ROWS, 42);
       break;
      case 2:
      default:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+      write_bda_byte(BIOSMEM_NB_ROWS, 24);
       break;
     }
-    write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, CX);
+    write_bda_byte( BIOSMEM_CHAR_HEIGHT, CX);
 }
 
 static void biosfn_load_gfx_8_14_chars (BL) Bit8u BL;
@@ -2920,17 +2924,17 @@ static void biosfn_load_gfx_8_14_chars (BL) Bit8u BL;
 
     switch (BL) {
      case 1:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+      write_bda_byte(BIOSMEM_NB_ROWS, 13);
       break;
      case 3:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+      write_bda_byte(BIOSMEM_NB_ROWS, 42);
       break;
      case 2:
      default:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+      write_bda_byte(BIOSMEM_NB_ROWS, 24);
       break;
     }
-    write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 14);
+    write_bda_byte( BIOSMEM_CHAR_HEIGHT, 14);
 }
 
 static void biosfn_load_gfx_8_8_dd_chars (BL) Bit8u BL;
@@ -2941,17 +2945,17 @@ static void biosfn_load_gfx_8_8_dd_chars (BL) Bit8u BL;
 
     switch (BL) {
      case 1:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+      write_bda_byte(BIOSMEM_NB_ROWS, 13);
       break;
      case 3:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+      write_bda_byte(BIOSMEM_NB_ROWS, 42);
       break;
      case 2:
      default:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+      write_bda_byte(BIOSMEM_NB_ROWS, 24);
       break;
     }
-    write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 8);
+    write_bda_byte( BIOSMEM_CHAR_HEIGHT, 8);
 }
 
 static void biosfn_load_gfx_8_16_chars (BL) Bit8u BL;
@@ -2962,17 +2966,17 @@ static void biosfn_load_gfx_8_16_chars (BL) Bit8u BL;
 
     switch (BL) {
      case 1:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
+      write_bda_byte(BIOSMEM_NB_ROWS, 13);
       break;
      case 3:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 42);
+      write_bda_byte(BIOSMEM_NB_ROWS, 42);
       break;
      case 2:
      default:
-      write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
+      write_bda_byte(BIOSMEM_NB_ROWS, 24);
       break;
     }
-    write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 16);
+    write_bda_byte( BIOSMEM_CHAR_HEIGHT, 16);
 }
 
 // --------------------------------------------------------------------------------------------
@@ -3020,10 +3024,10 @@ Bit8u BH;Bit16u *ES;Bit16u *BP;Bit16u *CX;Bit16u *DX;
     return;
   }
  // Set byte/char of on screen font
- write_word(ss,CX,(Bit16u)read_byte(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT));
+ write_word(ss,CX,(Bit16u)read_bda_byte(BIOSMEM_CHAR_HEIGHT));
 
  // Set Highest char row
- write_word(ss,DX,(Bit16u)read_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS));
+ write_word(ss,DX,(Bit16u)read_bda_byte(BIOSMEM_NB_ROWS));
 }
 
 // --------------------------------------------------------------------------------------------
@@ -3332,7 +3336,7 @@ Bit16u BX;Bit16u ES;Bit16u DI;
  memcpyb(ES,DI+0x04,BIOSMEM_SEG,0x49,30);
  memcpyb(ES,DI+0x22,BIOSMEM_SEG,0x84,3);
 
- write_byte(ES,DI+0x25,read_byte(BIOSMEM_SEG,BIOSMEM_DCC_INDEX));
+ write_byte(ES,DI+0x25,read_bda_byte(BIOSMEM_DCC_INDEX));
  write_byte(ES,DI+0x26,0);
  write_byte(ES,DI+0x27,16);
  write_byte(ES,DI+0x28,0);
@@ -3377,7 +3381,7 @@ static Bit16u biosfn_save_video_state (CX,ES,BX)
 {
     Bit16u i, v, crtc_addr, ar_index;
 
-    crtc_addr = read_word(BIOSMEM_SEG, BIOSMEM_CRTC_ADDRESS);
+    crtc_addr = read_bda_word( BIOSMEM_CRTC_ADDRESS);
     if (CX & 1) {
         write_byte(ES, BX, inb(VGAREG_SEQU_ADDRESS)); BX++;
         write_byte(ES, BX, inb(crtc_addr)); BX++;
@@ -3420,22 +3424,22 @@ static Bit16u biosfn_save_video_state (CX,ES,BX)
         write_byte(ES, BX, 0); BX++;
     }
     if (CX & 2) {
-        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE)); BX++;
-        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS)); BX += 2;
-        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE)); BX += 2;
-        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_CRTC_ADDRESS)); BX += 2;
-        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS)); BX++;
-        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT)); BX += 2;
-        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL)); BX++;
-        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_SWITCHES)); BX++;
-        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_MODESET_CTL)); BX++;
-        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_CURSOR_TYPE)); BX += 2;
+        write_byte(ES, BX, read_bda_byte(BIOSMEM_CURRENT_MODE)); BX++;
+        write_word(ES, BX, read_bda_word(BIOSMEM_NB_COLS)); BX += 2;
+        write_word(ES, BX, read_bda_word(BIOSMEM_PAGE_SIZE)); BX += 2;
+        write_word(ES, BX, read_bda_word(BIOSMEM_CRTC_ADDRESS)); BX += 2;
+        write_byte(ES, BX, read_bda_byte(BIOSMEM_NB_ROWS)); BX++;
+        write_word(ES, BX, read_bda_word(BIOSMEM_CHAR_HEIGHT)); BX += 2;
+        write_byte(ES, BX, read_bda_byte(BIOSMEM_VIDEO_CTL)); BX++;
+        write_byte(ES, BX, read_bda_byte(BIOSMEM_SWITCHES)); BX++;
+        write_byte(ES, BX, read_bda_byte(BIOSMEM_MODESET_CTL)); BX++;
+        write_word(ES, BX, read_bda_word(BIOSMEM_CURSOR_TYPE)); BX += 2;
         for(i=0;i<8;i++) {
-            write_word(ES, BX, read_word(BIOSMEM_SEG, BIOSMEM_CURSOR_POS+2*i));
+            write_word(ES, BX, read_bda_word( BIOSMEM_CURSOR_POS+2*i));
             BX += 2;
         }
-        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_CURRENT_START)); BX += 2;
-        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE)); BX++;
+        write_word(ES, BX, read_bda_word(BIOSMEM_CURRENT_START)); BX += 2;
+        write_byte(ES, BX, read_bda_byte(BIOSMEM_CURRENT_PAGE)); BX++;
         /* current font */
         write_word(ES, BX, read_word(0, 0x1f * 4)); BX += 2;
         write_word(ES, BX, read_word(0, 0x1f * 4 + 2)); BX += 2;
@@ -3521,22 +3525,22 @@ static Bit16u biosfn_restore_video_state (CX,ES,BX)
         outb(crtc_addr - 0x4 + 0xa, read_byte(ES, addr1)); addr1++;
     }
     if (CX & 2) {
-        write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE, read_byte(ES, BX)); BX++;
-        write_word(BIOSMEM_SEG,BIOSMEM_NB_COLS, read_word(ES, BX)); BX += 2;
-        write_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE, read_word(ES, BX)); BX += 2;
-        write_word(BIOSMEM_SEG,BIOSMEM_CRTC_ADDRESS, read_word(ES, BX)); BX += 2;
-        write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, read_byte(ES, BX)); BX++;
-        write_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT, read_word(ES, BX)); BX += 2;
-        write_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL, read_byte(ES, BX)); BX++;
-        write_byte(BIOSMEM_SEG,BIOSMEM_SWITCHES, read_byte(ES, BX)); BX++;
-        write_byte(BIOSMEM_SEG,BIOSMEM_MODESET_CTL, read_byte(ES, BX)); BX++;
-        write_word(BIOSMEM_SEG,BIOSMEM_CURSOR_TYPE, read_word(ES, BX)); BX += 2;
+        write_bda_byte(BIOSMEM_CURRENT_MODE, read_byte(ES, BX)); BX++;
+        write_bda_word(BIOSMEM_NB_COLS, read_word(ES, BX)); BX += 2;
+        write_bda_word(BIOSMEM_PAGE_SIZE, read_word(ES, BX)); BX += 2;
+        write_bda_word(BIOSMEM_CRTC_ADDRESS, read_word(ES, BX)); BX += 2;
+        write_bda_byte(BIOSMEM_NB_ROWS, read_byte(ES, BX)); BX++;
+        write_bda_word(BIOSMEM_CHAR_HEIGHT, read_word(ES, BX)); BX += 2;
+        write_bda_byte(BIOSMEM_VIDEO_CTL, read_byte(ES, BX)); BX++;
+        write_bda_byte(BIOSMEM_SWITCHES, read_byte(ES, BX)); BX++;
+        write_bda_byte(BIOSMEM_MODESET_CTL, read_byte(ES, BX)); BX++;
+        write_bda_word(BIOSMEM_CURSOR_TYPE, read_word(ES, BX)); BX += 2;
         for(i=0;i<8;i++) {
-            write_word(BIOSMEM_SEG, BIOSMEM_CURSOR_POS+2*i, read_word(ES, BX));
+            write_bda_word( BIOSMEM_CURSOR_POS+2*i, read_word(ES, BX));
             BX += 2;
         }
-        write_word(BIOSMEM_SEG,BIOSMEM_CURRENT_START, read_word(ES, BX)); BX += 2;
-        write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE, read_byte(ES, BX)); BX++;
+        write_bda_word(BIOSMEM_CURRENT_START, read_word(ES, BX)); BX += 2;
+        write_bda_byte(BIOSMEM_CURRENT_PAGE, read_byte(ES, BX)); BX++;
         /* current font */
         write_word(0, 0x1f * 4, read_word(ES, BX)); BX += 2;
         write_word(0, 0x1f * 4 + 2, read_word(ES, BX)); BX += 2;
@@ -3782,6 +3786,29 @@ ASM_END
 }
 
 // --------------------------------------------------------------------------------------------
+static Bit8u
+read_bda_byte(offset)
+  Bit16u offset;
+{
+ASM_START
+  push bp
+  mov  bp, sp
+
+    push bx
+    push ds
+    mov  ax, #BIOSMEM_SEG ; segment
+    mov  ds, ax
+    mov  bx, 4[bp] ; offset
+    mov  al, [bx]
+    ;; al = return value (byte)
+    pop  ds
+    pop  bx
+
+  pop  bp
+ASM_END
+}
+
+// --------------------------------------------------------------------------------------------
 static Bit16u
 read_word(seg, offset)
   Bit16u seg;
@@ -3796,6 +3823,29 @@ ASM_START
     mov  ax, 4[bp] ; segment
     mov  ds, ax
     mov  bx, 6[bp] ; offset
+    mov  ax, [bx]
+    ;; ax = return value (word)
+    pop  ds
+    pop  bx
+
+  pop  bp
+ASM_END
+}
+
+// --------------------------------------------------------------------------------------------
+static Bit16u
+read_bda_word(offset)
+  Bit16u offset;
+{
+ASM_START
+  push bp
+  mov  bp, sp
+
+    push bx
+    push ds
+    mov  ax, #BIOSMEM_SEG ; segment
+    mov  ds, ax
+    mov  bx, 4[bp] ; offset
     mov  ax, [bx]
     ;; ax = return value (word)
     pop  ds
@@ -3834,6 +3884,32 @@ ASM_END
 
 // --------------------------------------------------------------------------------------------
 static void
+write_bda_byte(offset, data)
+  Bit16u offset;
+  Bit8u  data;
+{
+ASM_START
+  push bp
+  mov  bp, sp
+
+    push ax
+    push bx
+    push ds
+    mov  ax, #BIOSMEM_SEG ; segment
+    mov  ds, ax
+    mov  bx, 4[bp] ; offset
+    mov  al, 6[bp] ; data byte
+    mov  [bx], al  ; write data byte
+    pop  ds
+    pop  bx
+    pop  ax
+
+  pop  bp
+ASM_END
+}
+
+// --------------------------------------------------------------------------------------------
+static void
 write_word(seg, offset, data)
   Bit16u seg;
   Bit16u offset;
@@ -3850,6 +3926,32 @@ ASM_START
     mov  ds, ax
     mov  bx, 6[bp] ; offset
     mov  ax, 8[bp] ; data word
+    mov  [bx], ax  ; write data word
+    pop  ds
+    pop  bx
+    pop  ax
+
+  pop  bp
+ASM_END
+}
+
+// --------------------------------------------------------------------------------------------
+static void
+write_bda_word(offset, data)
+  Bit16u offset;
+  Bit16u data;
+{
+ASM_START
+  push bp
+  mov  bp, sp
+
+    push ax
+    push bx
+    push ds
+    mov  ax, #BIOSMEM_SEG ; segment
+    mov  ds, ax
+    mov  bx, 4[bp] ; offset
+    mov  ax, 6[bp] ; data word
     mov  [bx], ax  ; write data word
     pop  ds
     pop  bx
