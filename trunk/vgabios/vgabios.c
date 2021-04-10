@@ -94,7 +94,6 @@ static void biosfn_write_char_only();
 static void biosfn_write_pixel();
 static void biosfn_read_pixel();
 static void biosfn_write_teletype();
-static void biosfn_perform_gray_scale_summing();
 static void biosfn_load_text_user_pat();
 static void biosfn_load_text_8_14_pat();
 static void biosfn_load_text_8_8_pat();
@@ -341,7 +340,7 @@ int10_test_1103:
   jmp   int10_end
 int10_test_12:
   cmp   ah, #0x12
-  jne   int10_test_101B
+  jne   int10_test_10
   cmp   bl, #0x10
   jne   int10_test_BL30
   call  biosfn_get_ega_info
@@ -371,9 +370,7 @@ int10_test_BL34:
   jne   int10_normal
   call  biosfn_enable_cursor_emulation
   jmp   int10_end
-int10_test_101B:
-  cmp   ax, #0x101b
-  je    int10_normal
+int10_test_10:
   cmp   ah, #0x10
   jne   int10_normal
   call  biosfn_group_10
@@ -649,10 +646,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
      // We do output only on the current page !
      biosfn_write_teletype(GET_AL(),0xff,GET_BL(),NO_ATTR);
      break;
-   case 0x10:
-     // All other functions of group AH=0x10 rewritten in assembler
-     biosfn_perform_gray_scale_summing(BX,CX);
-     break;
    case 0x11:
      switch(GET_AL())
       {
@@ -879,7 +872,11 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
 
     if((modeset_ctl&0x02)==0x02)
     {
-      biosfn_perform_gray_scale_summing(0x00, 0x100);
+ASM_START
+      xor  bx, bx
+      mov  cx, #0x0100
+      call biosfn_perform_gray_scale_summing
+ASM_END
     }
   }
 
@@ -2259,8 +2256,12 @@ int10_test_1019:
   jmp   biosfn_read_pel_mask
 int10_test_101A:
   cmp   al, #0x1a
-  jne   int10_group_10_unknown
+  jne   int10_test_101B
   jmp   biosfn_read_video_dac_state
+int10_test_101B:
+  cmp   al, #0x1b
+  jne   int10_group_10_unknown
+  jmp   biosfn_perform_gray_scale_summing
 int10_group_10_unknown:
 #ifdef DEBUG
   call  _unknown
@@ -2655,40 +2656,70 @@ get_dac_16_page:
 ASM_END
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_perform_gray_scale_summing (start,count)
-Bit16u start;Bit16u count;
-{Bit8u r,g,b;
- Bit16u i;
- Bit16u index;
-
- inb(VGAREG_ACTL_RESET);
- outb(VGAREG_ACTL_ADDRESS,0x00);
-
- for( index = 0; index < count; index++ )
-  {
-   // set read address and switch to read mode
-   outb(VGAREG_DAC_READ_ADDRESS,start);
-   // get 6-bit wide RGB data values
-   r=inb( VGAREG_DAC_DATA );
-   g=inb( VGAREG_DAC_DATA );
-   b=inb( VGAREG_DAC_DATA );
-
-   // intensity = ( 0.3 * Red ) + ( 0.59 * Green ) + ( 0.11 * Blue )
-   i = ( ( 77*r + 151*g + 28*b ) + 0x80 ) >> 8;
-
-   if(i>0x3f)i=0x3f;
-
-   // set write address and switch to write mode
-   outb(VGAREG_DAC_WRITE_ADDRESS,start);
-   // write new intensity value
-   outb( VGAREG_DAC_DATA, i&0xff );
-   outb( VGAREG_DAC_DATA, i&0xff );
-   outb( VGAREG_DAC_DATA, i&0xff );
-   start++;
-  }
- inb(VGAREG_ACTL_RESET);
- outb(VGAREG_ACTL_ADDRESS,0x20);
-}
+ASM_START
+biosfn_perform_gray_scale_summing:
+  push  ax
+  push  bx
+  push  cx
+  push  dx
+  mov   dx, #VGAREG_ACTL_RESET
+  in    al, dx
+  mov   dx, #VGAREG_ACTL_ADDRESS
+  mov   al, #0x00
+  out   dx, al
+dac_gss_loop:
+  mov   al, bl
+  mov   dx, #VGAREG_DAC_READ_ADDRESS
+  push  bx
+  out   dx, al
+  mov   dx, #VGAREG_DAC_DATA
+  in    al, dx
+  mov   bl, #0x4d
+  mul   al, bl
+  push  ax
+  in    al, dx
+  mov   bl, #0x97
+  mul   al, bl
+  push  ax
+  in    al, dx
+  mov   bl, #0x1c
+  mul   al, bl
+  mov   dx, ax
+  pop   ax
+  add   ax, dx
+  mov   dx, ax
+  pop   ax
+  add   ax, dx
+  add   ax, #0x80
+  shr   ax, #8
+  cmp   al, #0x3f
+  jna   dac_no_clip
+  mov   al, #0x3f
+dac_no_clip:
+  pop   bx
+  push  ax
+  mov   al, bl
+  mov   dx, #VGAREG_DAC_WRITE_ADDRESS
+  out   dx, al
+  pop   ax
+  mov   dx, #VGAREG_DAC_DATA
+  out   dx, al
+  out   dx, al
+  out   dx, al
+  inc   bl
+  dec   cx
+  jnz   dac_gss_loop
+  mov   dx, #VGAREG_ACTL_RESET
+  in    al, dx
+  mov   dx, #VGAREG_ACTL_ADDRESS
+  mov   al, #0x20
+  out   dx, al
+  pop   dx
+  pop   cx
+  pop   bx
+  pop   ax
+  ret
+ASM_END
 
 // --------------------------------------------------------------------------------------------
 static void get_font_access()
