@@ -21,7 +21,7 @@
 //
 // ============================================================================================
 //
-//  This VGA Bios is specific to the plex86/bochs Emulated VGA card.
+//  This VGA Bios is specific to the Bochs Emulated VGA card.
 //  You can NOT drive any physical vga card with it.
 //
 // ============================================================================================
@@ -160,7 +160,7 @@ vgabios_entry_point:
 .byte   0x00
 
 vgabios_name:
-.ascii	"Plex86/Bochs VGABios"
+.ascii	"Bochs VGABios"
 #ifdef PCIBIOS
 .ascii	" (PCI)"
 #endif
@@ -194,8 +194,6 @@ vgabios_license:
 vgabios_website:
 .ascii	"Please visit :"
 .byte	0x0a,0x0d
-;;.ascii  " . http://www.plex86.org"
-;;.byte	0x0a,0x0d
 .ascii	" . http://bochs.sourceforge.net"
 .byte	0x0a,0x0d
 .ascii	" . http://www.nongnu.org/vgabios"
