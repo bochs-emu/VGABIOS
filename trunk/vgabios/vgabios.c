@@ -108,7 +108,6 @@ static void biosfn_alternate_prtsc();
 static void biosfn_switch_video_interface();
 static void biosfn_enable_video_refresh_control();
 static void biosfn_write_string();
-static void biosfn_read_state_info();
 static void biosfn_read_video_state_size();
 static Bit16u biosfn_save_video_state();
 static Bit16u biosfn_restore_video_state();
@@ -300,94 +299,88 @@ vgabios_int10_handler:
 #endif
 #ifdef VBE
   cmp   ah, #0x4f
-  jne   int10_test_01
+  jne   int10_no_vbefn
   jmp   vbe_main_handler
 #endif
-int10_test_01:
+int10_no_vbefn:
+  push  #int10_end
   cmp   ah, #0x01
   jne   int10_test_02
-  call  biosfn_set_cursor_shape
-  jmp   int10_end
+  jmp   biosfn_set_cursor_shape
 int10_test_02:
   cmp   ah, #0x02
   jne   int10_test_03
-  call  biosfn_set_cursor_pos
-  jmp   int10_end
+  jmp   biosfn_set_cursor_pos
 int10_test_03:
   cmp   ah, #0x03
+  jne   int10_test_04
+  jmp   biosfn_get_cursor_pos
+int10_test_04:
+  cmp   ah, #0x04
   jne   int10_test_0F
-  call  biosfn_get_cursor_pos
-  jmp   int10_end
+  jmp   biosfn_read_light_pen_pos
 int10_test_0F:
   cmp   ah, #0x0f
   jne   int10_test_1A
-  call  biosfn_get_video_mode
-  jmp   int10_end
+  jmp   biosfn_get_video_mode
 int10_test_1A:
   cmp   ah, #0x1a
   jne   int10_test_0B
-  call  biosfn_group_1A
-  jmp   int10_end
+  jmp   biosfn_group_1A
 int10_test_0B:
   cmp   ah, #0x0b
   jne   int10_test_1103
-  call  biosfn_group_0B
-  jmp   int10_end
+  jmp   biosfn_group_0B
 int10_test_1103:
   cmp   ax, #0x1103
   jne   int10_test_12
-  call  biosfn_set_text_block_specifier
-  jmp   int10_end
+  jmp   biosfn_set_text_block_specifier
 int10_test_12:
   cmp   ah, #0x12
   jne   int10_test_10
   cmp   bl, #0x10
   jne   int10_test_BL30
-  call  biosfn_get_ega_info
-  jmp   int10_end
+  jmp   biosfn_get_ega_info
 int10_test_BL30:
   cmp   bl, #0x30
   jne   int10_test_BL31
-  call  biosfn_select_vert_res
-  jmp   int10_end
+  jmp   biosfn_select_vert_res
 int10_test_BL31:
   cmp   bl, #0x31
   jne   int10_test_BL32
-  call  biosfn_enable_default_palette_loading
-  jmp   int10_end
+  jmp   biosfn_enable_default_palette_loading
 int10_test_BL32:
   cmp   bl, #0x32
   jne   int10_test_BL33
-  call  biosfn_enable_video_addressing
-  jmp   int10_end
+  jmp   biosfn_enable_video_addressing
 int10_test_BL33:
   cmp   bl, #0x33
   jne   int10_test_BL34
-  call  biosfn_enable_grayscale_summing
-  jmp   int10_end
+  jmp   biosfn_enable_grayscale_summing
 int10_test_BL34:
   cmp   bl, #0x34
   jne   int10_normal
-  call  biosfn_enable_cursor_emulation
-  jmp   int10_end
+  jmp   biosfn_enable_cursor_emulation
 int10_test_10:
   cmp   ah, #0x10
+  jne   int10_test_1B
+  jmp   biosfn_group_10
+int10_test_1B:
+  cmp   ah, #0x1b
   jne   int10_normal
-  call  biosfn_group_10
-  jmp   int10_end
+  jmp   biosfn_read_state_info
 int10_normal:
   push es
   push ds
   pusha
-
-;; We have to set ds to access the right data segment
   mov   bx, #0xc000
   mov   ds, bx
   call _int10_func
-
   popa
   pop ds
   pop es
+  ret
+
 int10_end:
   popf
   iret
@@ -607,16 +600,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
         SET_AL(0x20);
       }
      break;
-   case 0x04:
-     // Read light pen pos (unsupported on VGA)
-#ifdef DEBUG
-     unimplemented();
-#endif
-     AX=0x00;
-     BX=0x00;
-     CX=0x00;
-     DX=0x00;
-     break;
    case 0x05:
      biosfn_set_active_page(GET_AL());
      break;
@@ -712,10 +695,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
      break;
    case 0x13:
      biosfn_write_string(GET_AL(),GET_BH(),GET_BL(),CX,GET_DH(),GET_DL(),ES,BP);
-     break;
-   case 0x1B:
-     biosfn_read_state_info(BX,ES,DI);
-     SET_AL(0x1B);
      break;
    case 0x1C:
      switch(GET_AL())
@@ -1188,6 +1167,18 @@ page_ok:
 page_ret:
   pop   ds
   pop   bp
+  ret
+
+;--------------------------------------------------------------------------------------------
+biosfn_read_light_pen_pos:
+;; unsupported on VGA
+#ifdef DEBUG
+  call _unimplemented
+#endif
+  xor   ax, ax
+  xor   bx, bx
+  xor   cx, cx
+  xor   dx, dx
   ret
 ASM_END
 
@@ -3356,32 +3347,59 @@ msg_alt_dcc:
 ASM_END
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_read_state_info (BX,ES,DI)
-Bit16u BX;Bit16u ES;Bit16u DI;
-{
- // Address of static functionality table
- write_word(ES,DI+0x00,&static_functionality);
- write_word(ES,DI+0x02,0xC000);
+ASM_START
+biosfn_read_state_info:
+  and   bx, bx
+  jnz   unsup_1B
+  push  ds
+  push  si
+  push  di
+  push  cx
+  mov   ax, #BIOSMEM_SEG
+  mov   ds, ax
+  mov   ax, #_static_functionality
+  stosw
+  mov   ax, #0xc000
+  stosw
+  mov   si, #BIOSMEM_CURRENT_MODE
+  mov   cx, #0x1e
+  cld
+  rep
+     movsb
+  mov   al, BIOSMEM_NB_ROWS
+  stosb
+  mov   ax, BIOSMEM_CHAR_HEIGHT
+  stosw
+  mov   al, BIOSMEM_DCC_INDEX
+  stosb
+  xor   al, al
+  stosb
+  mov   al, #0x10
+  stosb
+  xor   al, al
+  stosb
+  mov   al, #0x08
+  stosb
+  mov   al, #0x02
+  stosb
+  xor   ax, ax
+  stosw
+  mov   al, #0x03
+  stosb
+  xor   al, al
+  stosb
+  mov   cx, #0x0d
+  rep
+    stosb
+  pop   cx
+  pop   di
+  pop   si
+  pop   ds
+  mov   ax, #0x1b1b
+unsup_1B:
+  ret
+ASM_END
 
- // Hard coded copy from BIOS area. Should it be cleaner ?
- memcpyb(ES,DI+0x04,BIOSMEM_SEG,0x49,30);
- memcpyb(ES,DI+0x22,BIOSMEM_SEG,0x84,3);
-
- write_byte(ES,DI+0x25,read_bda_byte(BIOSMEM_DCC_INDEX));
- write_byte(ES,DI+0x26,0);
- write_byte(ES,DI+0x27,16);
- write_byte(ES,DI+0x28,0);
- write_byte(ES,DI+0x29,8);
- write_byte(ES,DI+0x2a,2);
- write_byte(ES,DI+0x2b,0);
- write_byte(ES,DI+0x2c,0);
- write_byte(ES,DI+0x31,3);
- write_byte(ES,DI+0x32,0);
-
- memsetb(ES,DI+0x33,0,13);
-}
-
-// --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
 static Bit16u biosfn_read_video_state_size2 (CX)
      Bit16u CX;
