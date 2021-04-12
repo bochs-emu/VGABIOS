@@ -214,6 +214,9 @@ vgabios_pci_data:
 #elif defined(VBE)
 .word 0x1234
 .word 0x1111 // Bochs VBE support
+#elif defined(BANSHEE)
+.word 0x121a
+.word 0x0003 // Banshee PCI
 #else
 #error "Unknown PCI vendor and device id"
 #endif
@@ -255,6 +258,10 @@ vgabios_init_func:
   call cirrus_init
 #endif
 
+#ifdef BANSHEE
+  call banshee_init
+#endif
+
 ;; display splash screen
   call _display_splash_screen
 
@@ -273,6 +280,11 @@ vgabios_init_func:
 #ifdef CIRRUS
 ;; show cirrus info
   call cirrus_display_info
+#endif
+
+#ifdef BANSHEE
+;; show 3dfx Banshee info
+  call banshee_display_info
 #endif
 
   retf
@@ -995,6 +1007,11 @@ ASM_START
 ASM_END
      break;
    }
+#ifdef BANSHEE
+ASM_START
+  call banshee_set_vga_mode
+ASM_END
+#endif
 }
 
 // --------------------------------------------------------------------------------------------
@@ -4232,6 +4249,10 @@ ASM_END
 #include "clext.c"
 #endif
 
+#ifdef BANSHEE
+#include "banshee.c"
+#endif
+
 // --------------------------------------------------------------------------------------------
 
 ASM_START
@@ -4244,4 +4265,10 @@ ASM_START
 vgabios_end:
 .byte 0xCB
 ;; BLOCK_STRINGS_BEGIN
+
+#ifdef BANSHEE
+.org 0x7ff8
+.byte 0x1a, 0x12, 0x04, 0x00
+#endif
+
 ASM_END
