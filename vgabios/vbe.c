@@ -1102,11 +1102,6 @@ vbe_03_ok:
 ASM_END
 
 
-Bit16u vbe_biosfn_read_video_state_size()
-{
-    return (VBE_DISPI_INDEX_Y_OFFSET - 1) * 2;
-}
-
 void vbe_biosfn_save_video_state(ES, BX)
      Bit16u ES; Bit16u BX;
 {
@@ -1178,6 +1173,26 @@ void vbe_biosfn_restore_video_state(ES, BX)
  *              BX      = Number of 64-byte blocks to hold the state buffer (if DL=00h)
  *
  */
+ASM_START
+vbe_biosfn_save_restore_state:
+  cmp   dl, #0x01
+  jb    read_state_size
+  jmp   vbe_normal
+read_state_size:
+  call  biosfn_read_video_state_size2
+  test  cx, #0x08
+  jz    no_svga_state
+  mov   ax, #VBE_DISPI_INDEX_Y_OFFSET
+  dec   ax
+  shl   ax, #1
+  add   bx, ax
+no_svga_state:
+  add   bx, #0x3f
+  shr   bx, #6
+  mov   ax, #0x004f
+  ret
+ASM_END
+
 void vbe_biosfn_save_restore_state(AX, CX, DX, ES, BX)
 Bit16u *AX; Bit16u CX; Bit16u DX; Bit16u ES; Bit16u *BX;
 {
@@ -1186,15 +1201,6 @@ Bit16u *AX; Bit16u CX; Bit16u DX; Bit16u ES; Bit16u *BX;
 
     result = 0x4f;
     switch(GET_DL()) {
-    case 0x00:
-        val = biosfn_read_video_state_size2(CX);
-#ifdef DEBUG
-        printf("VGA state size=%x\n", val);
-#endif
-        if (CX & 8)
-            val += vbe_biosfn_read_video_state_size();
-        write_word(ss, BX, val);
-        break;
     case 0x01:
         val = read_word(ss, BX);
         val = biosfn_save_video_state(CX, ES, val);
@@ -1791,7 +1797,7 @@ vbe_handlers:
   dw vbe_normal
   dw vbe_biosfn_return_current_mode
   ;; 04h
-  dw vbe_normal
+  dw vbe_biosfn_save_restore_state
   dw vbe_biosfn_display_window_control
   dw vbe_biosfn_set_get_logical_scan_line_length
   dw vbe_biosfn_set_get_display_start
