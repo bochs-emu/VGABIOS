@@ -614,8 +614,8 @@ static Bit8u static_functionality[0x10]=
  /* 7 */ 0x07,  // 200, 350, 400 scan lines
  /* 8 */ 0x02,  // mamimum number of visible charsets in text mode
  /* 9 */ 0x08,  // total number of charset blocks in text mode
- /* a */ 0xe7,  // Change to add new functions
- /* b */ 0x0c,  // Change to add new functions
+ /* a */ 0xff,  // Misc function support flags #1 (all supported)
+ /* b */ 0x0e,  // Misc function support flags #2
  /* c */ 0x00,  // reserved
  /* d */ 0x00,  // reserved
  /* e */ 0x00,  // Change to add new functions

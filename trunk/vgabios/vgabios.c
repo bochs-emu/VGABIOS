@@ -108,7 +108,6 @@ static void biosfn_alternate_prtsc();
 static void biosfn_switch_video_interface();
 static void biosfn_enable_video_refresh_control();
 static void biosfn_write_string();
-static void biosfn_read_video_state_size();
 static Bit16u biosfn_save_video_state();
 static Bit16u biosfn_restore_video_state();
 extern Bit8u video_save_pointer_table[];
@@ -377,8 +376,12 @@ int10_test_10:
   jmp   biosfn_group_10
 int10_test_1B:
   cmp   ah, #0x1b
-  jne   int10_normal
+  jne   int10_test_1C00
   jmp   biosfn_read_state_info
+int10_test_1C00:
+  cmp   ax, #0x1c00
+  jne   int10_normal
+  jmp   biosfn_read_video_state_size
 int10_normal:
   push es
   push ds
@@ -709,9 +712,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
    case 0x1C:
      switch(GET_AL())
       {
-       case 0x00:
-        biosfn_read_video_state_size(CX,&BX);
-        break;
        case 0x01:
         biosfn_save_video_state(CX,ES,BX);
         break;
@@ -3415,31 +3415,34 @@ unsup_1B:
   ret
 ASM_END
 
-// --------------------------------------------------------------------------------------------
-static Bit16u biosfn_read_video_state_size2 (CX)
-     Bit16u CX;
-{
-    Bit16u size;
-    size = 0;
-    if (CX & 1) {
-        size += 0x46;
-    }
-    if (CX & 2) {
-        size += (5 + 8 + 5) * 2 + 6;
-    }
-    if (CX & 4) {
-        size += 3 + 256 * 3 + 1;
-}
-    return size;
-}
+// -----------------------------------------------------------------------------
+ASM_START
+; called from VBE code
+biosfn_read_video_state_size2:
+  xor   bx, bx
+  test  cx, #0x01
+  jz    no_hw_state
+  add   bx, #0x46
+no_hw_state:
+  test  cx, #0x02
+  jz    no_bda_state
+  add   bx, #0x2a
+no_bda_state:
+  test  cx, #0x04
+  jz    no_dac_state
+  add   bx, #0x0304
+no_dac_state:
+  ret
 
-static void biosfn_read_video_state_size (CX, BX)
-     Bit16u CX; Bit16u *BX;
-{
-    Bit16u ss=get_SS();
-    write_word(ss, BX, biosfn_read_video_state_size2(CX));
-}
+biosfn_read_video_state_size:
+  call  biosfn_read_video_state_size2
+  add   bx, #0x3f
+  shr   bx, #6
+  mov   ax, #0x001c
+  ret
+ASM_END
 
+// -----------------------------------------------------------------------------
 static Bit16u biosfn_save_video_state (CX,ES,BX)
      Bit16u CX;Bit16u ES;Bit16u BX;
 {
