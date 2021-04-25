@@ -376,12 +376,17 @@ int10_test_10:
   jmp   biosfn_group_10
 int10_test_1B:
   cmp   ah, #0x1b
-  jne   int10_test_1C00
+  jne   int10_test_1C
   jmp   biosfn_read_state_info
-int10_test_1C00:
-  cmp   ax, #0x1c00
+int10_test_1C:
+  cmp   ah, #0x1c
   jne   int10_normal
+  cmp   al, #0x01
+  ja    int10_normal
+  je    int10_1C01
   jmp   biosfn_read_video_state_size
+int10_1C01:
+  jmp   biosfn_save_video_state
 int10_normal:
   push es
   push ds
@@ -712,9 +717,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
    case 0x1C:
      switch(GET_AL())
       {
-       case 0x01:
-        biosfn_save_video_state(CX,ES,BX);
-        break;
        case 0x02:
         biosfn_restore_video_state(CX,ES,BX);
         break;
@@ -2282,7 +2284,9 @@ biosfn_set_single_palette_reg:
   mov   dx, # VGAREG_ACTL_RESET
   in    al, dx
   mov   dx, # VGAREG_ACTL_ADDRESS
-  mov   al, bl
+  in    al, dx
+  and   al, #0x20
+  or    al, bl
   out   dx, al
   mov   al, bh
   out   dx, al
@@ -2316,11 +2320,15 @@ biosfn_set_all_palette_reg:
   in    al, dx
   mov   cl, #0x00
   mov   dx, # VGAREG_ACTL_ADDRESS
+  in    al, dx
+  and   al, #0x20
+  mov   ch, al
 set_palette_loop:
   mov   al, cl
   out   dx, al
   seg   es
   mov   al, [bx]
+  or    al, ch
   out   dx, al
   inc   bx
   inc   cl
@@ -2349,7 +2357,9 @@ biosfn_toggle_intensity:
   mov   dx, # VGAREG_ACTL_RESET
   in    al, dx
   mov   dx, # VGAREG_ACTL_ADDRESS
-  mov   al, #0x10
+  in    al, dx
+  and   al, #0x20
+  or    al, #0x10
   out   dx, al
   mov   dx, # VGAREG_ACTL_READ_DATA
   in    al, dx
@@ -2377,7 +2387,9 @@ biosfn_get_single_palette_reg:
   mov   dx, # VGAREG_ACTL_RESET
   in    al, dx
   mov   dx, # VGAREG_ACTL_ADDRESS
-  mov   al, bl
+  in    al, dx
+  and   al, #0x20
+  or    al, bl
   out   dx, al
   mov   dx, # VGAREG_ACTL_READ_DATA
   in    al, dx
@@ -2420,7 +2432,9 @@ get_palette_loop:
   mov   dx, # VGAREG_ACTL_RESET
   in    al, dx
   mov   dx, # VGAREG_ACTL_ADDRESS
-  mov   al, cl
+  in    al, dx
+  and   al, #0x20
+  or    al, cl
   out   dx, al
   mov   dx, # VGAREG_ACTL_READ_DATA
   in    al, dx
@@ -2433,7 +2447,9 @@ get_palette_loop:
   mov   dx, # VGAREG_ACTL_RESET
   in    al, dx
   mov   dx, # VGAREG_ACTL_ADDRESS
-  mov   al, #0x11
+  in    al, dx
+  and   al, #0x20
+  or    al, #0x11
   out   dx, al
   mov   dx, # VGAREG_ACTL_READ_DATA
   in    al, dx
@@ -3426,7 +3442,7 @@ biosfn_read_video_state_size2:
 no_hw_state:
   test  cx, #0x02
   jz    no_bda_state
-  add   bx, #0x2a
+  add   bx, #0x2d
 no_bda_state:
   test  cx, #0x04
   jz    no_dac_state
@@ -3440,94 +3456,208 @@ biosfn_read_video_state_size:
   shr   bx, #6
   mov   ax, #0x001c
   ret
+
+save_vga_state:
+  push  dx
+  push  di
+  test  cx, #0x01
+  jz    no_save_hw_state
+  mov   di, bx
+  mov   dx, #VGAREG_SEQU_ADDRESS
+  in    al, dx
+  stosb
+  push  ds
+  mov   ax, #BIOSMEM_SEG
+  mov   ds, ax
+  mov   dx, BIOSMEM_CRTC_ADDRESS
+  in    al, dx
+  stosb
+  pop   ds
+  push  dx
+  mov   dx, #VGAREG_GRDC_ADDRESS
+  in    al, dx
+  stosb
+  mov   dx, #VGAREG_ACTL_RESET
+  in    al, dx
+  mov   dx, #VGAREG_ACTL_ADDRESS
+  in    al, dx
+  stosb
+  and   al, #0x20
+  mov   bh, al
+  mov   dx, #VGAREG_READ_FEATURE_CTL
+  in    al, dx
+  stosb
+  mov   bl, #0x01 ;; VGA sequencer controller registers
+save_seqc_loop:
+  mov   dx, #VGAREG_SEQU_ADDRESS
+  mov   al, bl
+  out   dx, al
+  mov   dx, #VGAREG_SEQU_DATA
+  in    al, dx
+  stosb
+  inc   bl
+  cmp   bl, #0x04
+  jbe   save_seqc_loop
+  mov   dx, #VGAREG_SEQU_ADDRESS
+  xor   al, al
+  out   dx, al
+  mov   dx, #VGAREG_SEQU_DATA
+  in    al, dx
+  stosb
+  xor   bl, bl ;; VGA CRTC registers
+save_crtc_loop:
+  pop   dx
+  mov   al, bl
+  out   dx, al
+  push  dx
+  inc   dx
+  in    al, dx
+  stosb
+  inc   bl
+  cmp   bl, #0x18
+  jbe   save_crtc_loop
+  xor   bl, bl ;; VGA attribute controller registers
+save_actl_loop:
+  mov   dx, #VGAREG_ACTL_RESET
+  in    al, dx
+  mov   dx, #VGAREG_ACTL_ADDRESS
+  mov   al, bl
+  or    al, bh
+  out   dx, al
+  mov   dx, #VGAREG_ACTL_READ_DATA
+  in    al, dx
+  stosb
+  inc   bl
+  cmp   bl, #0x13
+  jbe   save_actl_loop
+  mov   dx, #VGAREG_ACTL_RESET
+  in    al, dx
+  xor   bl, bl ;; VGA graphics controller registers
+save_grdc_loop:
+  mov   dx, #VGAREG_GRDC_ADDRESS
+  mov   al, bl
+  out   dx, al
+  mov   dx, #VGAREG_GRDC_DATA
+  in    al, dx
+  stosb
+  inc   bl
+  cmp   bl, #0x08
+  jbe   save_grdc_loop
+  pop   ax ;; CRTC address
+  stosw
+  xor   bl, bl ;; VGA latches
+  mov   dx, ax
+  mov   al, #0x22
+  out   dx, al
+save_latches_loop:
+  push  dx
+  mov   dx, #VGAREG_GRDC_ADDRESS
+  mov   al, #0x04
+  mov   ah, bl
+  out   dx, ax
+  pop   dx
+  inc   dx
+  in    al, dx
+  stosb
+  dec   dx
+  inc   bl
+  cmp   bl, #0x04
+  jb    save_latches_loop
+  mov   dx, #VGAREG_GRDC_ADDRESS
+  mov   ax, #0x0004
+  out   dx, ax
+  mov   bx, di
+no_save_hw_state:
+  test  cx, #0x02
+  jz    no_save_bda_state
+  push  ds
+  push  cx
+  push  si
+  mov   ax, #BIOSMEM_SEG
+  mov   ds, ax
+  mov   si, #BIOSMEM_CURRENT_MODE
+  mov   di, bx
+  mov   cx, #0x1e
+  cld
+  rep
+     movsb
+  mov   si, #BIOSMEM_NB_ROWS
+  mov   cx, #0x07
+  cld
+  rep
+     movsb
+  xor   ax, ax
+  mov   ds, ax
+  mov   eax, 0x007c ;; INT 0x1F
+  stosd
+  mov   eax, 0x010c ;; INT 0x43
+  stosd
+  mov   bx, di
+  pop   si
+  pop   cx
+  pop   ds
+no_save_bda_state:
+  test  cx, #0x04
+  jz    no_save_dac_state
+  push  cx
+  mov   di, bx
+  mov   dx, #VGAREG_DAC_STATE
+  in    al, dx
+  stosb
+  mov   dx, #VGAREG_DAC_WRITE_ADDRESS
+  in    al, dx
+  stosb
+  mov   dx, #VGAREG_PEL_MASK
+  in    al, dx
+  stosb
+  mov   dx, #VGAREG_DAC_READ_ADDRESS
+  xor   al, al
+  out   dx, al
+  mov   cx, #0x0300
+  cld
+  mov   dx, #VGAREG_DAC_DATA
+dac_read_loop:
+  in    al, dx
+  stosb
+  loop  dac_read_loop
+  mov   bl, #0x14
+  call  biosfn_get_single_palette_reg
+  mov   al, bh
+  stosb
+  mov   bx, di
+  pop   cx
+no_save_dac_state:
+  pop   di
+  pop   dx
+  ret
+
+biosfn_save_video_state:
+  push  bx
+  call  save_vga_state
+  pop   bx
+  mov   ax, #0x001c
+  ret
+
+; called from VBE C code
+_biosfn_save_video_state:
+  push  bp
+  mov   bp, sp
+  push  cx
+  push  bx
+  push  es
+  mov   cx, 4[bp] ; CX
+  mov   ax, 6[bp] ; ES
+  mov   es, ax
+  mov   bx, 8[bp] ; BX
+  call  save_vga_state
+  mov   ax, bx
+  pop   es
+  pop   bx
+  pop   cx
+  pop   bp
 ASM_END
 
 // -----------------------------------------------------------------------------
-static Bit16u biosfn_save_video_state (CX,ES,BX)
-     Bit16u CX;Bit16u ES;Bit16u BX;
-{
-    Bit16u i, v, crtc_addr, ar_index;
-
-    crtc_addr = read_bda_word( BIOSMEM_CRTC_ADDRESS);
-    if (CX & 1) {
-        write_byte(ES, BX, inb(VGAREG_SEQU_ADDRESS)); BX++;
-        write_byte(ES, BX, inb(crtc_addr)); BX++;
-        write_byte(ES, BX, inb(VGAREG_GRDC_ADDRESS)); BX++;
-        inb(VGAREG_ACTL_RESET);
-        ar_index = inb(VGAREG_ACTL_ADDRESS);
-        write_byte(ES, BX, ar_index); BX++;
-        write_byte(ES, BX, inb(VGAREG_READ_FEATURE_CTL)); BX++;
-
-        for(i=1;i<=4;i++){
-            outb(VGAREG_SEQU_ADDRESS, i);
-            write_byte(ES, BX, inb(VGAREG_SEQU_DATA)); BX++;
-        }
-        outb(VGAREG_SEQU_ADDRESS, 0);
-        write_byte(ES, BX, inb(VGAREG_SEQU_DATA)); BX++;
-
-        for(i=0;i<=0x18;i++) {
-            outb(crtc_addr,i);
-            write_byte(ES, BX, inb(crtc_addr+1)); BX++;
-        }
-
-        for(i=0;i<=0x13;i++) {
-            inb(VGAREG_ACTL_RESET);
-            outb(VGAREG_ACTL_ADDRESS, i | (ar_index & 0x20));
-            write_byte(ES, BX, inb(VGAREG_ACTL_READ_DATA)); BX++;
-        }
-        inb(VGAREG_ACTL_RESET);
-
-        for(i=0;i<=8;i++) {
-            outb(VGAREG_GRDC_ADDRESS,i);
-            write_byte(ES, BX, inb(VGAREG_GRDC_DATA)); BX++;
-        }
-
-        write_word(ES, BX, crtc_addr); BX+= 2;
-
-        /* XXX: read plane latches */
-        write_byte(ES, BX, 0); BX++;
-        write_byte(ES, BX, 0); BX++;
-        write_byte(ES, BX, 0); BX++;
-        write_byte(ES, BX, 0); BX++;
-    }
-    if (CX & 2) {
-        write_byte(ES, BX, read_bda_byte(BIOSMEM_CURRENT_MODE)); BX++;
-        write_word(ES, BX, read_bda_word(BIOSMEM_NB_COLS)); BX += 2;
-        write_word(ES, BX, read_bda_word(BIOSMEM_PAGE_SIZE)); BX += 2;
-        write_word(ES, BX, read_bda_word(BIOSMEM_CRTC_ADDRESS)); BX += 2;
-        write_byte(ES, BX, read_bda_byte(BIOSMEM_NB_ROWS)); BX++;
-        write_word(ES, BX, read_bda_word(BIOSMEM_CHAR_HEIGHT)); BX += 2;
-        write_byte(ES, BX, read_bda_byte(BIOSMEM_VIDEO_CTL)); BX++;
-        write_byte(ES, BX, read_bda_byte(BIOSMEM_SWITCHES)); BX++;
-        write_byte(ES, BX, read_bda_byte(BIOSMEM_MODESET_CTL)); BX++;
-        write_word(ES, BX, read_bda_word(BIOSMEM_CURSOR_TYPE)); BX += 2;
-        for(i=0;i<8;i++) {
-            write_word(ES, BX, read_bda_word( BIOSMEM_CURSOR_POS+2*i));
-            BX += 2;
-        }
-        write_word(ES, BX, read_bda_word(BIOSMEM_CURRENT_START)); BX += 2;
-        write_byte(ES, BX, read_bda_byte(BIOSMEM_CURRENT_PAGE)); BX++;
-        /* current font */
-        write_word(ES, BX, read_word(0, 0x1f * 4)); BX += 2;
-        write_word(ES, BX, read_word(0, 0x1f * 4 + 2)); BX += 2;
-        write_word(ES, BX, read_word(0, 0x43 * 4)); BX += 2;
-        write_word(ES, BX, read_word(0, 0x43 * 4 + 2)); BX += 2;
-    }
-    if (CX & 4) {
-        /* XXX: check this */
-        write_byte(ES, BX, inb(VGAREG_DAC_STATE)); BX++; /* read/write mode dac */
-        write_byte(ES, BX, inb(VGAREG_DAC_WRITE_ADDRESS)); BX++; /* pix address */
-        write_byte(ES, BX, inb(VGAREG_PEL_MASK)); BX++;
-        // Set the whole dac always, from 0
-        outb(VGAREG_DAC_WRITE_ADDRESS,0x00);
-        for(i=0;i<256*3;i++) {
-            write_byte(ES, BX, inb(VGAREG_DAC_DATA)); BX++;
-        }
-        write_byte(ES, BX, 0); BX++; /* color select register */
-    }
-    return BX;
-}
-
 static Bit16u biosfn_restore_video_state (CX,ES,BX)
      Bit16u CX;Bit16u ES;Bit16u BX;
 {
@@ -3560,7 +3690,7 @@ static Bit16u biosfn_restore_video_state (CX,ES,BX)
         }
         // select crtc base address
         v = inb(VGAREG_READ_MISC_OUTPUT) & ~0x01;
-        if (crtc_addr = 0x3d4)
+        if (crtc_addr = VGAREG_VGA_CRTC_ADDRESS)
             v |= 0x01;
         outb(VGAREG_WRITE_MISC_OUTPUT, v);
 
@@ -3595,19 +3725,21 @@ static Bit16u biosfn_restore_video_state (CX,ES,BX)
         write_bda_byte(BIOSMEM_CURRENT_MODE, read_byte(ES, BX)); BX++;
         write_bda_word(BIOSMEM_NB_COLS, read_word(ES, BX)); BX += 2;
         write_bda_word(BIOSMEM_PAGE_SIZE, read_word(ES, BX)); BX += 2;
+        write_bda_word(BIOSMEM_CURRENT_START, read_word(ES, BX)); BX += 2;
+        for(i=0;i<8;i++) {
+            write_bda_word( BIOSMEM_CURSOR_POS+2*i, read_word(ES, BX));
+            BX += 2;
+        }
+        write_bda_word(BIOSMEM_CURSOR_TYPE, read_word(ES, BX)); BX += 2;
+        write_bda_byte(BIOSMEM_CURRENT_PAGE, read_byte(ES, BX)); BX++;
         write_bda_word(BIOSMEM_CRTC_ADDRESS, read_word(ES, BX)); BX += 2;
+        BX += 2;
         write_bda_byte(BIOSMEM_NB_ROWS, read_byte(ES, BX)); BX++;
         write_bda_word(BIOSMEM_CHAR_HEIGHT, read_word(ES, BX)); BX += 2;
         write_bda_byte(BIOSMEM_VIDEO_CTL, read_byte(ES, BX)); BX++;
         write_bda_byte(BIOSMEM_SWITCHES, read_byte(ES, BX)); BX++;
         write_bda_byte(BIOSMEM_MODESET_CTL, read_byte(ES, BX)); BX++;
-        write_bda_word(BIOSMEM_CURSOR_TYPE, read_word(ES, BX)); BX += 2;
-        for(i=0;i<8;i++) {
-            write_bda_word( BIOSMEM_CURSOR_POS+2*i, read_word(ES, BX));
-            BX += 2;
-        }
-        write_bda_word(BIOSMEM_CURRENT_START, read_word(ES, BX)); BX += 2;
-        write_bda_byte(BIOSMEM_CURRENT_PAGE, read_byte(ES, BX)); BX++;
+        write_bda_byte(BIOSMEM_DCC_INDEX, read_byte(ES, BX)); BX++;
         /* current font */
         write_word(0, 0x1f * 4, read_word(ES, BX)); BX += 2;
         write_word(0, 0x1f * 4 + 2, read_word(ES, BX)); BX += 2;
@@ -3623,8 +3755,14 @@ static Bit16u biosfn_restore_video_state (CX,ES,BX)
         for(i=0;i<256*3;i++) {
             outb(VGAREG_DAC_DATA, read_byte(ES, BX)); BX++;
         }
-        BX++;
         outb(VGAREG_DAC_WRITE_ADDRESS, v);
+        inb(VGAREG_ACTL_RESET);
+        ar_index = inb(VGAREG_ACTL_ADDRESS);
+        /* color select register */
+        outb(VGAREG_ACTL_ADDRESS, 0x14 | (ar_index & 0x20));
+        outb(VGAREG_ACTL_WRITE_DATA, read_byte(ES, BX)); BX++;
+        outb(VGAREG_ACTL_ADDRESS, ar_index);
+        inb(VGAREG_ACTL_RESET);
     }
     return BX;
 }
