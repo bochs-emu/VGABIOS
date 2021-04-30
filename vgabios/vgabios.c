@@ -1327,6 +1327,12 @@ Bit8u xstart;Bit8u ysrc;Bit8u ydest;Bit8u cols;Bit8u nbcols;Bit8u cheight;
  Bit16u src,dest;
  Bit8u i;
 
+#ifdef CIRRUS
+ if (is_cirrus_8bpp_mode()) {
+   cirrus_bitblt_copy(xstart,ysrc,ydest,cols);
+   return;
+ }
+#endif
  src=(ysrc*cheight*nbcols+xstart)*8;
  dest=(ydest*cheight*nbcols+xstart)*8;
  for(i=0;i<cheight;i++)
@@ -1342,6 +1348,12 @@ Bit8u xstart;Bit8u ystart;Bit8u cols;Bit8u nbcols;Bit8u cheight;Bit8u attr;
  Bit16u dest;
  Bit8u i;
 
+#ifdef CIRRUS
+ if (is_cirrus_8bpp_mode()) {
+   cirrus_bitblt_fill(xstart,attr,ystart,cols);
+   return;
+ }
+#endif
  dest=(ystart*cheight*nbcols+xstart)*8;
  for(i=0;i<cheight;i++)
   {
@@ -1365,6 +1377,10 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
  // Get the mode
  mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
+#ifdef CIRRUS
+ if (is_cirrus_8bpp_mode())
+  line = 14;
+#endif
  if(line==0xFF)return;
 
  // Get the dimensions
@@ -1419,7 +1435,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
   }
  else
   {
-   // FIXME gfx mode (Bochs VBE and Cirrus not supported)
+   // FIXME gfx mode (Bochs VBE and Cirrus (> 8 bpp) not supported)
    cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    if(nblines==0&&rul==0&&cul==0&&rlr==nbrows-1&&clr==nbcols-1)
     {
@@ -1577,16 +1593,30 @@ Bit8u car;Bit8u attr;Bit8u xcurs;Bit8u ycurs;Bit8u nbcols;Bit8u cheight;
  foffs = read_word(0x0, 0x43*4);
  fseg = read_word(0x0, 0x43*4+2);
  src = foffs + car * cheight;
- outw(VGAREG_SEQU_ADDRESS, 0x0f02);
- outw(VGAREG_GRDC_ADDRESS, 0x0205);
- if(attr&0x80)
-  {
-   outw(VGAREG_GRDC_ADDRESS, 0x1803);
-  }
- else
-  {
-   outw(VGAREG_GRDC_ADDRESS, 0x0003);
-  }
+ASM_START
+  push bp
+  mov  bp, sp
+  push ax
+  push bx
+  push dx
+  mov  dx, # VGAREG_SEQU_ADDRESS
+  mov  ax, #0x0f02
+  out  dx, ax
+  mov  dx, # VGAREG_GRDC_ADDRESS
+  mov  ax, #0x0205
+  out  dx, ax
+  mov  ax, #0x0003
+  mov  bx, 22[bp] ; attr
+  test bl, #0x80
+  jnz  no_xor
+  mov  ah, #0x18
+no_xor:
+  out  dx, ax
+  pop  dx
+  pop  bx
+  pop  ax
+  pop  bp
+ASM_END
  for(i=0;i<cheight;i++)
   {
    fdata = read_byte(fseg, src + i);
@@ -1703,6 +1733,12 @@ Bit8u car;Bit8u attr;Bit8u xcurs;Bit8u ycurs;Bit8u nbcols;Bit8u cheight;
  Bit16u fseg,foffs;
  Bit16u addr,dest,src;
 
+#ifdef CIRRUS
+ if (is_cirrus_8bpp_mode()) {
+   cirrus_bitblt_write_char(car,attr,xcurs,ycurs);
+   return;
+ }
+#endif
  addr=xcurs*8+ycurs*nbcols*cheight*8;
  foffs = read_word(0x0, 0x43*4);
  fseg = read_word(0x0, 0x43*4+2);
@@ -1736,6 +1772,10 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  // Get the mode
  mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
+#ifdef CIRRUS
+ if (is_cirrus_8bpp_mode())
+  line = 14;
+#endif
  if(line==0xFF)return;
 
  // Get the cursor pos for the page
@@ -1757,7 +1797,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
   }
  else
   {
-   // FIXME gfx mode (Bochs VBE and Cirrus not supported)
+   // FIXME gfx mode (Bochs VBE and Cirrus (> 8 bpp) not supported)
    cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
@@ -1795,6 +1835,10 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  // Get the mode
  mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
+#ifdef CIRRUS
+ if (is_cirrus_8bpp_mode())
+  line = 14;
+#endif
  if(line==0xFF)return;
 
  // Get the cursor pos for the page
@@ -1818,7 +1862,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
   }
  else
   {
-   // FIXME gfx mode (Bochs VBE and Cirrus not supported)
+   // FIXME gfx mode (Bochs VBE and Cirrus (> 8 bpp) not supported)
    cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
@@ -2074,6 +2118,10 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
  // Get the mode
  mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
+#ifdef CIRRUS
+ if (is_cirrus_8bpp_mode())
+  line = 14;
+#endif
  if(line==0xFF)return;
 
  // Get the cursor pos for the page
@@ -2128,7 +2176,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
      }
     else
      {
-      // FIXME gfx mode (Bochs VBE and Cirrus not supported)
+      // FIXME gfx mode (Bochs VBE and Cirrus (> 8 bpp) not supported)
       cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
       bpp=vga_modes[line].pixbits;
       switch(vga_modes[line].memmodel)
@@ -2325,16 +2373,17 @@ biosfn_set_all_palette_reg:
   mov   ch, al
 set_palette_loop:
   mov   al, cl
+  or    al, ch
   out   dx, al
   seg   es
   mov   al, [bx]
-  or    al, ch
   out   dx, al
   inc   bx
   inc   cl
   cmp   cl, #0x10
   jne   set_palette_loop
   mov   al, #0x11
+  or    al, ch
   out   dx, al
   seg   es
   mov   al, [bx]
