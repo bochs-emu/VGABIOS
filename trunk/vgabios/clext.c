@@ -5,7 +5,7 @@
 //  QEMU Cirrus CLGD 54xx VGABIOS Extension.
 //
 //  Copyright (c) 2004      Makoto Suzuki (suzu)
-//  Copyright (C) 2004-2020 Volker Ruppert
+//  Copyright (C) 2004-2021 Volker Ruppert
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -27,8 +27,11 @@
 #endif
 
 #define PM_BIOSMEM_CURRENT_MODE 0x449
+#define PM_BIOSMEM_NB_COLS      0x44a
 #define PM_BIOSMEM_CRTC_ADDRESS 0x463
-#define PM_BIOSMEM_VBE_MODE 0x4BA
+#define PM_BIOSMEM_NB_ROWS      0x484
+#define PM_BIOSMEM_CHAR_HEIGHT  0x485
+#define PM_BIOSMEM_VBE_MODE     0x4BA
 
 typedef struct
 {
@@ -585,6 +588,15 @@ cirrus_set_video_mode_extended_1:
   and al, #0x7f
 
   push ds
+  push cs
+  pop ds
+  push bx
+  push cx
+  mov bx, [si+2]
+  shr bx, #3
+  mov cx, [si+4]
+  shr cx, #4 ; cheight 16
+  dec cx
 #ifdef CIRRUS_VESA3_PMINFO
  db 0x2e ;; cs:
   mov si, [cirrus_vesa_sel0000_data]
@@ -593,7 +605,21 @@ cirrus_set_video_mode_extended_1:
 #endif
   mov ds, si
   mov [PM_BIOSMEM_CURRENT_MODE], al
+  mov [PM_BIOSMEM_NB_COLS], bx
+  mov [PM_BIOSMEM_NB_ROWS], cl
+  mov al, #0x10
+  xor ah, ah
+  mov [PM_BIOSMEM_CHAR_HEIGHT], ax
+  pop cx
+  pop bx
   pop ds
+  push bx
+  push dx
+  xor bh, bh
+  xor dx, dx
+  call biosfn_set_cursor_pos
+  pop dx
+  pop bx
 
   mov al, #0x20
 
@@ -714,6 +740,235 @@ csms_1:
   add bx, #0x2
   jmp csms_1
 csms_2:
+  ret
+
+; code for 'write character' support in 8bpp graphics modes
+
+; called from C code
+_is_cirrus_8bpp_mode:
+  push dx
+  mov  dx, #0x03c4
+  mov  al, #0x07
+  out  dx, al
+  inc  dx
+  in   al, dx
+  pop  dx
+  and  al, #0x0f
+  cmp  al, #0x01
+  jz   is_cirrus_8bpp
+  xor  ax, ax
+is_cirrus_8bpp:
+  ret
+
+cirrus_pm_get_bda_word:
+  push ds
+  push bx
+  push si
+#ifdef CIRRUS_VESA3_PMINFO
+ db 0x2e ;; cs:
+  mov  si, [cirrus_vesa_sel0000_data]
+#else
+  xor  si, si
+#endif
+  mov  ds, si
+  mov  bh, #0x04
+  mov  bl, al
+  mov  ax, [bx]
+  pop  si
+  pop  bx
+  pop  ds
+  ret
+
+cirrus_write_bltreg16:
+  push dx
+  push ax
+  mov  ah, al
+  mov  al, bl
+  mov  dx, #0x03ce
+  out  dx, ax
+  pop  ax
+  push ax
+  inc  bl
+  mov  al, bl
+  out  dx, ax
+  pop  ax
+  pop  dx
+  ret
+
+; in: columns in AL / out: size of line in AX
+cirrus_write_bltsize:
+  xor  ah, ah
+  shl  ax, #3
+  dec  ax
+  mov  bl, #0x20
+  call cirrus_write_bltreg16
+  mov  al, #BIOSMEM_CHAR_HEIGHT
+  call cirrus_pm_get_bda_word
+  xor  ah, ah
+  push ax
+  dec  ax
+  mov  bl, #0x22
+  call cirrus_write_bltreg16
+  mov  al, #BIOSMEM_NB_COLS
+  call cirrus_pm_get_bda_word
+  xor  ah, ah
+  shl  ax, #3
+  mov  bl, #0x24
+  call cirrus_write_bltreg16
+  mov  bl, #0x26
+  call cirrus_write_bltreg16
+  pop bx
+  mul bx
+  ret
+
+cirrus_write_bltaddr:
+  push ax
+  push bx
+  xor  bh, bh
+  mul  bx
+  mov  bl, cl
+  shl  bx, #3
+  add  ax, bx
+  jnc  cirrus_addr_noinc
+  inc  dx
+cirrus_addr_noinc:
+  pop  bx
+  mov  bl, bh
+  call cirrus_write_bltreg16
+  mov  ax, dx
+  mov  ah, al
+  mov  al, bh
+  inc  al
+  inc  al
+  mov  dx, #0x03ce
+  out  dx, ax
+  pop  ax
+  ret
+
+_cirrus_bitblt_write_char:
+  push bp
+  mov  bp, sp
+  push ax
+  push bx
+  push cx
+  push dx
+  mov  cl, 8[bp]  ; xcurs
+  mov  ch, 10[bp] ; ycurs
+  mov  al, #0x01
+  call cirrus_write_bltsize
+  mov  bl, ch
+  mov  bh, #0x28
+  call cirrus_write_bltaddr
+  mov  ax, #0x0001 ; src pitch 1
+  mov  bl, #0x26
+  call cirrus_write_bltreg16
+  mov  dx, #0x03ce
+  mov  ax, #0x8430 ; colorexpand memsrc
+  out  dx, ax
+  mov  ax, #0x0d32 ; ROP: copy
+  out  dx, ax
+  xor  ax, ax ; background
+  out  dx, ax
+  mov  ah, 6[bp] ; attr
+  mov  al, #0x01
+  out  dx, ax
+  mov  ax, #0x0231 ; start
+  out  dx, ax
+  push ds
+  push es
+  push si
+  push di
+  xor  ax, ax
+  mov  ds, ax
+  mov  bx, #0x10c ; INT 0x43
+  mov  si, [bx]
+  mov  ax, [bx+2]
+  mov  ds, ax
+  mov  bl, 4[bp]  ; character
+  mov  al, #BIOSMEM_CHAR_HEIGHT
+  call cirrus_pm_get_bda_word
+  xor  ah, ah
+  push ax
+  mul  bl
+  add  si, ax
+  mov  ax, #0xa000
+  mov  es, ax
+  xor  di, di
+  pop  cx
+  cld
+  rep
+    movsb
+  pop  di
+  pop  si
+  pop  es
+  pop  ds
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  pop  bp
+  ret
+
+_cirrus_bitblt_copy:
+  push bp
+  mov  bp, sp
+  push ax
+  push bx
+  push cx
+  push dx
+  mov  cl, 4[bp] ; xstart
+  mov  ch, 8[bp] ; ydest
+  mov  al, 10[bp] ; cols
+  call cirrus_write_bltsize
+  mov  bl, 6[bp] ; ysrc
+  mov  bh, #0x2c
+  call cirrus_write_bltaddr
+  mov  bl, ch
+  mov  bh, #0x28
+  call cirrus_write_bltaddr
+  mov  dx, #0x03ce
+  mov  ax, #0x0030 ; normal blt
+  out  dx, ax
+  mov  ax, #0x0d32 ; ROP: copy
+  out  dx, ax
+  mov  ax, #0x0231 ; start
+  out  dx, ax
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  pop  bp
+  ret
+
+_cirrus_bitblt_fill:
+  push bp
+  mov  bp, sp
+  push ax
+  push bx
+  push dx
+  mov  cl, 4[bp] ; xstart
+  mov  ch, 8[bp] ; ydest
+  mov  al, 10[bp] ; cols
+  call cirrus_write_bltsize
+  mov  bl, ch
+  mov  bh, #0x28
+  call cirrus_write_bltaddr
+  mov  dx, #0x03ce
+  mov  ax, #0x0030 ; normal blt
+  out  dx, ax
+  mov  ax, #0x0e32 ; ROP: 1
+  out  dx, ax
+  mov  ax, #0x0433 ; solidfill
+  out  dx, ax
+  mov  ah, 6[bp] ; attr
+  mov  al, #0x01
+  out  dx, ax
+  mov  ax, #0x0231
+  out  dx, ax
+  pop  dx
+  pop  bx
+  pop  ax
+  pop  bp
   ret
 
 cirrus_extbios_80h:
