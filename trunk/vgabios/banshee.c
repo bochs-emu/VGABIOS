@@ -52,7 +52,7 @@ banshee_not_installed:
 .byte 0x0d,0x0a
 .byte 0x0d,0x0a,0x00
 
-banshee_check:
+banshee_detect:
   mov  ax,  #0xb103
   mov  ecx, #0x030000
   mov  si,  #0x0000
@@ -67,22 +67,23 @@ banshee_check:
   cmp  ax,  #0x0003
   je   banshee_ok
   cmp  ax,  #0x0005
-  je   banshee_ok
-not_detected:
-  stc
-  ret
+  jne  not_detected
 banshee_ok:
-  clc
-  ret
-
-banshee_init:
-  call banshee_check
-  jc   no_banshee
+  push ax
   mov  cx, bx
   mov  dl, #0x18
   call pci_read_reg
-  and  ax, #0xfffe
-  mov  dx, ax
+  mov  dh, ah
+  pop  ax
+  clc
+  ret
+not_detected:
+  stc
+  ret
+
+banshee_init:
+  call banshee_detect
+  jc   no_banshee
   mov  dl, #0x04 ; pciInit0
   mov  eax, #0x0180f840
   out  dx, eax
@@ -135,7 +136,7 @@ banshee_display_info:
   pop  ds
   mov  si, #threedfx_msg
   call _display_string
-  call banshee_check
+  call banshee_detect
   mov  si, #banshee_not_installed
   jc   banshee_show_msg
   mov  si, #banshee_msg
@@ -172,13 +173,8 @@ banshee_set_vga_mode:
   push bx
   push cx
   push dx
-  call banshee_check
-  jc   no_banshee
-  mov  cx, bx
-  mov  dl, #0x18
-  call pci_read_reg
-  and  ax, #0xfffe
-  mov  dx, ax
+  call banshee_detect
+  jc   no_banshee2
   mov  eax, #0x00000140
   mov  dl, #0x28 ; vgaInit0
   out  dx, eax
@@ -277,6 +273,7 @@ banshee_set_vga_mode_2:
   mov  dl, #0x1c ; dramInit1
   mov  eax, #0x00548031
   out  dx, eax
+no_banshee2:
   pop  dx
   pop  cx
   pop  bx
