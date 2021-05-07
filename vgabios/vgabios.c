@@ -914,6 +914,12 @@ ASM_END
  outb(VGAREG_ACTL_ADDRESS,0x20);
  inb(VGAREG_ACTL_RESET);
 
+#ifdef BANSHEE
+ASM_START
+  call banshee_set_vga_mode
+ASM_END
+#endif
+
  if(noclearmem==0x00)
   {
    if(vga_modes[line].class==TEXT)
@@ -1009,11 +1015,6 @@ ASM_START
 ASM_END
      break;
    }
-#ifdef BANSHEE
-ASM_START
-  call banshee_set_vga_mode
-ASM_END
-#endif
 }
 
 // --------------------------------------------------------------------------------------------
@@ -4369,6 +4370,7 @@ void printf(s)
 #endif
 
 ASM_START
+#if defined(VBE) || defined(CIRRUS)
   ; get LFB address from PCI
   ; in - ax: PCI device vendor
   ; out - ax: LFB address (high 16 bit)
@@ -4414,6 +4416,7 @@ _pci_get_lfb_addr:
   pop cx
   pop bx
   ret
+#endif
 
   ; read PCI register
   ; in - cx: device/function
