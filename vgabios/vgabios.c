@@ -3796,24 +3796,62 @@ static Bit16u biosfn_restore_video_state (CX,ES,BX)
         write_word(0, 0x43 * 4, read_word(ES, BX)); BX += 2;
         write_word(0, 0x43 * 4 + 2, read_word(ES, BX)); BX += 2;
     }
-    if (CX & 4) {
-        BX++;
-        v = read_byte(ES, BX); BX++;
-        outb(VGAREG_PEL_MASK, read_byte(ES, BX)); BX++;
-        // Set the whole dac always, from 0
-        outb(VGAREG_DAC_WRITE_ADDRESS,0x00);
-        for(i=0;i<256*3;i++) {
-            outb(VGAREG_DAC_DATA, read_byte(ES, BX)); BX++;
-        }
-        outb(VGAREG_DAC_WRITE_ADDRESS, v);
-        inb(VGAREG_ACTL_RESET);
-        ar_index = inb(VGAREG_ACTL_ADDRESS);
-        /* color select register */
-        outb(VGAREG_ACTL_ADDRESS, 0x14 | (ar_index & 0x20));
-        outb(VGAREG_ACTL_WRITE_DATA, read_byte(ES, BX)); BX++;
-        outb(VGAREG_ACTL_ADDRESS, ar_index);
-        inb(VGAREG_ACTL_RESET);
-    }
+ASM_START
+    push  bp
+    mov   bp, sp
+    push  ax
+    push  bx
+    push  cx
+    push  dx
+    push  es
+    mov   cx, 16[bp] ;; CX
+    mov   ax, 18[bp] ;; ES
+    mov   es, ax
+    mov   bx, 20[bp] ;; BX
+    test  cx, #0x04
+    jz    no_rest_dac_state
+    inc   bx
+    seg   es
+    mov   al, [bx]
+    push  ax
+    inc   bx
+    seg   es
+    mov   al, [bx]
+    mov   dx, #VGAREG_PEL_MASK
+    out   dx, al
+    inc   bx
+    mov   al, #0x00
+    mov   dx, #VGAREG_DAC_WRITE_ADDRESS
+    out   dx, al
+    mov   cx, #0x0300
+    cld
+    mov   dx, #VGAREG_DAC_DATA
+dac_write_loop:
+    seg   es
+    mov   al, [bx]
+    out   dx, al
+    inc   bx
+    loop  dac_write_loop
+    pop   ax
+    mov   dx, #VGAREG_DAC_WRITE_ADDRESS
+    out   dx, al
+    seg   es
+    mov   al, [bx]
+    push  bx
+    mov   bh, al
+    mov   bl, #0x14
+    call  biosfn_set_single_palette_reg
+    pop   bx
+    inc   bx
+    mov   20[bp], bx
+no_rest_dac_state:
+    pop   es
+    pop   dx
+    pop   cx
+    pop   bx
+    pop   ax
+    pop   bp
+ASM_END
     return BX;
 }
 
