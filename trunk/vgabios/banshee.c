@@ -24,7 +24,8 @@
 
 ASM_START
 
-;; strings
+;; Banshee strings
+
 threedfx_msg:
 .ascii "3dfx Voodoo"
 .byte 0x00
@@ -64,7 +65,8 @@ banshee_vesa_productrevision:
 .ascii "1.0"
 .byte 0
 
-;; mode tables
+;; Banshee mode tables
+
 banshee_svga_sequ:
 .byte 0x03,0x01,0x0f,0x00,0x0e
 
@@ -159,6 +161,8 @@ banshee_vesa_modelist:
 ;; invalid
 .word 0xffff, 0xffff
 
+;; Banshee init code
+
 banshee_detect:
   push si
   mov  ax,  #0xb103
@@ -237,7 +241,24 @@ banshee_init:
   mov  dl, #0x0c ;; lfbMemoryConfig
   mov  eax, #0x000a3fff
   out  dx, eax
+  push dx
+  call get_crtc_address
+  pop  ax
+  mov  al, #0x1c
+  out  dx, ax
 no_banshee:
+  ret
+
+banshee_get_io_base_address:
+  push ax
+  call get_crtc_address
+  mov  al, #0x1c
+  out  dx, al
+  inc  dx
+  in   al, dx
+  mov  dh, al
+  mov  dl, #0x00
+  pop  ax
   ret
 
 banshee_display_info:
@@ -278,6 +299,7 @@ banshee_show_msg:
   pop  ds
   ret
 
+;; Banshee INT 10h handler (set video mode / VBE support)
 banshee_int10_handler:
   pushf
   push bp
@@ -363,7 +385,7 @@ banshee_switch_mode:
   out  dx, al
   mov ax, #0x01
   out  dx, al
-  call banshee_detect
+  call banshee_get_io_base_address
   xor  eax, eax
   mov  dl, #0x4c ;; dacMode
   out  dx, eax
@@ -420,6 +442,8 @@ bgm_2:
   clc ;; video mode is supported
   ret
 
+;; Banshee mode helper functions
+
 set_bda_byte:
   push ds
   push si
@@ -475,7 +499,7 @@ banshee_clear_vram:
   push es
   mov  ax, #0xa000
   mov  es, ax
-  call banshee_detect
+  call banshee_get_io_base_address
   mov  dl, #0x2c ;; vgaInit1
   xor  bx, bx
 clear_loop:
@@ -501,14 +525,17 @@ clear_loop:
   pop  ax
   ret
 
+;; Banshee i/o setup in VGA mode
+
 banshee_set_vga_mode:
   push ds
   push ax
   push bx
   push cx
   push dx
-  call banshee_detect
-  jc   no_banshee2
+  call banshee_get_io_base_address
+  or   dh, dh
+  jz   no_banshee2
   mov  eax, #0x00000140
   mov  dl, #0x28 ;; vgaInit0
   out  dx, eax
@@ -541,52 +568,37 @@ no_256col:
   pop  dx
   test cl, #0x01
   jnz  vga_gfx_mode
+  xor  ax, ax
+  call get_crtc_xres
+  mov  bx, ax
   xor  eax, eax
-  mov  al, BIOSMEM_NB_ROWS
-  inc  al
+  call get_crtc_yres
+  shr  ax, #4 ;; FIXME: use char height
   shl  eax, #12
-  mov  bx, BIOSMEM_NB_COLS
   or   ax, bx
   mov  dl, #0x98 ;; vidScreenSize
   out  dx, eax
   xor  eax, eax
-  mov  ax, bx
+  mov  al, bl
   shl  ax, #1
   mov  dl, #0xe8 ;; vidDesktopOverlayStride
   out  dx, eax
   jmp  banshee_set_vga_mode_2
 vga_gfx_mode:
-  xor  eax, eax
-  push dx
-  mov  dx, #VGAREG_VGA_CRTC_ADDRESS
-  mov  al, #0x12
-  out  dx, al
-  inc  dx
-  in   al, dx
-  mov  bl, al
-  xor  bh, bh
-  dec  dx
-  mov  al, #0x07
-  out  dx, al
-  inc  dx
-  in   al, dx
-  pop  dx
-  test al, #0x02
-  jz   no_bit8
-  or   bh, #0x01
-no_bit8:
-  test al, #0x40
-  jz   no_bit9
-  or   bh, #0x02
-no_bit9:
-  mov  ax, bx
-  inc  ax
+  xor  ax, ax
+  call get_crtc_xres
+  mov  bx, ax
   test cl, #0x02
   jz   vga_16col_1
-  shr  ax, #1
+  shr  bx, #1
 vga_16col_1:
+  xor  eax, eax
+  call get_crtc_yres
+  test cl, #0x02
+  jz   vga_16col_2
+  shr  ax, #1
+vga_16col_2:
   shl  eax, #12
-  mov  bx, BIOSMEM_NB_COLS
   push bx
   shl  bx, #3
   or   ax, bx
@@ -594,9 +606,9 @@ vga_16col_1:
   out  dx, eax
   pop  ax
   test cl, #0x02
-  jz   vga_16col_2
+  jz   vga_16col_3
   shl  ax, #3
-vga_16col_2:
+vga_16col_3:
   and  eax, #0xffff
   mov  dl, #0xe8 ;; vidDesktopOverlayStride
   out  dx, eax
@@ -615,6 +627,50 @@ no_banshee2:
   pop  ds
   ret
 
+;; VGA compatibility helper functions
+
+get_crtc_xres:
+  push dx
+  call get_crtc_address
+  mov  al, #0x01
+  out  dx, al
+  inc  dx
+  in   al, dx
+  inc  al
+  pop  dx
+  ret
+
+get_crtc_yres:
+  push bx
+  push dx
+  call get_crtc_address
+  mov  al, #0x12
+  out  dx, al
+  inc  dx
+  in   al, dx
+  mov  bl, al
+  xor  bh, bh
+  dec  dx
+  mov  al, #0x07
+  out  dx, al
+  inc  dx
+  in   al, dx
+  test al, #0x02
+  jz   no_bit8
+  or   bh, #0x01
+no_bit8:
+  test al, #0x40
+  jz   no_bit9
+  or   bh, #0x02
+no_bit9:
+  mov  ax, bx
+  inc  ax
+  pop  dx
+  pop  bx
+  ret
+
+;; Banshee VBE support
+
 banshee_vesa:
   cmp  al, #0x15
   ja   banshee_vesa_unimplemented
@@ -630,29 +686,6 @@ banshee_vesa:
 
 banshee_vesa_unimplemented:
   mov  ax, #0x014F ;; not implemented
-  ret
-
-;; in ax:vesamode, out ax:bansheemode
-banshee_vesamode_to_mode:
-  push ds
-  push cx
-  push si
-  push cs
-  pop  ds
-  mov  cx, #0xffff
-  mov  si, #banshee_vesa_modelist
-bvtm_1:
-  cmp  [si], ax
-  jz   bvtm_2
-  cmp  [si], cx
-  jz   bvtm_2
-  add  si, #4
-  jmp  bvtm_1
-bvtm_2:
-  mov  ax,[si+2]
-  pop  si
-  pop  cx
-  pop  ds
   ret
 
 banshee_vesa_00h:
@@ -801,7 +834,7 @@ banshee_vesa_01h_3:
   mov  al, #0x00
   stosb
 
-  ;; v1.2+ stuffs
+  ;; v1.2+ stuffs (TODO)
 ;  push si
 ;  add  si, #18
 ;  movsw
@@ -934,11 +967,74 @@ banshee_vesa_05h_failed:
   mov  ax, #0x014f
   ret
 
+banshee_vesa_06h:
+  mov  ax, cx
+  cmp  bl, #0x01
+  jb   banshee_vesa_06h_bl0
+  je   banshee_vesa_06h_bl1
+  cmp  bl, #0x03
+  jb   banshee_vesa_06h_bl2
+  je   banshee_vesa_06h_bl3
+  mov  ax, #0x0100
+  ret
+banshee_vesa_06h_bl0:
+  call banshee_get_bpp_bytes
+  mov  bl, al
+  xor  bh, bh
+  mov  ax, cx
+  mul  bx
+banshee_vesa_06h_bl2:
+  call banshee_set_line_offset
+banshee_vesa_06h_bl1:
+  call banshee_get_bpp_bytes
+  mov  bl, al
+  xor  bh, bh
+  xor  dx, dx
+  call banshee_get_line_offset
+  push ax
+  div  bx
+  mov  cx, ax
+  pop  bx
+  mov  dx, #0x100 ;; vram in 64k
+  xor  ax, ax
+  div  bx
+  mov  dx, ax
+  mov  ax, #0x004f
+  ret
+banshee_vesa_06h_bl3:
+  mov  ax, #0x0100 ;; TODO
+  ret
+
+;; VBE helper functions
+
+;; in ax:vesamode, out ax:bansheemode
+banshee_vesamode_to_mode:
+  push ds
+  push cx
+  push si
+  push cs
+  pop  ds
+  mov  cx, #0xffff
+  mov  si, #banshee_vesa_modelist
+bvtm_1:
+  cmp  [si], ax
+  jz   bvtm_2
+  cmp  [si], cx
+  jz   bvtm_2
+  add  si, #4
+  jmp  bvtm_1
+bvtm_2:
+  mov  ax,[si+2]
+  pop  si
+  pop  cx
+  pop  ds
+  ret
+
 banshee_get_lfb_addr:
   push bx
   push cx
   push dx
-  call banshee_detect
+  call banshee_get_io_base_address
   mov  dl, #0x16
   call pci_read_reg
   shr  eax, #16
@@ -951,7 +1047,7 @@ banshee_get_bank:
   push bx
   push cx
   push dx
-  call banshee_detect
+  call banshee_get_io_base_address
   mov  dl, #0x2c ;; vgaInit1
   in   eax, dx
   and  ax, #0x03ff
@@ -965,7 +1061,7 @@ banshee_set_bank:
   push cx
   push dx
   push ax
-  call banshee_detect
+  call banshee_get_io_base_address
   mov  dl, #0x2c ;; vgaInit1
   in   eax, dx
   and  eax, #0xfffffc00
@@ -987,6 +1083,37 @@ banshee_get_line_offset_entry:
   mul  bx
   ret
 
+banshee_get_bpp_bytes:
+  call banshee_get_io_base_address
+  mov  dl, #0x5c ;; vidProcCfg
+  in   eax, dx
+  shr  eax, #18
+  and  ax, #0x03
+  inc  al
+  ret
+
+banshee_set_line_offset:
+  push bx
+  push ax
+  call banshee_get_io_base_address
+  mov  dl, #0xe8 ;; vidDesktopOverlayStride
+  in   eax, dx
+  pop  bx
+  and  bx, #0x7fff
+  or   ax, bx
+  out  dx, eax
+  pop  bx
+  ret
+
+banshee_get_line_offset:
+  push dx
+  call banshee_get_io_base_address
+  mov  dl, #0xe8 ;; vidDesktopOverlayStride
+  in   eax, dx
+  and  ax, #0x7fff
+  pop  dx
+  ret
+
 banshee_vesa_handlers:
   ;; 00h
   dw banshee_vesa_00h
@@ -996,7 +1123,7 @@ banshee_vesa_handlers:
   ;; 04h
   dw banshee_vesa_unimplemented
   dw banshee_vesa_05h
-  dw banshee_vesa_unimplemented
+  dw banshee_vesa_06h
   dw banshee_vesa_unimplemented
   ;; 08h
   dw banshee_vesa_unimplemented
