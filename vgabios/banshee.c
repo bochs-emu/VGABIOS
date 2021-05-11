@@ -20,7 +20,7 @@
 //  License along with this library; if not, write to the Free Software
 //  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-#define BANSHEE_MODE_SIZE 13
+#define BANSHEE_MODE_SIZE 16
 
 ASM_START
 
@@ -112,6 +112,8 @@ banshee_modes:
 .word banshee_640x400x8_crtc ;; CRTC settings
 .word 0,0 ;; pllCtrl0 (0 = unused)
 .byte 0x63 ;; misc reg
+.byte 0x04 ;; VBE memory model
+.word banshee_color_params_8bpp ;; color params
 ;; 640 x 480 x 8
 .byte 0x5f
 .byte 8
@@ -120,6 +122,8 @@ banshee_modes:
 .word banshee_640x480x8_crtc
 .word 0,0
 .byte 0xe3
+.byte 0x04
+.word banshee_color_params_8bpp
 ;; 800 x 600 x 8
 .byte 0x5c
 .byte 8
@@ -128,6 +132,8 @@ banshee_modes:
 .word banshee_800x600x8_crtc
 .word 0xbc3e,0x0000 ;; 40 MHz
 .byte 0xef
+.byte 0x04
+.word banshee_color_params_8bpp
 ;; 1024 x 768 x 8
 .byte 0x5e
 .byte 8
@@ -136,6 +142,8 @@ banshee_modes:
 .word banshee_1024x768x8_crtc
 .word 0xe15d,0x0000 ;; 65 MHz
 .byte 0xef
+.byte 0x04
+.word banshee_color_params_8bpp
 ;; 1280 x 1024 x 8
 .byte 0x6b
 .byte 8
@@ -144,6 +152,58 @@ banshee_modes:
 .word banshee_1280x1024x8_crtc
 .word 0xb358,0x0000 ;; 108 MHz
 .byte 0xef
+.byte 0x04
+.word banshee_color_params_8bpp
+;; 640 x 400 x 16
+.byte 0x29 ;; mode
+.byte 16   ;; depth
+.word 640  ;; xres
+.word 400  ;; yres
+.word banshee_640x400x8_crtc ;; CRTC settings
+.word 0,0 ;; pllCtrl0 (0 = unused)
+.byte 0x63 ;; misc reg
+.byte 0x06 ;; VBE memory model
+.word banshee_color_params_16bpp ;; color params
+;; 640 x 480 x 16
+.byte 0x6e
+.byte 16
+.word 640
+.word 480
+.word banshee_640x480x8_crtc
+.word 0,0
+.byte 0xe3
+.byte 0x06
+.word banshee_color_params_16bpp
+;; 800 x 600 x 16
+.byte 0x70
+.byte 16
+.word 800
+.word 600
+.word banshee_800x600x8_crtc
+.word 0xbc3e,0x0000 ;; 40 MHz
+.byte 0xef
+.byte 0x06
+.word banshee_color_params_16bpp
+;; 1024 x 768 x 16
+.byte 0x72
+.byte 16
+.word 1024
+.word 768
+.word banshee_1024x768x8_crtc
+.word 0xe15d,0x0000 ;; 65 MHz
+.byte 0xef
+.byte 0x06
+.word banshee_color_params_16bpp
+;; 1280 x 1024 x 16
+.byte 0x74
+.byte 16
+.word 1280
+.word 1024
+.word banshee_1280x1024x8_crtc
+.word 0xb358,0x0000 ;; 108 MHz
+.byte 0xef
+.byte 0x06
+.word banshee_color_params_16bpp
 banshee_mode_list_end:
 .byte 0xff
 
@@ -158,8 +218,23 @@ banshee_vesa_modelist:
 .word 0x0105, 0x005e
 ;; 1280x1024x8
 .word 0x0107, 0x006b
+;; 640x400x16
+.word 0x018a, 0x0029
+;; 640x480x16
+.word 0x0111, 0x006e
+;; 800x600x16
+.word 0x0114, 0x0070
+;; 1024x768x16
+.word 0x0117, 0x0072
+;; 1280x1024x16
+.word 0x011a, 0x0074
 ;; invalid
 .word 0xffff, 0xffff
+
+banshee_color_params_8bpp:
+.byte 0, 0, 0, 0, 0, 0, 0, 0
+banshee_color_params_16bpp:
+.byte 5, 11, 6, 5, 5, 0, 0, 0
 
 ;; Banshee init code
 
@@ -246,9 +321,17 @@ banshee_init:
   pop  ax
   mov  al, #0x1c
   out  dx, ax
+  push dx
+  mov  dl, #0x14
+  call pci_read_reg
+  shr  eax, #16
+  pop  dx
+  mov  al, #0x1d
+  out  dx, ax
 no_banshee:
   ret
 
+;; out dx:i/o base
 banshee_get_io_base_address:
   push ax
   call get_crtc_address
@@ -259,6 +342,17 @@ banshee_get_io_base_address:
   mov  dh, al
   mov  dl, #0x00
   pop  ax
+  ret
+
+;; out ax:lfb base (upper 16 bits)
+banshee_get_lfb_base_address:
+  call get_crtc_address
+  mov  al, #0x1d
+  out  dx, al
+  inc  dx
+  in   al, dx
+  mov  ah, al
+  mov  al, #0x00
   ret
 
 banshee_display_info:
@@ -405,6 +499,16 @@ no_pll_setup:
   mov  dl, #0x98 ;; vidScreenSize
   out  dx, eax
   and  eax, #0x00000fff
+  mov  bl, [si+1]
+  xor  bh, bh
+  shr  bx, #3
+  cmp  bl, #0x01
+  jbe  set_mode_8bpp_1
+  push dx
+  xor  dx, dx
+  mul  bx
+  pop  dx
+set_mode_8bpp_1:
   mov  dl, #0xe8 ;; vidDesktopOverlayStride
   out  dx, eax
   mov  eax, #0x00001140
@@ -414,6 +518,13 @@ no_pll_setup:
   mov  dl, #0x2c ;; vgaInit1
   out  dx, eax
   mov  eax, #0x00000081
+  dec  bx
+  jz   set_mode_8bpp_2
+  and  ebx, #0x07
+  shl  ebx, #18
+  or   eax, ebx
+  or   ax, #0x0c00
+set_mode_8bpp_2:
   mov  dl, #0x5c ;; vidProcCfg
   out  dx, eax
   pop  ds
@@ -814,7 +925,7 @@ banshee_vesa_01h_1:
   stosb
   mov  al, #0x1 ;; XXX number of banks
   stosb
-  mov  al, #0x04 ;; memory model: packed pixel
+  mov  al, [si+13] ;; memory model
   stosb
   mov  al, #0x0   ;; XXX size of bank in K
   stosb
@@ -834,20 +945,15 @@ banshee_vesa_01h_3:
   mov  al, #0x00
   stosb
 
-  ;; v1.2+ stuffs (TODO)
-;  push si
-;  add  si, #18
-;  movsw
-;  movsw
-;  movsw
-;  movsw
-;  pop  si
-;; HACK
-  xor  ax, ax
-  stosw
-  stosw
-  stosw
-  stosw
+  ;; v1.2+ stuffs
+  mov  ax, [si+14]
+  push si
+  mov  si, ax
+  movsw
+  movsw
+  movsw
+  movsw
+  pop  si
 
   mov  ah, [si+1]
   mov  al, #0x0
@@ -859,7 +965,7 @@ banshee_vesa_01h_3:
   ;; 32-bit LFB address
   xor  ax, ax
   stosw
-  call banshee_get_lfb_addr
+  call banshee_get_lfb_base_address
   stosw
   or   ax, ax
   jz banshee_vesa_01h_4
@@ -1002,7 +1108,72 @@ banshee_vesa_06h_bl1:
   mov  ax, #0x004f
   ret
 banshee_vesa_06h_bl3:
-  mov  ax, #0x0100 ;; TODO
+  push dx
+  call banshee_get_io_base_address
+  mov  dl, #0x98 ;; vidScreenSize
+  in   eax, dx
+  shr  eax, #12
+  mov  bx, ax
+  mov  dx, #0x100 ;; vram in 64k
+  xor  ax, ax
+  div  bx
+  push ax
+  call banshee_get_bpp_bytes
+  mov  cl, al
+  xor  ch, ch
+  pop  ax
+  mov  bx, ax
+  div  cx
+  mov  cx, ax
+  pop  dx
+  mov  ax, #0x004f
+  ret
+
+banshee_vesa_07h:
+  cmp  bl, #0x80
+  je   banshee_vesa_07h_bl0
+  cmp  bl, #0x01
+  je   banshee_vesa_07h_bl1
+  jb   banshee_vesa_07h_bl0
+  mov  ax, #0x0100
+  ret
+banshee_vesa_07h_bl0:
+  push dx
+  call banshee_get_bpp_bytes
+  mov  bl, al
+  xor  bh, bh
+  mov  ax, cx
+  mul  bx
+  pop  bx
+  push ax
+  call banshee_get_line_offset
+  mul  bx
+  pop  bx
+  add  ax, bx
+  jnc  banshee_vesa_07h_noinc
+  inc  dx
+banshee_vesa_07h_noinc:
+  call banshee_set_start_addr
+  mov  ax, #0x004f
+  ret
+banshee_vesa_07h_bl1:
+  call banshee_get_start_addr
+  push ax
+  call banshee_get_line_offset
+  mov  bx, ax
+  pop  ax
+  div  bx
+  push ax
+  push dx
+  call banshee_get_bpp_bytes
+  mov  bl, al
+  xor  bh, bh
+  pop  ax
+  xor  dx, dx
+  div  bx
+  mov  cx, ax
+  pop  dx
+  mov  ax, #0x004f
   ret
 
 ;; VBE helper functions
@@ -1028,19 +1199,6 @@ bvtm_2:
   pop  si
   pop  cx
   pop  ds
-  ret
-
-banshee_get_lfb_addr:
-  push bx
-  push cx
-  push dx
-  call banshee_get_io_base_address
-  mov  dl, #0x16
-  call pci_read_reg
-  shr  eax, #16
-  pop  dx
-  pop  cx
-  pop  bx
   ret
 
 banshee_get_bank:
@@ -1092,6 +1250,15 @@ banshee_get_bpp_bytes:
   inc  al
   ret
 
+banshee_get_line_offset:
+  push dx
+  call banshee_get_io_base_address
+  mov  dl, #0xe8 ;; vidDesktopOverlayStride
+  in   eax, dx
+  and  ax, #0x7fff
+  pop  dx
+  ret
+
 banshee_set_line_offset:
   push bx
   push ax
@@ -1105,13 +1272,22 @@ banshee_set_line_offset:
   pop  bx
   ret
 
-banshee_get_line_offset:
-  push dx
+banshee_get_start_addr:
   call banshee_get_io_base_address
-  mov  dl, #0xe8 ;; vidDesktopOverlayStride
+  mov  dl, #0xe4 ;; vidDesktopStartAddr
   in   eax, dx
-  and  ax, #0x7fff
-  pop  dx
+  mov  edx, eax
+  shr  edx, #16
+  ret
+
+banshee_set_start_addr:
+  push ax
+  mov  ax, dx
+  shl  eax, #16
+  pop  ax
+  call banshee_get_io_base_address
+  mov  dl, #0xe4 ;; vidDesktopStartAddr
+  out  dx, eax
   ret
 
 banshee_vesa_handlers:
@@ -1124,7 +1300,7 @@ banshee_vesa_handlers:
   dw banshee_vesa_unimplemented
   dw banshee_vesa_05h
   dw banshee_vesa_06h
-  dw banshee_vesa_unimplemented
+  dw banshee_vesa_07h
   ;; 08h
   dw banshee_vesa_unimplemented
   dw banshee_vesa_unimplemented

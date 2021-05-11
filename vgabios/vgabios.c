@@ -1609,7 +1609,7 @@ ASM_START
   mov  ax, #0x0003
   mov  bx, 22[bp] ; attr
   test bl, #0x80
-  jnz  no_xor
+  jz   no_xor
   mov  ah, #0x18
 no_xor:
   out  dx, ax
@@ -3771,31 +3771,6 @@ static Bit16u biosfn_restore_video_state (CX,ES,BX)
         addr1++;
         outb(crtc_addr - 0x4 + 0xa, read_byte(ES, addr1)); addr1++;
     }
-    if (CX & 2) {
-        write_bda_byte(BIOSMEM_CURRENT_MODE, read_byte(ES, BX)); BX++;
-        write_bda_word(BIOSMEM_NB_COLS, read_word(ES, BX)); BX += 2;
-        write_bda_word(BIOSMEM_PAGE_SIZE, read_word(ES, BX)); BX += 2;
-        write_bda_word(BIOSMEM_CURRENT_START, read_word(ES, BX)); BX += 2;
-        for(i=0;i<8;i++) {
-            write_bda_word( BIOSMEM_CURSOR_POS+2*i, read_word(ES, BX));
-            BX += 2;
-        }
-        write_bda_word(BIOSMEM_CURSOR_TYPE, read_word(ES, BX)); BX += 2;
-        write_bda_byte(BIOSMEM_CURRENT_PAGE, read_byte(ES, BX)); BX++;
-        write_bda_word(BIOSMEM_CRTC_ADDRESS, read_word(ES, BX)); BX += 2;
-        BX += 2;
-        write_bda_byte(BIOSMEM_NB_ROWS, read_byte(ES, BX)); BX++;
-        write_bda_word(BIOSMEM_CHAR_HEIGHT, read_word(ES, BX)); BX += 2;
-        write_bda_byte(BIOSMEM_VIDEO_CTL, read_byte(ES, BX)); BX++;
-        write_bda_byte(BIOSMEM_SWITCHES, read_byte(ES, BX)); BX++;
-        write_bda_byte(BIOSMEM_MODESET_CTL, read_byte(ES, BX)); BX++;
-        write_bda_byte(BIOSMEM_DCC_INDEX, read_byte(ES, BX)); BX++;
-        /* current font */
-        write_word(0, 0x1f * 4, read_word(ES, BX)); BX += 2;
-        write_word(0, 0x1f * 4 + 2, read_word(ES, BX)); BX += 2;
-        write_word(0, 0x43 * 4, read_word(ES, BX)); BX += 2;
-        write_word(0, 0x43 * 4 + 2, read_word(ES, BX)); BX += 2;
-    }
 ASM_START
     push  bp
     mov   bp, sp
@@ -3808,6 +3783,43 @@ ASM_START
     mov   ax, 18[bp] ;; ES
     mov   es, ax
     mov   bx, 20[bp] ;; BX
+    test  cx, #0x02
+    jz    no_rest_bda_state
+    push  ds
+    push  cx
+    push  si
+    push  di
+    push  es
+    pop   ds
+    mov   si, bx
+    mov   ax, #BIOSMEM_SEG
+    mov   es, ax
+    mov   di, #BIOSMEM_CURRENT_MODE
+    mov   cx, #0x1e
+    cld
+    rep
+       movsb
+    mov   di, #BIOSMEM_NB_ROWS
+    mov   cx, #0x07
+    cld
+    rep
+       movsb
+    xor   ax, ax
+    mov   es, ax
+    lodsd
+    seg   es
+    mov   0x007c, eax ;; INT 0x1F
+    lodsd
+    seg   es
+    mov   0x010c, eax ;; INT 0x43
+    mov   bx, si
+    push  ds
+    pop   es
+    pop   di
+    pop   si
+    pop   cx
+    pop   ds
+no_rest_bda_state:
     test  cx, #0x04
     jz    no_rest_dac_state
     inc   bx
