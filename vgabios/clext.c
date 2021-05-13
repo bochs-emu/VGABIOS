@@ -26,12 +26,10 @@
 #undef CIRRUS_VESA3_PMINFO
 #endif
 
-#define PM_BIOSMEM_CURRENT_MODE 0x449
 #define PM_BIOSMEM_NB_COLS      0x44a
 #define PM_BIOSMEM_CRTC_ADDRESS 0x463
 #define PM_BIOSMEM_NB_ROWS      0x484
 #define PM_BIOSMEM_CHAR_HEIGHT  0x485
-#define PM_BIOSMEM_VBE_MODE     0x4BA
 
 typedef struct
 {
@@ -671,7 +669,7 @@ cirrus_switch_mode:
   call cirrus_switch_mode_setregs
 
   mov bx, [si+14] ;; crtc
-  call cirrus_get_crtc
+  call get_crtc_address
   call cirrus_switch_mode_setregs
 
   mov dx, #0x3c6
@@ -973,7 +971,7 @@ _cirrus_bitblt_fill:
 
 cirrus_extbios_80h:
   push dx
-  call cirrus_get_crtc
+  call get_crtc_address
   mov al, #0x27
   out dx, al
   inc dx
@@ -1002,7 +1000,7 @@ cirrus_extbios_81h:
   ret
 cirrus_extbios_82h:
   push dx
-  call cirrus_get_crtc
+  call get_crtc_address
   xor ax, ax
   mov al, #0x27
   out dx, al
@@ -1743,21 +1741,6 @@ cvtm_2:
   pop ds
   ret
 
-  ; cirrus_get_crtc
-  ;; NOTE - may be called in protected mode
-cirrus_get_crtc:
-  push ds
-  push ax
-  mov  dx, #0x3cc
-  in   al, dx
-  and  al, #0x01
-  shl  al, #5
-  mov  dx, #0x3b4
-  add  dl, al
-  pop  ax
-  pop  ds
-  ret
-
 ;; in - al:mode, out - cflag:result, si:table, ax:destroyed
 cirrus_get_modeentry:
   and al, #0x7f
@@ -1806,7 +1789,7 @@ cirrus_get_bpp_bytes_2:
 cirrus_set_line_offset:
   shr  ax, #3
   push ax
-  call cirrus_get_crtc
+  call get_crtc_address
   mov  al, #0x13
   out  dx, al
   inc  dx
@@ -1827,7 +1810,7 @@ cirrus_set_line_offset:
 cirrus_get_line_offset:
   push dx
   push bx
-  call cirrus_get_crtc
+  call get_crtc_address
   mov  al, #0x13
   out  dx, al
   inc  dx
@@ -1885,7 +1868,7 @@ cirrus_set_start_addr:
   push bx
   push dx
   push ax
-  call cirrus_get_crtc
+  call get_crtc_address
   mov  al, #0x0d
   out  dx, al
   inc  dx
@@ -1928,7 +1911,7 @@ cirrus_set_start_addr:
 ;; out - current address in DX:AX
 cirrus_get_start_addr:
   push bx
-  call cirrus_get_crtc
+  call get_crtc_address
   mov  al, #0x0c
   out  dx, al
   inc  dx

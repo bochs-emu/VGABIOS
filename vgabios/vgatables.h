@@ -27,6 +27,9 @@
 #define BIOSMEM_VBE_FLAG      0xB9
 #define BIOSMEM_VBE_MODE      0xBA
 
+#define PM_BIOSMEM_CURRENT_MODE 0x449
+#define PM_BIOSMEM_VBE_MODE     0x4BA
+
 
 /*
  *
