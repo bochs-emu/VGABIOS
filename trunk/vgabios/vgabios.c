@@ -381,12 +381,16 @@ int10_test_1B:
 int10_test_1C:
   cmp   ah, #0x1c
   jne   int10_normal
-  cmp   al, #0x01
+  cmp   al, #0x02
+  je    int10_1C02
   ja    int10_normal
+  cmp   al, #0x01
   je    int10_1C01
   jmp   biosfn_read_video_state_size
 int10_1C01:
   jmp   biosfn_save_video_state
+int10_1C02:
+  jmp   biosfn_restore_video_state
 int10_normal:
   push es
   push ds
@@ -714,20 +718,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
    case 0x13:
      biosfn_write_string(GET_AL(),GET_BH(),GET_BL(),CX,GET_DH(),GET_DL(),ES,BP);
      break;
-   case 0x1C:
-     switch(GET_AL())
-      {
-       case 0x02:
-        biosfn_restore_video_state(CX,ES,BX);
-        break;
-#ifdef DEBUG
-       default:
-        unknown();
-#endif
-      }
-     SET_AL(0x1C);
-     break;
-
 #ifdef VBE
    case 0x4f:
      if (vbe_has_vbe_display()) {
@@ -3705,167 +3695,224 @@ _biosfn_save_video_state:
   pop   bx
   pop   cx
   pop   bp
+  ret
 ASM_END
 
 // -----------------------------------------------------------------------------
-static Bit16u biosfn_restore_video_state (CX,ES,BX)
-     Bit16u CX;Bit16u ES;Bit16u BX;
-{
-    Bit16u i, crtc_addr, v, addr1, ar_index;
-
-    if (CX & 1) {
-        // Reset Attribute Ctl flip-flop
-        inb(VGAREG_ACTL_RESET);
-
-        crtc_addr = read_word(ES, BX + 0x40);
-        addr1 = BX;
-        BX += 5;
-
-        for(i=1;i<=4;i++){
-            outb(VGAREG_SEQU_ADDRESS, i);
-            outb(VGAREG_SEQU_DATA, read_byte(ES, BX)); BX++;
-        }
-        outb(VGAREG_SEQU_ADDRESS, 0);
-        outb(VGAREG_SEQU_DATA, read_byte(ES, BX)); BX++;
-
-        // Disable CRTC write protection
-        outw(crtc_addr,0x0011);
-        // Set CRTC regs
-        for(i=0;i<=0x18;i++) {
-            if (i != 0x11) {
-                outb(crtc_addr,i);
-                outb(crtc_addr+1, read_byte(ES, BX));
-            }
-            BX++;
-        }
-        // select crtc base address
-        v = inb(VGAREG_READ_MISC_OUTPUT) & ~0x01;
-        if (crtc_addr = VGAREG_VGA_CRTC_ADDRESS)
-            v |= 0x01;
-        outb(VGAREG_WRITE_MISC_OUTPUT, v);
-
-        // enable write protection if needed
-        outb(crtc_addr, 0x11);
-        outb(crtc_addr+1, read_byte(ES, BX - 0x18 + 0x11));
-
-        // Set Attribute Ctl
-        ar_index = read_byte(ES, addr1 + 0x03);
-        inb(VGAREG_ACTL_RESET);
-        for(i=0;i<=0x13;i++) {
-            outb(VGAREG_ACTL_ADDRESS, i | (ar_index & 0x20));
-            outb(VGAREG_ACTL_WRITE_DATA, read_byte(ES, BX)); BX++;
-        }
-        outb(VGAREG_ACTL_ADDRESS, ar_index);
-        inb(VGAREG_ACTL_RESET);
-
-        for(i=0;i<=8;i++) {
-            outb(VGAREG_GRDC_ADDRESS,i);
-            outb(VGAREG_GRDC_DATA, read_byte(ES, BX)); BX++;
-        }
-        BX += 2; /* crtc_addr */
-        BX += 4; /* plane latches */
-
-        outb(VGAREG_SEQU_ADDRESS, read_byte(ES, addr1)); addr1++;
-        outb(crtc_addr, read_byte(ES, addr1)); addr1++;
-        outb(VGAREG_GRDC_ADDRESS, read_byte(ES, addr1)); addr1++;
-        addr1++;
-        outb(crtc_addr - 0x4 + 0xa, read_byte(ES, addr1)); addr1++;
-    }
 ASM_START
-    push  bp
-    mov   bp, sp
-    push  ax
-    push  bx
-    push  cx
-    push  dx
-    push  es
-    mov   cx, 16[bp] ;; CX
-    mov   ax, 18[bp] ;; ES
-    mov   es, ax
-    mov   bx, 20[bp] ;; BX
-    test  cx, #0x02
-    jz    no_rest_bda_state
-    push  ds
-    push  cx
-    push  si
-    push  di
-    push  es
-    pop   ds
-    mov   si, bx
-    mov   ax, #BIOSMEM_SEG
-    mov   es, ax
-    mov   di, #BIOSMEM_CURRENT_MODE
-    mov   cx, #0x1e
-    cld
-    rep
-       movsb
-    mov   di, #BIOSMEM_NB_ROWS
-    mov   cx, #0x07
-    cld
-    rep
-       movsb
-    xor   ax, ax
-    mov   es, ax
-    lodsd
-    seg   es
-    mov   0x007c, eax ;; INT 0x1F
-    lodsd
-    seg   es
-    mov   0x010c, eax ;; INT 0x43
-    mov   bx, si
-    push  ds
-    pop   es
-    pop   di
-    pop   si
-    pop   cx
-    pop   ds
+restore_vga_state:
+  test  cx, #0x01
+  jz    no_rest_hw_state
+  push  cx
+  push  dx
+  push  bx
+  add   bx, #5
+  mov   cl, #0x01 ;; VGA sequencer controller registers
+  mov   dx, #VGAREG_SEQU_ADDRESS
+rest_seqc_loop:
+  mov   al, cl
+  seg   es
+  mov   ah, [bx]
+  out   dx, ax
+  inc   bx
+  inc   cl
+  cmp   cl, #0x04
+  jbe   rest_seqc_loop
+  mov   al, #0x00
+  seg   es
+  mov   ah, [bx]
+  out   dx, ax
+  inc   bx
+  seg   es
+  mov   ax, 0x36[bx]
+  push  ax
+  cmp   ax, #VGAREG_VGA_CRTC_ADDRESS
+  jne   no_color
+  mov   dx, #VGAREG_READ_MISC_OUTPUT
+  in    al, dx
+  or    al, #0x01 ;; set CRTC color address
+  mov   dx, #VGAREG_WRITE_MISC_OUTPUT
+  out   dx, al
+no_color:
+  pop   dx
+  mov   ax, #0x0011 ;; Disable CRTC write protection
+  out   dx, ax
+  xor   cl, cl ;; VGA CRTC registers
+rest_crtc_loop:
+  mov   al, cl
+  seg   es
+  mov   ah, [bx]
+  out   dx, ax
+  inc   bx
+  inc   cl
+  cmp   cl, #0x18
+  jbe   rest_crtc_loop
+  mov   dx, #VGAREG_ACTL_RESET
+  in    al, dx
+  xor   cl, cl ;; VGA attribute controller registers
+  mov   dx, #VGAREG_ACTL_ADDRESS
+rest_actl_loop:
+  mov   al, cl
+  or    al, #0x20
+  out   dx, al
+  seg   es
+  mov   al, [bx]
+  out   dx, al
+  inc   bx
+  inc   cl
+  cmp   cl, #0x13
+  jbe   rest_actl_loop
+  xor   cl, cl ;; VGA graphics controller registers
+  mov   dx, #VGAREG_GRDC_ADDRESS
+rest_grdc_loop:
+  mov   al, cl
+  seg   es
+  mov   ah, [bx]
+  out   dx, ax
+  inc   bx
+  inc   cl
+  cmp   cl, #0x08
+  jbe   rest_grdc_loop
+  add   bx, #6
+  pop   ax
+  push  bx
+  mov   bx, ax
+  seg   es
+  mov   al, [bx]
+  mov   dx, #VGAREG_SEQU_ADDRESS
+  out   dx, al
+  inc   bx
+  seg   es
+  mov   al, [bx]
+  call  get_crtc_address
+  out   dx, al
+  inc   bx
+  seg   es
+  mov   al, [bx]
+  mov   dx, #VGAREG_GRDC_ADDRESS
+  out   dx, al
+  inc   bx
+  mov   dx, #VGAREG_ACTL_RESET
+  in    al, dx
+  mov   dx, #VGAREG_ACTL_ADDRESS
+  seg   es
+  mov   al, [bx]
+  out   dx, al
+  mov   dx, #VGAREG_ACTL_RESET
+  in    al, dx
+  inc   bx
+  seg   es
+  mov   al, [bx]
+  mov   dx, #VGAREG_WRITE_FEATURE_CTL
+  pop   bx
+  pop   dx
+  pop   cx
+no_rest_hw_state:
+  test  cx, #0x02
+  jz    no_rest_bda_state
+  push  ds
+  push  cx
+  push  si
+  push  di
+  push  es
+  pop   ds
+  mov   si, bx
+  mov   ax, #BIOSMEM_SEG
+  mov   es, ax
+  mov   di, #BIOSMEM_CURRENT_MODE
+  mov   cx, #0x1e
+  cld
+  rep
+     movsb
+  mov   di, #BIOSMEM_NB_ROWS
+  mov   cx, #0x07
+  cld
+  rep
+     movsb
+  xor   ax, ax
+  mov   es, ax
+  lodsd
+  seg   es
+  mov   0x007c, eax ;; INT 0x1F
+  lodsd
+  seg   es
+  mov   0x010c, eax ;; INT 0x43
+  mov   bx, si
+  push  ds
+  pop   es
+  pop   di
+  pop   si
+  pop   cx
+  pop   ds
 no_rest_bda_state:
-    test  cx, #0x04
-    jz    no_rest_dac_state
-    inc   bx
-    seg   es
-    mov   al, [bx]
-    push  ax
-    inc   bx
-    seg   es
-    mov   al, [bx]
-    mov   dx, #VGAREG_PEL_MASK
-    out   dx, al
-    inc   bx
-    mov   al, #0x00
-    mov   dx, #VGAREG_DAC_WRITE_ADDRESS
-    out   dx, al
-    mov   cx, #0x0300
-    cld
-    mov   dx, #VGAREG_DAC_DATA
+  test  cx, #0x04
+  jz    no_rest_dac_state
+  push  cx
+  push  dx
+  inc   bx
+  seg   es
+  mov   al, [bx]
+  push  ax
+  inc   bx
+  seg   es
+  mov   al, [bx]
+  mov   dx, #VGAREG_PEL_MASK
+  out   dx, al
+  inc   bx
+  mov   al, #0x00
+  mov   dx, #VGAREG_DAC_WRITE_ADDRESS
+  out   dx, al
+  mov   cx, #0x0300
+  cld
+  mov   dx, #VGAREG_DAC_DATA
 dac_write_loop:
-    seg   es
-    mov   al, [bx]
-    out   dx, al
-    inc   bx
-    loop  dac_write_loop
-    pop   ax
-    mov   dx, #VGAREG_DAC_WRITE_ADDRESS
-    out   dx, al
-    seg   es
-    mov   al, [bx]
-    push  bx
-    mov   bh, al
-    mov   bl, #0x14
-    call  biosfn_set_single_palette_reg
-    pop   bx
-    inc   bx
-    mov   20[bp], bx
+  seg   es
+  mov   al, [bx]
+  out   dx, al
+  inc   bx
+  loop  dac_write_loop
+  pop   ax
+  mov   dx, #VGAREG_DAC_WRITE_ADDRESS
+  out   dx, al
+  seg   es
+  mov   al, [bx]
+  push  bx
+  mov   bh, al
+  mov   bl, #0x14
+  call  biosfn_set_single_palette_reg
+  pop   bx
+  inc   bx
+  pop   dx
+  pop   cx
 no_rest_dac_state:
-    pop   es
-    pop   dx
-    pop   cx
-    pop   bx
-    pop   ax
-    pop   bp
+  ret
+
+biosfn_restore_video_state:
+  push  bx
+  call  restore_vga_state
+  pop   bx
+  mov   ax, #0x001c
+  ret
+
+; called from VBE C code
+_biosfn_restore_video_state:
+  push  bp
+  mov   bp, sp
+  push  cx
+  push  bx
+  push  es
+  mov   cx, 4[bp] ; CX
+  mov   ax, 6[bp] ; ES
+  mov   es, ax
+  mov   bx, 8[bp] ; BX
+  call  save_vga_state
+  mov   ax, bx
+  pop   es
+  pop   bx
+  pop   cx
+  pop   bp
+  ret
 ASM_END
-    return BX;
-}
 
 // ============================================================================================
 //
@@ -4481,6 +4528,19 @@ pci_read_reg:
   out dx, eax
   add dl, #4
   in  eax, dx
+  ret
+
+  ; get CRTC address from VGA misc output setting
+  ; out - dx: CRTC address
+get_crtc_address:
+  push ax
+  mov  dx, #VGAREG_READ_MISC_OUTPUT
+  in   al, dx
+  and  al, #0x01
+  shl  al, #5
+  mov  dx, #VGAREG_MDA_CRTC_ADDRESS
+  add  dl, al
+  pop  ax
   ret
 ASM_END
 

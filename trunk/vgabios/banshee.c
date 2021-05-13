@@ -204,6 +204,56 @@ banshee_modes:
 .byte 0xef
 .byte 0x06
 .word banshee_color_params_16bpp
+;; 640 x 400 x 24
+.byte 0x2a ;; mode
+.byte 24   ;; depth
+.word 640  ;; xres
+.word 400  ;; yres
+.word banshee_640x400x8_crtc ;; CRTC settings
+.word 0,0 ;; pllCtrl0 (0 = unused)
+.byte 0x63 ;; misc reg
+.byte 0x06 ;; VBE memory model
+.word banshee_color_params_24bpp ;; color params
+;; 640 x 480 x 24
+.byte 0x69 ;; mode
+.byte 24   ;; depth
+.word 640  ;; xres
+.word 480  ;; yres
+.word banshee_640x480x8_crtc ;; CRTC settings
+.word 0,0 ;; pllCtrl0 (0 = unused)
+.byte 0x63 ;; misc reg
+.byte 0x06 ;; VBE memory model
+.word banshee_color_params_24bpp ;; color params
+;; 800 x 600 x 24
+.byte 0x71
+.byte 24
+.word 800
+.word 600
+.word banshee_800x600x8_crtc
+.word 0xbc3e,0x0000 ;; 40 MHz
+.byte 0xef
+.byte 0x06
+.word banshee_color_params_24bpp
+;; 1024 x 768 x 24
+.byte 0x73
+.byte 24
+.word 1024
+.word 768
+.word banshee_1024x768x8_crtc
+.word 0xe15d,0x0000 ;; 65 MHz
+.byte 0xef
+.byte 0x06
+.word banshee_color_params_24bpp
+;; 1280 x 1024 x 24
+.byte 0x75
+.byte 24
+.word 1280
+.word 1024
+.word banshee_1280x1024x8_crtc
+.word 0xb358,0x0000 ;; 108 MHz
+.byte 0xef
+.byte 0x06
+.word banshee_color_params_24bpp
 banshee_mode_list_end:
 .byte 0xff
 
@@ -220,14 +270,24 @@ banshee_vesa_modelist:
 .word 0x0107, 0x006b
 ;; 640x400x16
 .word 0x018a, 0x0029
+;; 640x400x24
+.word 0x018b, 0x002a
 ;; 640x480x16
 .word 0x0111, 0x006e
+;; 640x480x24
+.word 0x0112, 0x0069
 ;; 800x600x16
 .word 0x0114, 0x0070
+;; 800x600x24
+.word 0x0115, 0x0071
 ;; 1024x768x16
 .word 0x0117, 0x0072
+;; 1024x768x24
+.word 0x0118, 0x0073
 ;; 1280x1024x16
 .word 0x011a, 0x0074
+;; 1280x1024x24
+.word 0x011b, 0x0075
 ;; invalid
 .word 0xffff, 0xffff
 
@@ -235,6 +295,8 @@ banshee_color_params_8bpp:
 .byte 0, 0, 0, 0, 0, 0, 0, 0
 banshee_color_params_16bpp:
 .byte 5, 11, 6, 5, 5, 0, 0, 0
+banshee_color_params_24bpp:
+.byte 8, 16, 8, 8, 8, 0, 0, 0
 
 ;; Banshee init code
 
@@ -411,7 +473,7 @@ banshee_set_video_mode:
   push ax
   push bx
   xor  ax, ax ;; reset VBE mode
-  mov  bx, #BIOSMEM_VBE_MODE
+  mov  bx, #PM_BIOSMEM_VBE_MODE
   call set_bda_word
   pop  bx
   pop  ax
@@ -558,7 +620,7 @@ bgm_2:
 set_bda_byte:
   push ds
   push si
-  mov  si, #0x40
+  xor  si, si
   mov  ds, si
   mov  [bx], al
   pop  si
@@ -568,22 +630,11 @@ set_bda_byte:
 set_bda_word:
   push ds
   push si
-  mov  si, #0x40
+  xor  si, si
   mov  ds, si
   mov  [bx], ax
   pop  si
   pop  ds
-  ret
-
-get_crtc_address:
-  push ax
-  mov  dx, #VGAREG_READ_MISC_OUTPUT
-  in   al, dx
-  and  al, #0x01
-  shl  al, #5
-  mov  dx, #VGAREG_MDA_CRTC_ADDRESS
-  add  dl, al
-  pop  ax
   ret
 
 set_vgacore_regs:
@@ -657,7 +708,7 @@ banshee_set_vga_mode:
   out  dx, eax
   mov  dl, #0xe4 ;; vidDesktopStartAddr
   out  dx, eax
-  mov  ax, #BIOSMEM_SEG
+  xor  ax, ax
   mov  ds, ax
   push dx
   mov  dx, #VGAREG_GRDC_ADDRESS
@@ -1021,7 +1072,7 @@ banshee_vesa_set_mode:
   int  #0x10
   push bx
   mov  ax, bx
-  mov  bx, #BIOSMEM_VBE_MODE
+  mov  bx, #PM_BIOSMEM_VBE_MODE
   call set_bda_word
   pop  bx
   mov  ax, #0x004F
@@ -1029,14 +1080,14 @@ banshee_vesa_set_mode:
 
 banshee_vesa_03h:
   push ds
-  mov  ax, #0x0040
+  xor  ax, ax
   mov  ds, ax
-  mov  bx, #BIOSMEM_VBE_MODE
+  mov  bx, #PM_BIOSMEM_VBE_MODE
   mov  ax, [bx]
   mov  bx, ax
   test bx, bx
   jnz  banshee_vesa_03h_1
-  mov  bx, #BIOSMEM_CURRENT_MODE
+  mov  bx, #PM_BIOSMEM_CURRENT_MODE
   mov  al, [bx]
   mov  bl, al
   xor  bh, bh
@@ -1176,6 +1227,51 @@ banshee_vesa_07h_bl1:
   mov  ax, #0x004f
   ret
 
+banshee_vesa_15h:
+  cmp bl,#0x01
+  jb  banshee_vesa_get_capabilities
+  je  banshee_vesa_read_EDID
+  jmp banshee_vesa_unimplemented
+
+banshee_vesa_get_capabilities:
+  test cx,cx
+  jne  banshee_vesa_unimplemented
+  mov  ax, #0x004f
+  mov  bx, #0x0202
+  ret
+
+banshee_vesa_read_EDID:
+  call banshee_ddc_init
+  jnz  banshee_vesa_unimplemented
+  call banshee_ddc_start
+  call banshee_ddc_delay
+  mov  al, #0xa0
+  call banshee_ddc_send_byte
+  jc   banshee_vesa_unimplemented
+  mov  al, #0x00
+  call banshee_ddc_send_byte
+  jc   banshee_vesa_unimplemented
+  call banshee_ddc_stop
+  call banshee_ddc_start
+  call banshee_ddc_delay
+  mov  al, #0xa1
+  call banshee_ddc_send_byte
+  jc   banshee_vesa_unimplemented
+  push cx
+  push di
+  mov  cx, #0x0080
+  cld
+banshee_vesa_15h_01:
+  call banshee_ddc_read_byte
+  stosb
+  call banshee_ddc_send_status
+  loop banshee_vesa_15h_01
+  call banshee_ddc_stop
+  pop  di
+  pop  cx
+  mov  ax, #0x004f
+  ret
+
 ;; VBE helper functions
 
 ;; in ax:vesamode, out ax:bansheemode
@@ -1290,6 +1386,151 @@ banshee_set_start_addr:
   out  dx, eax
   ret
 
+;; DDC helper functions for VESA 15h
+
+banshee_ddc_init:
+  call banshee_get_io_base_address
+  mov  dl, #0x78 ;; vidSerialParallelPort
+  in   eax, dx
+  or   eax, #0x040000
+  out  dx, eax
+  call banshee_ddc_clr_dck
+  in   eax, dx
+  shr  eax, #19
+  and  al, #0x04
+  pushf
+  call banshee_ddc_set_dck
+  popf
+  ret
+
+banshee_ddc_delay:
+  in   al, 0x61
+  and  al, #0x10
+  mov  ah, al
+banshee_ddc_delay_01:
+  nop
+  in   al, 0x61
+  and  al, #0x10
+  cmp  al, ah
+  jz   banshee_ddc_delay_01
+  ret
+
+banshee_ddc_set_dck:
+  mov  al, #0x01
+  db   0xa9 ;; skip next opcode (TEST AX, #0x02b0)
+banshee_ddc_set_dda:
+  mov  al, #0x02
+  push ebx
+  xor  ebx, ebx
+  mov  bl, al
+  shl  ebx, #19
+  in   eax, dx
+  or   eax, ebx
+  out  dx, eax
+  pop  ebx
+  ret
+
+banshee_ddc_clr_dck:
+  mov  al, #0x01
+  db   0xa9 ;; skip next opcode (see above)
+banshee_ddc_clr_dda:
+  mov  al, #0x02
+  push ebx
+  xor  ebx, ebx
+  mov  bl, al
+  shl  ebx, #19
+  xor  ebx, #0xffffffff
+  in   eax, dx
+  and  eax, ebx
+  out  dx, eax
+  pop  ebx
+  ret
+
+banshee_ddc_start:
+  call banshee_ddc_clr_dda
+  call banshee_ddc_clr_dck
+  ret
+
+banshee_ddc_stop:
+  call banshee_ddc_set_dck
+  call banshee_ddc_set_dda
+  ret
+
+banshee_ddc_get_dda:
+  in   eax, dx
+  shr  eax, #23
+  ret
+
+banshee_ddc_send_bit:
+  push ax
+  pushf
+  call banshee_ddc_delay
+  popf
+  jc   banshee_ddc_send_bit_01
+  call banshee_ddc_clr_dda
+  jmp  banshee_ddc_send_bit_02
+banshee_ddc_send_bit_01:
+  call banshee_ddc_set_dda
+banshee_ddc_send_bit_02:
+  call banshee_ddc_set_dck
+  call banshee_ddc_delay
+  call banshee_ddc_clr_dck
+  pop  ax
+  ret
+
+banshee_ddc_read_bit:
+  push ax
+  call banshee_ddc_delay
+  call banshee_ddc_set_dck
+  call banshee_ddc_get_dda
+  pushf
+  call banshee_ddc_delay
+  call banshee_ddc_clr_dck
+  popf
+  pop  ax
+  ret
+
+banshee_ddc_send_byte:
+  push cx
+  mov  cx, #0x08
+banshee_ddc_send_byte_01:
+  shl  al, #0x01
+  call banshee_ddc_send_bit
+  loop banshee_ddc_send_byte_01
+  call banshee_ddc_set_dda
+  call banshee_ddc_delay
+  call banshee_ddc_set_dck
+  call banshee_ddc_get_dda
+  pushf
+  call banshee_ddc_clr_dck
+  call banshee_ddc_clr_dda
+  popf
+  pop  cx
+  ret
+
+banshee_ddc_read_byte:
+  push cx
+  call banshee_ddc_set_dda
+  mov  al, #0x00
+  mov  cx, #0x08
+banshee_ddc_read_byte_01:
+  call banshee_ddc_read_bit
+  rcl  al, #0x01
+  loop banshee_ddc_read_byte_01
+  pop  cx
+  ret
+
+banshee_ddc_send_status:
+  cmp  cx, #0x01
+  jz   banshee_ddc_send_status_01
+  call banshee_ddc_clr_dda
+banshee_ddc_send_status_01:
+  call banshee_ddc_delay
+  call banshee_ddc_set_dck
+  call banshee_ddc_delay
+  call banshee_ddc_clr_dck
+  ret
+
 banshee_vesa_handlers:
   ;; 00h
   dw banshee_vesa_00h
@@ -1318,5 +1559,5 @@ banshee_vesa_handlers:
   dw banshee_vesa_unimplemented
   ;; 14h
   dw banshee_vesa_unimplemented
-  dw banshee_vesa_unimplemented
+  dw banshee_vesa_15h
 ASM_END
