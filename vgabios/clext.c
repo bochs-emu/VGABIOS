@@ -27,6 +27,7 @@
 #endif
 
 #define PM_BIOSMEM_NB_COLS      0x44a
+#define PM_BIOSMEM_CURSOR_POS   0x450
 #define PM_BIOSMEM_CRTC_ADDRESS 0x463
 #define PM_BIOSMEM_NB_ROWS      0x484
 #define PM_BIOSMEM_CHAR_HEIGHT  0x485
@@ -584,12 +585,17 @@ cirrus_set_video_mode_extended:
   pop ax
 cirrus_set_video_mode_extended_1:
   and al, #0x7f
+  call cirrus_set_video_mode_bda
+  mov al, #0x20
+  pop si
+  jmp cirrus_return
 
+cirrus_set_video_mode_bda:
+  push bx
+  push cx
   push ds
   push cs
   pop ds
-  push bx
-  push cx
   mov bx, [si+2]
   shr bx, #3
   mov cx, [si+4]
@@ -608,21 +614,12 @@ cirrus_set_video_mode_extended_1:
   mov al, #0x10
   xor ah, ah
   mov [PM_BIOSMEM_CHAR_HEIGHT], ax
+  xor ax, ax
+  mov [PM_BIOSMEM_CURSOR_POS], ax
+  pop ds
   pop cx
   pop bx
-  pop ds
-  push bx
-  push dx
-  xor bh, bh
-  xor dx, dx
-  call biosfn_set_cursor_pos
-  pop dx
-  pop bx
-
-  mov al, #0x20
-
-  pop si
-  jmp cirrus_return
+  ret
 
 cirrus_vesa_pmbios_init:
   retf
@@ -1317,11 +1314,12 @@ cirrus_vesa_02h_3:
   test bx, #0x8000 ;; no clear
   jnz cirrus_vesa_02h_4
   push ax
-  xor ax,ax
+  xor ax, ax
   call cirrus_clear_vram
   pop ax
 cirrus_vesa_02h_4:
   pop ax
+  call cirrus_set_video_mode_bda
   push ds
 #ifdef CIRRUS_VESA3_PMINFO
  db 0x2e ;; cs:
@@ -1330,7 +1328,6 @@ cirrus_vesa_02h_4:
   xor si, si
 #endif
   mov ds, si
-  mov [PM_BIOSMEM_CURRENT_MODE], al
   mov [PM_BIOSMEM_VBE_MODE], bx
   pop ds
   pop si
