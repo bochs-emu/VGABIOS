@@ -1271,15 +1271,15 @@ cirrus_vesa_01h_4:
   pop ds
 
   test cx, #0x4000 ;; LFB flag
-  jz cirrus_vesa_01h_5
+  jz   cirrus_vesa_01h_5
   push cx
  db 0x26 ;; es:
-  mov cx, [di]
-  cmp cx, #0x0080 ;; is LFB supported?
-  jnz cirrus_vesa_01h_6
-  mov ax, #0x014F ;; error - no LFB
+  mov  cx, [di]
+  test cx, #0x0080 ;; is LFB supported?
+  jnz  cirrus_vesa_01h_6
+  mov  ax, #0x014F ;; error - no LFB
 cirrus_vesa_01h_6:
-  pop cx
+  pop  cx
 cirrus_vesa_01h_5:
   ret
 
@@ -1697,7 +1697,7 @@ cirrus_vesa_read_EDID:
   call cirrus_ddc_delay
   mov  al, #0xa1
   call cirrus_ddc_send_byte
-  jnz  cirrus_vesa_unimplemented
+  jc   cirrus_vesa_unimplemented
   push cx
   push di
   mov  cx, #0x0080
