@@ -20,6 +20,8 @@
 //  License along with this library; if not, write to the Free Software
 //  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
+//#define BANSHEE_DEBUG
+
 #define BANSHEE_MODE_SIZE 16
 
 ASM_START
@@ -465,11 +467,17 @@ banshee_int10_handler:
   jnz  banshee_unhandled
   call banshee_vesa
 banshee_return:
+#ifdef BANSHEE_DEBUG
+  call banshee_ret_debug_dump
+#endif
   pop  bp
   popf
   iret
 
 banshee_set_video_mode:
+#ifdef BANSHEE_DEBUG
+  call banshee_call_debug_dump
+#endif
   push ax
   push bx
   xor  ax, ax ;; reset VBE mode
@@ -502,6 +510,32 @@ banshee_unhandled:
   pop  bp
   popf
   jmp  vgabios_int10_handler
+
+#ifdef BANSHEE_DEBUG
+banshee_call_debug_dump:
+  push es
+  push ds
+  pusha
+  push cs
+  pop ds
+  call _banshee_call_debugmsg
+  popa
+  pop ds
+  pop es
+  ret
+
+banshee_ret_debug_dump:
+  push es
+  push ds
+  pusha
+  push cs
+  pop ds
+  call _banshee_ret_debugmsg
+  popa
+  pop ds
+  pop es
+  ret
+#endif
 
 banshee_switch_mode:
   push bx
@@ -834,6 +868,9 @@ no_bit9:
 ;; Banshee VBE support
 
 banshee_vesa:
+#ifdef BANSHEE_DEBUG
+  call banshee_call_debug_dump
+#endif
   cmp  al, #0x15
   ja   banshee_vesa_unimplemented
   push bx
@@ -1047,7 +1084,7 @@ banshee_vesa_01h_4:
   push cx
  db 0x26 ;; es:
   mov  cx, [di]
-  cmp  cx, #0x0080 ;; is LFB supported?
+  test cx, #0x0080 ;; is LFB supported?
   jnz  banshee_vesa_01h_6
   mov  ax, #0x014F ;; error - no LFB
 banshee_vesa_01h_6:
@@ -1059,7 +1096,7 @@ banshee_vesa_02h:
   test bx, #0x3e00
   jnz  banshee_vesa_unimplemented ;; unknown flags
   mov  ax, bx
-  and  ax, #0x7fff
+  and  ax, #0x01ff
   cmp  ax, #0x0100
   jb   banshee_vesa_set_mode
   call banshee_vesamode_to_mode
@@ -1228,13 +1265,13 @@ banshee_vesa_07h_bl1:
   ret
 
 banshee_vesa_15h:
-  cmp bl,#0x01
+  cmp bl, #0x01
   jb  banshee_vesa_get_capabilities
   je  banshee_vesa_read_EDID
   jmp banshee_vesa_unimplemented
 
 banshee_vesa_get_capabilities:
-  test cx,cx
+  test cx, cx
   jne  banshee_vesa_unimplemented
   mov  ax, #0x004f
   mov  bx, #0x0202
@@ -1561,3 +1598,17 @@ banshee_vesa_handlers:
   dw banshee_vesa_unimplemented
   dw banshee_vesa_15h
 ASM_END
+
+#ifdef BANSHEE_DEBUG
+static void banshee_call_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
+  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
+{
+  printf("vgabios banshee call ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
+}
+
+static void banshee_ret_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
+  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
+{
+  printf("vgabios banshee ret  ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
+}
+#endif

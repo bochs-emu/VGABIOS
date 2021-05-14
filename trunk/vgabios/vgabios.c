@@ -134,6 +134,12 @@ ASM_END
 ASM_START
 .text
 .rom
+
+#ifdef BANSHEE
+.org 0x7ff8
+.byte 0x1a, 0x12, 0x04, 0x00
+#endif
+
 .org 0
 
 use16 386
@@ -4568,10 +4574,5 @@ ASM_START
 vgabios_end:
 .byte 0xCB
 ;; BLOCK_STRINGS_BEGIN
-
-#ifdef BANSHEE
-.org 0x7ff8
-.byte 0x1a, 0x12, 0x04, 0x00
-#endif
 
 ASM_END
