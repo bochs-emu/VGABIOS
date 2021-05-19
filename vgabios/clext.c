@@ -564,6 +564,7 @@ cirrus_set_video_mode_extended:
 cirrus_set_video_mode_extended_1:
   and al, #0x7f
   call cirrus_set_video_mode_bda
+  SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
   mov al, #0x20
   pop si
   jmp cirrus_return
@@ -853,6 +854,23 @@ _cirrus_bitblt_write_char:
   push bx
   push cx
   push dx
+  push ds
+  push es
+  push si
+  push di
+  xor  ax, ax
+  mov  ds, ax
+  mov  bx, #0x10c ; INT 0x43
+  mov  si, [bx]
+  mov  ax, [bx+2]
+  mov  ds, ax
+  mov  al, #BIOSMEM_CHAR_HEIGHT
+  call cirrus_pm_get_bda_word
+  mov  bx, ax
+  push bx
+  mov  al, 4[bp]  ; character
+  mul  bl
+  add  si, ax
   mov  cl, 8[bp]  ; xcurs
   mov  ch, 10[bp] ; ycurs
   mov  al, #0x01
@@ -875,23 +893,6 @@ _cirrus_bitblt_write_char:
   out  dx, ax
   mov  ax, #0x0231 ; start
   out  dx, ax
-  push ds
-  push es
-  push si
-  push di
-  xor  ax, ax
-  mov  ds, ax
-  mov  bx, #0x10c ; INT 0x43
-  mov  si, [bx]
-  mov  ax, [bx+2]
-  mov  ds, ax
-  mov  bl, 4[bp]  ; character
-  mov  al, #BIOSMEM_CHAR_HEIGHT
-  call cirrus_pm_get_bda_word
-  xor  ah, ah
-  push ax
-  mul  bl
-  add  si, ax
   mov  ax, #0xa000
   mov  es, ax
   xor  di, di
@@ -1320,13 +1321,12 @@ cirrus_vesa_02h_1:
 cirrus_vesa_02h_3:
   test bx, #0x8000 ;; no clear
   jnz cirrus_vesa_02h_4
-  push ax
   xor ax, ax
   call cirrus_clear_vram
-  pop ax
 cirrus_vesa_02h_4:
   pop ax
   call cirrus_set_video_mode_bda
+  SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
   push ds
 #ifdef CIRRUS_VESA3_PMINFO
  db 0x2e ;; cs:

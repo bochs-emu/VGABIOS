@@ -52,6 +52,13 @@
 #ifdef VBE
 #include "vbe.h"
 #endif
+#ifdef CIRRUS
+#define VGAEXT
+#define VGAEXT_is_8bpp_mode    is_cirrus_8bpp_mode
+#define VGAEXT_8bpp_write_char cirrus_bitblt_write_char
+#define VGAEXT_8bpp_copy       cirrus_bitblt_copy
+#define VGAEXT_8bpp_fill       cirrus_bitblt_fill
+#endif
 
 #define USE_BX_INFO
 
@@ -1324,9 +1331,9 @@ Bit8u xstart;Bit8u ysrc;Bit8u ydest;Bit8u cols;Bit8u nbcols;Bit8u cheight;
  Bit16u src,dest;
  Bit8u i;
 
-#ifdef CIRRUS
- if (is_cirrus_8bpp_mode()) {
-   cirrus_bitblt_copy(xstart,ysrc,ydest,cols);
+#ifdef VGAEXT
+ if (VGAEXT_is_8bpp_mode()) {
+   VGAEXT_8bpp_copy(xstart,ysrc,ydest,cols);
    return;
  }
 #endif
@@ -1345,9 +1352,9 @@ Bit8u xstart;Bit8u ystart;Bit8u cols;Bit8u nbcols;Bit8u cheight;Bit8u attr;
  Bit16u dest;
  Bit8u i;
 
-#ifdef CIRRUS
- if (is_cirrus_8bpp_mode()) {
-   cirrus_bitblt_fill(xstart,attr,ystart,cols);
+#ifdef VGAEXT
+ if (VGAEXT_is_8bpp_mode()) {
+   VGAEXT_8bpp_fill(xstart,attr,ystart,cols);
    return;
  }
 #endif
@@ -1374,8 +1381,8 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
  // Get the mode
  mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
-#ifdef CIRRUS
- if (is_cirrus_8bpp_mode())
+#ifdef VGAEXT
+ if (VGAEXT_is_8bpp_mode())
   line = 14;
 #endif
  if(line==0xFF)return;
@@ -1730,9 +1737,9 @@ Bit8u car;Bit8u attr;Bit8u xcurs;Bit8u ycurs;Bit8u nbcols;Bit8u cheight;
  Bit16u fseg,foffs;
  Bit16u addr,dest,src;
 
-#ifdef CIRRUS
- if (is_cirrus_8bpp_mode()) {
-   cirrus_bitblt_write_char(car,attr,xcurs,ycurs);
+#ifdef VGAEXT
+ if (VGAEXT_is_8bpp_mode()) {
+   VGAEXT_8bpp_write_char(car,attr,xcurs,ycurs);
    return;
  }
 #endif
@@ -1769,8 +1776,8 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  // Get the mode
  mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
-#ifdef CIRRUS
- if (is_cirrus_8bpp_mode())
+#ifdef VGAEXT
+ if (VGAEXT_is_8bpp_mode())
   line = 14;
 #endif
  if(line==0xFF)return;
@@ -1832,8 +1839,8 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
  // Get the mode
  mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
-#ifdef CIRRUS
- if (is_cirrus_8bpp_mode())
+#ifdef VGAEXT
+ if (VGAEXT_is_8bpp_mode())
   line = 14;
 #endif
  if(line==0xFF)return;
@@ -2115,8 +2122,8 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
  // Get the mode
  mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
  line=find_vga_entry(mode);
-#ifdef CIRRUS
- if (is_cirrus_8bpp_mode())
+#ifdef VGAEXT
+ if (VGAEXT_is_8bpp_mode())
   line = 14;
 #endif
  if(line==0xFF)return;
