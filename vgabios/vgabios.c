@@ -1325,45 +1325,161 @@ Bit8u xstart;Bit8u ystart;Bit8u cols;Bit8u nbcols;Bit8u cheight;Bit8u attr;
 }
 
 // --------------------------------------------------------------------------------------------
-static void vgamem_copy_lin(xstart,ysrc,ydest,cols,nbcols,cheight)
-Bit8u xstart;Bit8u ysrc;Bit8u ydest;Bit8u cols;Bit8u nbcols;Bit8u cheight;
-{
- Bit16u src,dest;
- Bit8u i;
-
+ASM_START
+; arguments: xstart,ysrc,ydest,cols,nbcols,cheight
+_vgamem_copy_lin:
+  push bp
+  mov  bp, sp
 #ifdef VGAEXT
- if (VGAEXT_is_8bpp_mode()) {
-   VGAEXT_8bpp_copy(xstart,ysrc,ydest,cols);
-   return;
- }
+  call VGAEXT_is_8bpp_mode
+  or   ax, ax
+  jz   lin_copy_vga
+  call VGAEXT_8bpp_copy
+  pop  bp
+  ret
+lin_copy_vga:
 #endif
- src=(ysrc*cheight*nbcols+xstart)*8;
- dest=(ydest*cheight*nbcols+xstart)*8;
- for(i=0;i<cheight;i++)
-  {
-   memcpyb(0xa000,dest+i*nbcols*8,0xa000,src+i*nbcols*8,cols*8);
-  }
-}
+  push ax
+  push bx
+  push cx
+  push dx
+  push ds
+  push es
+  push si
+  push di
+  mov  ax, 4[bp] ; xstart
+  shl  ax, #3
+  push ax
+  mov  al, 12[bp] ; nbcols
+  mov  bl, 14[bp] ; cheight
+  mul  bl
+  shl  ax, #3
+  mov  cx, ax
+  mov  dx, 6[bp] ; ysrc
+  or   dx, dx
+  jz   lin_copy_set_start1
+  mov  ax, cx
+  mov  bx, dx
+  mul  bx
+lin_copy_set_start1:
+  pop  bx
+  push bx
+  add  ax, bx
+  mov  si, ax
+  mov  dx, 8[bp] ; ydest
+  or   dx, dx
+  jz   lin_copy_set_start2
+  mov  ax, cx
+  mov  bx, dx
+  mul  bx
+lin_copy_set_start2:
+  pop  bx
+  add  ax, bx
+  mov  di, ax
+  mov  ax, #0xa000
+  mov  ds, ax
+  mov  es, ax
+  mov  bl, 14[bp] ; cheight
+  mov  cx, 10[bp] ; cols
+  shl  cx, #2
+  mov  dx, 12[bp] ; nbcols
+  shl  dx, #3
+lin_copy_loop:
+  push cx
+  push si
+  push di
+  cld
+  rep
+    movsw
+  pop  di
+  pop  si
+  pop  cx
+  dec  bl
+  jz   lin_copy_end
+  add  si, dx
+  add  di, dx
+  jmp  lin_copy_loop
+lin_copy_end:
+  pop  di
+  pop  si
+  pop  es
+  pop  ds
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  pop  bp
+  ret
+ASM_END
 
 // --------------------------------------------------------------------------------------------
-static void vgamem_fill_lin(xstart,ystart,cols,nbcols,cheight,attr)
-Bit8u xstart;Bit8u ystart;Bit8u cols;Bit8u nbcols;Bit8u cheight;Bit8u attr;
-{
- Bit16u dest;
- Bit8u i;
-
+ASM_START
+; arguments: xstart,ystart,attr,cols,nbcols,cheight
+_vgamem_fill_lin:
+  push bp
+  mov  bp, sp
 #ifdef VGAEXT
- if (VGAEXT_is_8bpp_mode()) {
-   VGAEXT_8bpp_fill(xstart,attr,ystart,cols);
-   return;
- }
+  call VGAEXT_is_8bpp_mode
+  or   ax, ax
+  jz   lin_fill_vga
+  call VGAEXT_8bpp_fill
+  pop  bp
+  ret
+lin_fill_vga:
 #endif
- dest=(ystart*cheight*nbcols+xstart)*8;
- for(i=0;i<cheight;i++)
-  {
-   memsetb(0xa000,dest+i*nbcols*8,attr,cols*8);
-  }
-}
+  push ax
+  push bx
+  push cx
+  push dx
+  push es
+  push di
+  mov  ax, 4[bp] ; xstart
+  shl  ax, #3
+  push ax
+  mov  dx, 6[bp] ; ystart
+  or   dx, dx
+  jz   lin_fill_set_start
+  mov  al, 12[bp] ; nbcols
+  mov  bl, 14[bp] ; cheight
+  mul  bl
+  shl  ax, #3
+  mov  bx, dx
+  mul  bx
+lin_fill_set_start:
+  pop  bx
+  add  ax, bx
+  mov  di, ax
+  mov  ax, #0xa000
+  mov  es, ax
+  mov  al, 8[bp] ; attr
+  mov  ah, al
+  mov  bl, 14[bp] ; cheight
+  mov  cx, 10[bp] ; cols
+  shl  cx, #2
+  mov  dx, 12[bp] ; nbcols
+  shl  dx, #3
+lin_fill_loop:
+  push cx
+  push di
+  cld
+  rep
+    stosw
+  pop  di
+  pop  cx
+  dec  bl
+  jz   lin_fill_end
+  add  di, dx
+  jmp  lin_fill_loop
+lin_fill_end:
+  pop  di
+  pop  es
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  pop  bp
+  ret
+ASM_END
 
 // --------------------------------------------------------------------------------------------
 static void biosfn_scroll (nblines,attr,rul,cul,rlr,clr,page,dir)
@@ -1520,7 +1636,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
           {for(i=rul;i<=rlr;i++)
             {
              if((i+nblines>rlr)||(nblines==0))
-              vgamem_fill_lin(cul,i,cols,nbcols,cheight,attr);
+              vgamem_fill_lin(cul,i,attr,cols,nbcols,cheight);
              else
               vgamem_copy_lin(cul,i+nblines,i,cols,nbcols,cheight);
             }
@@ -1529,7 +1645,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
           {for(i=rlr;i>=rul;i--)
             {
              if((i<rul+nblines)||(nblines==0))
-              vgamem_fill_lin(cul,i,cols,nbcols,cheight,attr);
+              vgamem_fill_lin(cul,i,attr,cols,nbcols,cheight);
              else
               vgamem_copy_lin(cul,i,i-nblines,cols,nbcols,cheight);
              if (i>rlr) break;
@@ -1729,41 +1845,92 @@ Bit8u car;Bit8u attr;Bit8u xcurs;Bit8u ycurs;Bit8u nbcols;Bit8u bpp;
 }
 
 // --------------------------------------------------------------------------------------------
-static void write_gfx_char_lin(car,attr,xcurs,ycurs,nbcols,cheight)
-Bit8u car;Bit8u attr;Bit8u xcurs;Bit8u ycurs;Bit8u nbcols;Bit8u cheight;
-{
- Bit8u i,j,mask,data;
- Bit8u fdata;
- Bit16u fseg,foffs;
- Bit16u addr,dest,src;
-
+ASM_START
+; arguments: car,attr,xcurs,ycurs,nbcols,cheight
+_write_gfx_char_lin:
+  push bp
+  mov  bp, sp
 #ifdef VGAEXT
- if (VGAEXT_is_8bpp_mode()) {
-   VGAEXT_8bpp_write_char(car,attr,xcurs,ycurs);
-   return;
- }
+  call VGAEXT_is_8bpp_mode
+  or   ax, ax
+  jz   lin_wc_vga
+  call VGAEXT_8bpp_write_char
+  pop  bp
+  ret
+lin_wc_vga:
 #endif
- addr=xcurs*8+ycurs*nbcols*cheight*8;
- foffs = read_word(0x0, 0x43*4);
- fseg = read_word(0x0, 0x43*4+2);
- src = foffs + car * cheight;
- for(i=0;i<cheight;i++)
-  {
-   fdata = read_byte(fseg, src + i);
-   dest=addr+i*nbcols*8;
-   mask = 0x80;
-   for(j=0;j<8;j++)
-    {
-     data = 0x00;
-     if (fdata & mask)
-      {
-       data = attr;
-      }
-     write_byte(0xa000,dest+j,data);
-     mask >>= 1;
-    }
-  }
-}
+  push ax
+  push bx
+  push cx
+  push dx
+  push ds
+  push es
+  push si
+  push di
+  xor  ax, ax
+  mov  ds, ax
+  mov  bx, #0x10c ; INT 0x43
+  mov  si, [bx]
+  mov  ax, [bx+2]
+  mov  ds, ax
+  mov  bx, 14[bp] ; cheight
+  mov  al, 4[bp]  ; character
+  mul  bl
+  add  si, ax
+  mov  ax, 8[bp] ; xcurs
+  shl  ax, #3
+  push ax
+  mov  dx, 10[bp] ; ycurs
+  or   dx, dx
+  jz   lin_wc_set_start
+  mov  al, 12[bp] ; nbcols
+  mov  bl, 14[bp] ; cheight
+  mul  bl
+  shl  ax, #3
+  mov  bx, dx
+  mul  bx
+lin_wc_set_start:
+  pop  bx
+  add  ax, bx
+  mov  di, ax
+  mov  ax, #0xa000
+  mov  es, ax
+  mov  bl, 14[bp] ; cheight
+  mov  dx, 12[bp] ; nbcols
+  shl  dx, #3
+lin_wc_loop1:
+  push di
+  lodsb
+  mov  cx, #0x08
+  cld
+lin_wc_loop2:
+  shl  al, #1
+  push ax
+  jnc  lin_wc_set_bkgnd
+  mov  al, 6[bp] ; attr
+  db    0xa9 ; skip next opcode (TEST AX, #0xC030)
+lin_wc_set_bkgnd:
+  xor  al, al
+  stosb
+  pop  ax
+  loop lin_wc_loop2
+  pop  di
+  dec  bl
+  jz   lin_wc_end
+  add  di, dx
+  jmp  lin_wc_loop1
+lin_wc_end:
+  pop  di
+  pop  si
+  pop  es
+  pop  ds
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  pop  bp
+  ret
+ASM_END
 
 // --------------------------------------------------------------------------------------------
 static void biosfn_write_char_attr (car,page,attr,count)

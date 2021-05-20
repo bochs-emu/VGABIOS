@@ -753,7 +753,7 @@ no_vbe_interface:
 
 vbe_display_info:
   call _vbe_has_vbe_display
-  test ax, ax
+  or   ax, ax
   jz   no_vbe_flag
   mov  ax, #0xc000
   mov  ds, ax
@@ -1055,6 +1055,9 @@ Bit16u *AX;Bit16u BX;
             write_bda_word(BIOSMEM_CURSOR_POS,0);
             write_bda_word(BIOSMEM_VBE_MODE,BX);
             write_bda_byte(BIOSMEM_VIDEO_CTL,(0x60 | no_clear));
+ASM_START
+            SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
+ASM_END
 
             result = 0x4f;
         } else {
@@ -1740,7 +1743,7 @@ vbe_read_EDID:
   call vbe_ddc_delay
   mov  al, #0xa1
   call vbe_ddc_send_byte
-  jnz  vbe_unimplemented
+  jc   vbe_unimplemented
   push cx
   push di
   mov  cx, #0x0080
@@ -1762,8 +1765,14 @@ vbe_unimplemented:
 
 ; Handle INT 10h AH 4Fh
 vbe_main_handler:
+  push ax
+  call _vbe_has_vbe_display
+  shr  al, #1
+  pop  ax
+  jnc  vbe_unsupported
   cmp  al, #0x15
   jbe  vbe_call_table
+vbe_unsupported:
   mov  ax, #0x014F ;; unsupported
   jmp  int10_end
 vbe_call_table:

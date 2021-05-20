@@ -748,6 +748,7 @@ cirrus_set_vga_vclk:
 
 ; called from C code
 _is_cirrus_8bpp_mode:
+is_cirrus_8bpp_mode:
   push dx
   mov  dx, #0x03c4
   mov  al, #0x07
@@ -781,6 +782,7 @@ cirrus_pm_get_bda_word:
   pop  ds
   ret
 
+; in: regnum in BL, value in AX
 cirrus_write_bltreg16:
   push dx
   push ax
@@ -804,16 +806,12 @@ cirrus_write_bltsize:
   dec  ax
   mov  bl, #0x20
   call cirrus_write_bltreg16
-  mov  al, #BIOSMEM_CHAR_HEIGHT
-  call cirrus_pm_get_bda_word
-  xor  ah, ah
+  mov  ax, 14[bp] ; cheight
   push ax
   dec  ax
   mov  bl, #0x22
   call cirrus_write_bltreg16
-  mov  al, #BIOSMEM_NB_COLS
-  call cirrus_pm_get_bda_word
-  xor  ah, ah
+  mov  ax, 12[bp] ; nbrows
   shl  ax, #3
   mov  bl, #0x24
   call cirrus_write_bltreg16
@@ -823,6 +821,7 @@ cirrus_write_bltsize:
   mul bx
   ret
 
+; in: size of line in AX, ypos in BL, regnum in BH, xpos in CL
 cirrus_write_bltaddr:
   push ax
   push bx
@@ -847,9 +846,7 @@ cirrus_addr_noinc:
   pop  ax
   ret
 
-_cirrus_bitblt_write_char:
-  push bp
-  mov  bp, sp
+cirrus_bitblt_write_char:
   push ax
   push bx
   push cx
@@ -864,10 +861,7 @@ _cirrus_bitblt_write_char:
   mov  si, [bx]
   mov  ax, [bx+2]
   mov  ds, ax
-  mov  al, #BIOSMEM_CHAR_HEIGHT
-  call cirrus_pm_get_bda_word
-  mov  bx, ax
-  push bx
+  mov  bx, 14[bp] ; cheight
   mov  al, 4[bp]  ; character
   mul  bl
   add  si, ax
@@ -896,7 +890,7 @@ _cirrus_bitblt_write_char:
   mov  ax, #0xa000
   mov  es, ax
   xor  di, di
-  pop  cx
+  mov  cx, 14[bp] ; cheight
   cld
   rep
     movsb
@@ -908,12 +902,9 @@ _cirrus_bitblt_write_char:
   pop  cx
   pop  bx
   pop  ax
-  pop  bp
   ret
 
-_cirrus_bitblt_copy:
-  push bp
-  mov  bp, sp
+cirrus_bitblt_copy:
   push ax
   push bx
   push cx
@@ -939,17 +930,14 @@ _cirrus_bitblt_copy:
   pop  cx
   pop  bx
   pop  ax
-  pop  bp
   ret
 
-_cirrus_bitblt_fill:
-  push bp
-  mov  bp, sp
+cirrus_bitblt_fill:
   push ax
   push bx
   push dx
   mov  cl, 4[bp] ; xstart
-  mov  ch, 8[bp] ; ydest
+  mov  ch, 6[bp] ; ydest
   mov  al, 10[bp] ; cols
   call cirrus_write_bltsize
   mov  bl, ch
@@ -962,7 +950,7 @@ _cirrus_bitblt_fill:
   out  dx, ax
   mov  ax, #0x0433 ; solidfill
   out  dx, ax
-  mov  ah, 6[bp] ; attr
+  mov  ah, 8[bp] ; attr
   mov  al, #0x01
   out  dx, ax
   mov  ax, #0x0231
@@ -970,7 +958,6 @@ _cirrus_bitblt_fill:
   pop  dx
   pop  bx
   pop  ax
-  pop  bp
   ret
 
 cirrus_extbios_80h:
