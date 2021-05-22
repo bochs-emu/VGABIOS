@@ -54,10 +54,17 @@
 #endif
 #ifdef CIRRUS
 #define VGAEXT
-#define VGAEXT_is_8bpp_mode    is_cirrus_8bpp_mode
+#define VGAEXT_is_8bpp_mode    cirrus_is_8bpp_mode
 #define VGAEXT_8bpp_write_char cirrus_bitblt_write_char
 #define VGAEXT_8bpp_copy       cirrus_bitblt_copy
 #define VGAEXT_8bpp_fill       cirrus_bitblt_fill
+#endif
+#ifdef BANSHEE
+#define VGAEXT
+#define VGAEXT_is_8bpp_mode    banshee_is_8bpp_mode
+#define VGAEXT_8bpp_write_char banshee_8bpp_write_char
+#define VGAEXT_8bpp_copy       banshee_8bpp_copy
+#define VGAEXT_8bpp_fill       banshee_8bpp_fill
 #endif
 
 #define USE_BX_INFO
@@ -1355,6 +1362,7 @@ lin_copy_vga:
   mul  bl
   shl  ax, #3
   mov  cx, ax
+  xor  ax, ax
   mov  dx, 6[bp] ; ysrc
   or   dx, dx
   jz   lin_copy_set_start1
@@ -1366,6 +1374,7 @@ lin_copy_set_start1:
   push bx
   add  ax, bx
   mov  si, ax
+  xor  ax, ax
   mov  dx, 8[bp] ; ydest
   or   dx, dx
   jz   lin_copy_set_start2
@@ -1436,6 +1445,7 @@ lin_fill_vga:
   mov  ax, 4[bp] ; xstart
   shl  ax, #3
   push ax
+  xor  ax, ax
   mov  dx, 6[bp] ; ystart
   or   dx, dx
   jz   lin_fill_set_start
@@ -1555,7 +1565,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
   }
  else
   {
-   // FIXME gfx mode (Bochs VBE and Cirrus (> 8 bpp) not supported)
+   // FIXME gfx mode (Bochs VBE and Banshee / Cirrus (> 8 bpp) not supported)
    cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    if(nblines==0&&rul==0&&cul==0&&rlr==nbrows-1&&clr==nbcols-1)
     {
@@ -1968,7 +1978,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
   }
  else
   {
-   // FIXME gfx mode (Bochs VBE and Cirrus (> 8 bpp) not supported)
+   // FIXME gfx mode (Bochs VBE and Banshee / Cirrus (> 8 bpp) not supported)
    cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
@@ -2033,7 +2043,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
   }
  else
   {
-   // FIXME gfx mode (Bochs VBE and Cirrus (> 8 bpp) not supported)
+   // FIXME gfx mode (Bochs VBE and Banshee / Cirrus (> 8 bpp) not supported)
    cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
@@ -2347,7 +2357,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
      }
     else
      {
-      // FIXME gfx mode (Bochs VBE and Cirrus (> 8 bpp) not supported)
+      // FIXME gfx mode (Bochs VBE and Banshee / Cirrus (> 8 bpp) not supported)
       cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
       bpp=vga_modes[line].pixbits;
       switch(vga_modes[line].memmodel)
