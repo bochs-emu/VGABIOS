@@ -495,11 +495,9 @@ banshee_set_video_mode:
   jnz  banshee_noclear
   call banshee_clear_vram
 banshee_noclear:
-  push bx
   and  al, #0x7f
-  mov  bx, #0x0049
-  call set_bda_byte
-  pop  bx
+  call banshee_set_video_mode_bda
+  SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
   pop  si
   mov  al, #0x20
   jmp  banshee_return
@@ -649,16 +647,32 @@ bgm_2:
   clc ;; video mode is supported
   ret
 
-;; Banshee mode helper functions
+;; Banshee set mode helper functions
 
-set_bda_byte:
+banshee_set_video_mode_bda:
+  push bx
+  push cx
   push ds
-  push si
-  xor  si, si
-  mov  ds, si
-  mov  [bx], al
-  pop  si
-  pop  ds
+  push cs
+  pop ds
+  mov bx, [si+2]
+  shr bx, #3
+  mov cx, [si+4]
+  shr cx, #4 ;; cheight 16
+  dec cx
+  xor si, si
+  mov ds, si
+  mov [PM_BIOSMEM_CURRENT_MODE], al
+  mov [PM_BIOSMEM_NB_COLS], bx
+  mov [PM_BIOSMEM_NB_ROWS], cl
+  mov al, #0x10
+  xor ah, ah
+  mov [PM_BIOSMEM_CHAR_HEIGHT], ax
+  xor ax, ax
+  mov [PM_BIOSMEM_CURSOR_POS], ax
+  pop ds
+  pop cx
+  pop bx
   ret
 
 set_bda_word:
@@ -865,6 +879,266 @@ no_bit9:
   pop  bx
   ret
 
+;; code for 'write character' support in 8bpp graphics modes
+
+;; called from C code
+_banshee_is_8bpp_mode:
+banshee_is_8bpp_mode:
+  push dx
+  call banshee_get_io_base_address
+  mov  dl, #0x5c ;; vidProcCfg
+  in   eax, dx
+  pop  dx
+  test ax, #0x01
+  jz   no_banshee_8bpp_mode
+  shr  eax, #18
+  and  al, #0x07
+  inc  al
+  cmp  al, #0x01
+  jz   banshee_8bpp_mode
+no_banshee_8bpp_mode:
+  xor  ax, ax
+banshee_8bpp_mode:
+  ret
+
+banshee_8bpp_write_char:
+  push ax
+  push bx
+  push cx
+  push dx
+  push ds
+  push es
+  push si
+  push di
+  xor  ax, ax
+  mov  ds, ax
+  mov  bx, #0x10c ;; INT 0x43
+  mov  si, [bx]
+  mov  ax, [bx+2]
+  mov  ds, ax
+  mov  bx, 14[bp] ;; cheight
+  mov  al, 4[bp]  ;; character
+  mul  bl
+  add  si, ax
+  mov  ax, 8[bp] ;; xcurs
+  shl  ax, #3
+  push ax
+  mov  dx, 10[bp] ;; ycurs
+  or   dx, dx
+  jz   banshee_wc_set_start
+  mov  al, 12[bp] ;; nbcols
+  mov  bl, 14[bp] ;; cheight
+  mul  bl
+  shl  ax, #3
+  mov  bx, dx
+  mul  bx
+banshee_wc_set_start:
+  pop  bx
+  add  ax, bx
+  jnc  banshee_wc_noinc1
+  inc  dx
+banshee_wc_noinc1:
+  shl  dx, #1
+  test ax, #0x8000
+  jz   banshee_wc_noinc2
+  and  ax, #0x7fff
+  or   dx, #0x0001
+banshee_wc_noinc2:
+  mov  di, ax
+  mov  ax, dx
+  call banshee_set_bank
+  mov  ax, #0xa000
+  mov  es, ax
+  mov  bl, 14[bp] ;; cheight
+  mov  dx, 12[bp] ;; nbcols
+  shl  dx, #3
+banshee_wc_loop1:
+  push di
+  lodsb
+  mov  cx, #0x08
+  cld
+banshee_wc_loop2:
+  shl  al, #1
+  push ax
+  jnc  banshee_wc_set_bkgnd
+  mov  al, 6[bp] ;; attr
+  db    0xa9 ;; skip next opcode (TEST AX, #0xC030)
+banshee_wc_set_bkgnd:
+  xor  al, al
+  stosb
+  pop  ax
+  loop banshee_wc_loop2
+  pop  di
+  dec  bl
+  jz   banshee_wc_end
+  add  di, dx
+  jmp  banshee_wc_loop1
+banshee_wc_end:
+  pop  di
+  pop  si
+  pop  es
+  pop  ds
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  ret
+
+;; FIXME: this code works for scroll up only
+banshee_8bpp_copy:
+  push ax
+  push bx
+  push cx
+  push dx
+  push ds
+  push es
+  push si
+  push di
+  mov  ax, 4[bp] ;; xstart
+  shl  ax, #3
+  push ax
+  mov  al, 12[bp] ;; nbcols
+  mov  bl, 14[bp] ;; cheight
+  mul  bl
+  shl  ax, #3
+  mov  cx, ax
+  xor  ax, ax
+  mov  dx, 6[bp] ;; ysrc
+  or   dx, dx
+  jz   banshee_copy_set_start1
+  mov  ax, cx
+  mov  bx, dx
+  mul  bx
+banshee_copy_set_start1:
+  pop  bx
+  push bx
+  add  ax, bx
+  mov  si, ax
+  xor  ax, ax
+  mov  dx, 8[bp] ;; ydest
+  or   dx, dx
+  jz   banshee_copy_set_start2
+  mov  ax, cx
+  mov  bx, dx
+  mul  bx
+banshee_copy_set_start2:
+  pop  bx
+  add  ax, bx
+  jnc  banshee_copy_noinc1
+  inc  dx
+banshee_copy_noinc1:
+  shl  dx, #1
+  test ax, #0x8000
+  jz   banshee_copy_noinc2
+  and  ax, #0x7fff
+  or   dx, #0x0001
+banshee_copy_noinc2:
+  mov  di, ax
+  mov  ax, dx
+  test ax, #0x0001
+  jz   banshee_copy_no_xor
+  xor  si, #0x8000
+banshee_copy_no_xor:
+  call banshee_set_bank
+  mov  ax, #0xa000
+  mov  ds, ax
+  mov  es, ax
+  mov  bl, 14[bp] ;; cheight
+  mov  cx, 10[bp] ;; cols
+  shl  cx, #2
+  mov  dx, 12[bp] ;; nbcols
+  shl  dx, #3
+banshee_copy_loop:
+  push cx
+  push si
+  push di
+  cld
+  rep
+    movsw
+  pop  di
+  pop  si
+  pop  cx
+  dec  bl
+  jz   banshee_copy_end
+  add  si, dx
+  add  di, dx
+  jmp  banshee_copy_loop
+banshee_copy_end:
+  pop  di
+  pop  si
+  pop  es
+  pop  ds
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  ret
+
+banshee_8bpp_fill:
+  push ax
+  push bx
+  push cx
+  push dx
+  push es
+  push di
+  mov  ax, 4[bp] ;; xstart
+  shl  ax, #3
+  push ax
+  xor  ax, ax
+  mov  dx, 6[bp] ;; ystart
+  or   dx, dx
+  jz   banshee_fill_set_start
+  mov  al, 12[bp] ;; nbcols
+  mov  bl, 14[bp] ;; cheight
+  mul  bl
+  shl  ax, #3
+  mov  bx, dx
+  mul  bx
+banshee_fill_set_start:
+  pop  bx
+  add  ax, bx
+  jnc  banshee_fill_noinc1
+  inc  dx
+banshee_fill_noinc1:
+  shl  dx, #1
+  test ax, #0x8000
+  jz   banshee_fill_noinc2
+  and  ax, #0x7fff
+  or   dx, #0x0001
+banshee_fill_noinc2:
+  mov  di, ax
+  mov  ax, dx
+  call banshee_set_bank
+  mov  ax, #0xa000
+  mov  es, ax
+  mov  al, 8[bp] ;; attr
+  mov  ah, al
+  mov  bl, 14[bp] ;; cheight
+  mov  cx, 10[bp] ;; cols
+  shl  cx, #2
+  mov  dx, 12[bp] ;; nbcols
+  shl  dx, #3
+banshee_fill_loop:
+  push cx
+  push di
+  cld
+  rep
+    stosw
+  pop  di
+  pop  cx
+  dec  bl
+  jz   banshee_fill_end
+  add  di, dx
+  jmp  banshee_fill_loop
+banshee_fill_end:
+  pop  di
+  pop  es
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  ret
+
 ;; Banshee VBE support
 
 banshee_vesa:
@@ -981,9 +1255,16 @@ banshee_vesa_01h_1:
     stosw ;; clear buffer
   pop  di
 
-  mov  ax, #0x003b ;; mode
+  mov  ax, #0x003b ;; mode attr
+  push bx
+  mov  bl, [si+1] ;; bpp
+  cmp  bl, #0x08
+  jne  banshee_vesa_no_8bpp
+  or   al, #0x04 ;; TTY support
+banshee_vesa_no_8bpp:
+  pop  bx
   stosw
-  mov  ax, #0x0007 ;; attr
+  mov  ax, #0x0007 ;; win attr
   stosw
   mov  ax, #0x0020 ;; granularity =32K
   stosw
@@ -1046,7 +1327,7 @@ banshee_vesa_01h_3:
   mov  ah, [si+1]
   mov  al, #0x0
   sub  ah, #9
-  rcl  al, #1 ; bit 0=palette flag
+  rcl  al, #1 ;; bit 0=palette flag
   stosb ;; direct screen mode info
 
   ;; v2.0+ stuffs
@@ -1067,9 +1348,9 @@ banshee_vesa_01h_3:
 banshee_vesa_01h_4:
 
   xor  ax, ax
-  stosw ; reserved
-  stosw ; reserved
-  stosw ; reserved
+  stosw ;; reserved
+  stosw ;; reserved
+  stosw ;; reserved
 
   mov  ax, #0x004F
   mov  di, bp
@@ -1355,10 +1636,12 @@ banshee_set_bank:
   call banshee_get_io_base_address
   mov  dl, #0x2c ;; vgaInit1
   in   eax, dx
-  and  eax, #0xfffffc00
+  and  eax, #0xfff00000
   pop  bx
   and  bx, #0x03ff
   or   ax, bx
+  shl  ebx, #10
+  or   eax, ebx
   out  dx, eax
   mov  ax, bx
   pop  dx

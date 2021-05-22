@@ -26,12 +26,6 @@
 #undef CIRRUS_VESA3_PMINFO
 #endif
 
-#define PM_BIOSMEM_NB_COLS      0x44a
-#define PM_BIOSMEM_CURSOR_POS   0x450
-#define PM_BIOSMEM_CRTC_ADDRESS 0x463
-#define PM_BIOSMEM_NB_ROWS      0x484
-#define PM_BIOSMEM_CHAR_HEIGHT  0x485
-
 typedef struct
 {
   /* + 0 */
@@ -747,8 +741,8 @@ cirrus_set_vga_vclk:
 ; code for 'write character' support in 8bpp graphics modes
 
 ; called from C code
-_is_cirrus_8bpp_mode:
-is_cirrus_8bpp_mode:
+_cirrus_is_8bpp_mode:
+cirrus_is_8bpp_mode:
   push dx
   mov  dx, #0x03c4
   mov  al, #0x07
@@ -1162,9 +1156,16 @@ cirrus_vesa_01h_1:
     stosw ;; clear buffer
   pop di
 
-  mov ax, #0x003b ;; mode
+  mov  ax, #0x003b ;; mode attr
+  push bx
+  mov  bl, [si+6] ;; bpp
+  cmp  bl, #0x08
+  jne  cirrus_vesa_no_8bpp
+  or   al, #0x04 ;; TTY support
+cirrus_vesa_no_8bpp:
+  pop  bx
   stosw
-  mov ax, #0x0007 ;; attr
+  mov ax, #0x0007 ;; win attr
   stosw
   mov ax, #0x0010 ;; granularity =16K
   stosw
