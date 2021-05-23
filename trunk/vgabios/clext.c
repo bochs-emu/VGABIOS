@@ -793,15 +793,18 @@ cirrus_write_bltreg16:
   pop  dx
   ret
 
-; in: columns in AL / out: size of line in AX
+; in: columns in AL rows in BL / out: size of line in AX
 cirrus_write_bltsize:
   xor  ah, ah
   shl  ax, #3
   dec  ax
+  push bx
   mov  bl, #0x20
   call cirrus_write_bltreg16
+  pop  bx
   mov  ax, 14[bp] ; cheight
   push ax
+  mul  bl
   dec  ax
   mov  bl, #0x22
   call cirrus_write_bltreg16
@@ -862,6 +865,7 @@ cirrus_bitblt_write_char:
   mov  cl, 8[bp]  ; xcurs
   mov  ch, 10[bp] ; ycurs
   mov  al, #0x01
+  mov  bl, #0x01
   call cirrus_write_bltsize
   mov  bl, ch
   mov  bh, #0x28
@@ -906,6 +910,7 @@ cirrus_bitblt_copy:
   mov  cl, 4[bp] ; xstart
   mov  ch, 8[bp] ; ydest
   mov  al, 10[bp] ; cols
+  mov  bl, #0x01
   call cirrus_write_bltsize
   mov  bl, 6[bp] ; ysrc
   mov  bh, #0x2c
@@ -932,7 +937,8 @@ cirrus_bitblt_fill:
   push dx
   mov  cl, 4[bp] ; xstart
   mov  ch, 6[bp] ; ydest
-  mov  al, 10[bp] ; cols
+  mov  al, 8[bp] ; cols
+  mov  bl, 10[bp] ; rows
   call cirrus_write_bltsize
   mov  bl, ch
   mov  bh, #0x28
@@ -944,7 +950,7 @@ cirrus_bitblt_fill:
   out  dx, ax
   mov  ax, #0x0433 ; solidfill
   out  dx, ax
-  mov  ah, 8[bp] ; attr
+  mov  ah, 16[bp] ; attr
   mov  al, #0x01
   out  dx, ax
   mov  ax, #0x0231

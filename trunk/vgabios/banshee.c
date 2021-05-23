@@ -946,6 +946,7 @@ banshee_wc_noinc1:
 banshee_wc_noinc2:
   mov  di, ax
   mov  ax, dx
+  mov  bl, #0x01
   call banshee_set_bank
   mov  ax, #0xa000
   mov  es, ax
@@ -1039,6 +1040,7 @@ banshee_copy_noinc2:
   jz   banshee_copy_no_xor
   xor  si, #0x8000
 banshee_copy_no_xor:
+  mov  bl, #0x03
   call banshee_set_bank
   mov  ax, #0xa000
   mov  ds, ax
@@ -1081,6 +1083,7 @@ banshee_8bpp_fill:
   push dx
   push es
   push di
+banshee_fill_next_row:
   mov  ax, 4[bp] ;; xstart
   shl  ax, #3
   push ax
@@ -1108,13 +1111,14 @@ banshee_fill_noinc1:
 banshee_fill_noinc2:
   mov  di, ax
   mov  ax, dx
+  mov  bl, #0x01
   call banshee_set_bank
   mov  ax, #0xa000
   mov  es, ax
-  mov  al, 8[bp] ;; attr
+  mov  al, 16[bp] ;; attr
   mov  ah, al
   mov  bl, 14[bp] ;; cheight
-  mov  cx, 10[bp] ;; cols
+  mov  cx, 8[bp] ;; cols
   shl  cx, #2
   mov  dx, 12[bp] ;; nbcols
   shl  dx, #3
@@ -1127,10 +1131,13 @@ banshee_fill_loop:
   pop  di
   pop  cx
   dec  bl
-  jz   banshee_fill_end
+  jz   banshee_fill_check_row
   add  di, dx
   jmp  banshee_fill_loop
-banshee_fill_end:
+banshee_fill_check_row:
+  inc  6[bp] ;; ystart
+  dec  10[bp] ;; rows
+  jnz  banshee_fill_next_row
   pop  di
   pop  es
   pop  dx
@@ -1428,7 +1435,10 @@ banshee_vesa_05h:
   ret
 banshee_vesa_05h_set:
   mov  ax, dx
+  push bx
+  mov  bl, #0x03
   call banshee_set_bank
+  pop  bx
   cmp  ax, dx
   jne  banshee_vesa_05h_failed
   mov  ax, #0x004f
@@ -1628,25 +1638,33 @@ banshee_get_bank:
   pop  bx
   ret
 
+;; in AX:requested bank, BL:r/w mode, out AX:set bank
 banshee_set_bank:
-  push bx
   push cx
   push dx
   push ax
   call banshee_get_io_base_address
   mov  dl, #0x2c ;; vgaInit1
   in   eax, dx
-  and  eax, #0xfff00000
-  pop  bx
-  and  bx, #0x03ff
-  or   ax, bx
-  shl  ebx, #10
-  or   eax, ebx
+  pop  cx
+  and  cx, #0x03ff
+  test bl, #0x01
+  jz   banshee_set_bank_1
+  and  eax, #0xfffffc00
+  or   ax, cx
+banshee_set_bank_1:
+  test bl, #0x02
+  jz   banshee_set_bank_2
+  push cx
+  and  eax, #0xfff003ff
+  shl  ecx, #10
+  or   eax, ecx
+  pop  cx
+banshee_set_bank_2:
   out  dx, eax
-  mov  ax, bx
+  mov  ax, cx
   pop  dx
   pop  cx
-  pop  bx
   ret
 
 banshee_get_line_offset_entry:

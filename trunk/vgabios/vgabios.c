@@ -1423,7 +1423,7 @@ ASM_END
 
 // --------------------------------------------------------------------------------------------
 ASM_START
-; arguments: xstart,ystart,attr,cols,nbcols,cheight
+; arguments: xstart,ystart,cols,rows,nbcols,cheight,attr
 _vgamem_fill_lin:
   push bp
   mov  bp, sp
@@ -1461,10 +1461,13 @@ lin_fill_set_start:
   mov  di, ax
   mov  ax, #0xa000
   mov  es, ax
-  mov  al, 8[bp] ; attr
-  mov  ah, al
   mov  bl, 14[bp] ; cheight
-  mov  cx, 10[bp] ; cols
+  mov  al, 10[bp] ; rows
+  mul  bl
+  mov  bx, ax
+  mov  al, 16[bp] ; attr
+  mov  ah, al
+  mov  cx, 8[bp] ; cols
   shl  cx, #2
   mov  dx, 12[bp] ; nbcols
   shl  dx, #3
@@ -1476,7 +1479,7 @@ lin_fill_loop:
     stosw
   pop  di
   pop  cx
-  dec  bl
+  dec  bx
   jz   lin_fill_end
   add  di, dx
   jmp  lin_fill_loop
@@ -1567,7 +1570,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
   {
    // FIXME gfx mode (Bochs VBE and Banshee / Cirrus (> 8 bpp) not supported)
    cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
-   if(nblines==0&&rul==0&&cul==0&&rlr==nbrows-1&&clr==nbcols-1)
+   if(nblines==0&&rul==0&&cul==0&&rlr==nbrows-1&&clr==nbcols-1&&vga_modes[line].memmodel!=LINEAR8)
     {
      switch(vga_modes[line].memmodel)
       {
@@ -1580,9 +1583,6 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
        case CGA:
          bpp=vga_modes[line].pixbits;
          memsetb(vga_modes[line].sstart,0,attr,nbrows*nbcols*cheight*bpp);
-         break;
-       case LINEAR8:
-         memsetb(vga_modes[line].sstart,0,attr,nbrows*nbcols*cheight*8);
          break;
       }
     }
@@ -1642,11 +1642,13 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
           }
          break;
        case LINEAR8:
-         if(dir==SCROLL_UP)
+         if(nblines==0)
+          vgamem_fill_lin(cul,rul,cols,rlr-rul+1,nbcols,cheight,attr);
+         else if(dir==SCROLL_UP)
           {for(i=rul;i<=rlr;i++)
             {
-             if((i+nblines>rlr)||(nblines==0))
-              vgamem_fill_lin(cul,i,attr,cols,nbcols,cheight);
+             if(i+nblines>rlr)
+              vgamem_fill_lin(cul,i,cols,1,nbcols,cheight,attr);
              else
               vgamem_copy_lin(cul,i+nblines,i,cols,nbcols,cheight);
             }
@@ -1654,8 +1656,8 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
          else
           {for(i=rlr;i>=rul;i--)
             {
-             if((i<rul+nblines)||(nblines==0))
-              vgamem_fill_lin(cul,i,attr,cols,nbcols,cheight);
+             if(i<rul+nblines)
+              vgamem_fill_lin(cul,i,cols,1,nbcols,cheight,attr);
              else
               vgamem_copy_lin(cul,i,i-nblines,cols,nbcols,cheight);
              if (i>rlr) break;
@@ -3166,11 +3168,29 @@ static void biosfn_load_text_8_16_pat (AL,BL) Bit8u AL;Bit8u BL;
 
 static void biosfn_load_gfx_8_8_chars (ES,BP) Bit16u ES;Bit16u BP;
 {
-    /* set 0x1F INT pointer */
-    write_word(0x0, 0x1F*4, BP);
-    write_word(0x0, 0x1F*4+2, ES);
-
-    write_bda_byte( BIOSMEM_CHAR_HEIGHT, 8);
+ASM_START
+  push bp
+  mov  bp, sp
+  push ax
+  push bx
+  push ds
+  xor  ax, ax
+  mov  ds, ax
+  mov  bx, #0x007c ;; INT 0x1F
+  mov  ax, 4[bp]
+  mov  [bx+2], ax
+  mov  ax, 6[bp]
+  mov  [bx], ax
+  mov  ax, #BIOSMEM_SEG
+  mov  ds, ax
+  mov  bx, #BIOSMEM_CHAR_HEIGHT
+  mov  al, #0x08
+  mov  [bx], al
+  pop  ds
+  pop  bx
+  pop  ax
+  pop  bp
+ASM_END
 }
 
 static void biosfn_load_gfx_user_chars (ES,BP,CX,BL,DL) Bit16u ES;Bit16u BP;Bit16u CX;Bit8u BL;Bit8u DL;
@@ -3202,8 +3222,9 @@ static void biosfn_load_gfx_user_chars (ES,BP,CX,BL,DL) Bit16u ES;Bit16u BP;Bit1
 static void biosfn_load_gfx_8_14_chars (BL) Bit8u BL;
 {
     /* set 0x43 INT pointer */
-    write_word(0x0, 0x43*4, &vgafont14);
-    write_word(0x0, 0x43*4+2, 0xC000);
+ASM_START
+    SET_INT_VECTOR(0x43, #0xC000, #_vgafont14)
+ASM_END
 
     switch (BL) {
      case 1:
@@ -3223,8 +3244,9 @@ static void biosfn_load_gfx_8_14_chars (BL) Bit8u BL;
 static void biosfn_load_gfx_8_8_dd_chars (BL) Bit8u BL;
 {
     /* set 0x43 INT pointer */
-    write_word(0x0, 0x43*4, &vgafont8);
-    write_word(0x0, 0x43*4+2, 0xC000);
+ASM_START
+    SET_INT_VECTOR(0x43, #0xC000, #_vgafont8)
+ASM_END
 
     switch (BL) {
      case 1:
@@ -3244,8 +3266,9 @@ static void biosfn_load_gfx_8_8_dd_chars (BL) Bit8u BL;
 static void biosfn_load_gfx_8_16_chars (BL) Bit8u BL;
 {
     /* set 0x43 INT pointer */
-    write_word(0x0, 0x43*4, &vgafont16);
-    write_word(0x0, 0x43*4+2, 0xC000);
+ASM_START
+    SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
+ASM_END
 
     switch (BL) {
      case 1:

@@ -243,12 +243,8 @@ dispi_set_id:
   out  dx, ax
   pop  dx
   ret
-ASM_END
 
-static void dispi_set_xres(xres)
-  Bit16u xres;
-{
-ASM_START
+_dispi_set_xres:
   push bp
   mov  bp, sp
   push ax
@@ -264,24 +260,44 @@ ASM_START
   pop  dx
   pop  ax
   pop  bp
-ASM_END
-}
+  ret
 
-static void dispi_set_yres(yres)
-  Bit16u yres;
-{
-  outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_YRES);
-  outw(VBE_DISPI_IOPORT_DATA,yres);
-}
+_dispi_set_yres:
+  push bp
+  mov  bp, sp
+  push ax
+  push dx
 
-static void dispi_set_bpp(bpp)
-  Bit16u bpp;
-{
-  outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_BPP);
-  outw(VBE_DISPI_IOPORT_DATA,bpp);
-}
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_YRES
+  out  dx, ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  mov  ax, 4[bp] ; yres
+  out  dx, ax
 
-ASM_START
+  pop  dx
+  pop  ax
+  pop  bp
+  ret
+
+_dispi_set_bpp:
+  push bp
+  mov  bp, sp
+  push ax
+  push dx
+
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_BPP
+  out  dx, ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  mov  ax, 4[bp] ; bpp
+  out  dx, ax
+
+  pop  dx
+  pop  ax
+  pop  bp
+  ret
+
 ; AL = bits per pixel / AH = bytes per pixel
 dispi_get_bpp:
   push dx
@@ -357,6 +373,28 @@ _dispi_get_max_bpp:
   mov  ax, bx
   call _dispi_set_enable
   pop  ax
+  pop  bx
+  pop  dx
+  ret
+
+_dispi_support_bank_granularity_32k:
+  push dx
+  push bx
+  call dispi_get_enable
+  mov  bx, ax
+  or   ax, # VBE_DISPI_GETCAPS
+  call _dispi_set_enable
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_BANK
+  out  dx, ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  in   ax, dx
+  push ax
+  mov  ax, bx
+  call _dispi_set_enable
+  pop  ax
+  shr  ax, #8
+  and  al, #VBE_DISPI_BANK_GRANULARITY_32K
   pop  bx
   pop  dx
   ret
@@ -930,6 +968,7 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
         ModeInfoListItem  *cur_info;
         Boolean           using_lfb;
         Bit16u            lfb_addr;
+        Bit16u            support_bank_gr_32k;
 
 #ifdef DEBUG
         printf("VBE vbe_biosfn_return_mode_information ES%x DI%x CX%x\n",ES,DI,CX);
@@ -958,6 +997,10 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
 #endif
                 if (lfb_addr > 0) {
                   info.PhysBasePtr = ((Bit32u)lfb_addr << 16);
+                }
+                support_bank_gr_32k = dispi_support_bank_granularity_32k();
+                if (support_bank_gr_32k != 0) {
+                  info.WinGranularity = VBE_DISPI_BANK_GRANULARITY_KB;
                 }
                 if (info.WinAAttributes & VBE_WINDOW_ATTRIBUTE_RELOCATABLE) {
                   info.WinFuncPtr = 0xC0000000UL;
@@ -1001,6 +1044,7 @@ Bit16u *AX;Bit16u BX;
     Boolean           using_lfb;
     Bit8u             no_clear;
     Bit8u             lfb_flag;
+    Bit16u            support_bank_gr_32k;
 
     using_lfb=((BX & VBE_MODE_LINEAR_FRAME_BUFFER) == VBE_MODE_LINEAR_FRAME_BUFFER);
     lfb_flag=using_lfb?VBE_DISPI_LFB_ENABLED:0;
@@ -1045,7 +1089,9 @@ Bit16u *AX;Bit16u BX;
             dispi_set_xres(cur_info->info.XResolution);
             dispi_set_yres(cur_info->info.YResolution);
             dispi_set_bank(0);
-            dispi_set_enable(VBE_DISPI_ENABLED | no_clear | lfb_flag);
+            support_bank_gr_32k = dispi_support_bank_granularity_32k();
+            dispi_set_enable(VBE_DISPI_ENABLED | support_bank_gr_32k |
+                             no_clear | lfb_flag);
             vga_compat_setup();
 
             write_bda_word(BIOSMEM_NB_COLS,cur_info->info.XResolution>>3);
