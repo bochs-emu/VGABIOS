@@ -985,7 +985,6 @@ banshee_wc_end:
   pop  ax
   ret
 
-;; FIXME: this code works for scroll up only
 banshee_8bpp_copy:
   push ax
   push bx
@@ -1006,41 +1005,49 @@ banshee_8bpp_copy:
   xor  ax, ax
   mov  dx, 6[bp] ;; ysrc
   or   dx, dx
-  jz   banshee_copy_set_start1
+  jz   banshee_copy_set_start_src
   mov  ax, cx
   mov  bx, dx
   mul  bx
-banshee_copy_set_start1:
+banshee_copy_set_start_src:
   pop  bx
   push bx
   add  ax, bx
+  jnc  banshee_copy_noinc1s
+  inc  dx
+banshee_copy_noinc1s:
+  shl  dx, #1
+  test ax, #0x8000
+  jz   banshee_copy_noinc2s
+  and  ax, #0x7fff
+  or   dx, #0x0001
+banshee_copy_noinc2s:
   mov  si, ax
+  mov  ax, dx
+  mov  bl, #0x02
+  call banshee_set_bank
   xor  ax, ax
   mov  dx, 8[bp] ;; ydest
   or   dx, dx
-  jz   banshee_copy_set_start2
+  jz   banshee_copy_set_start_dst
   mov  ax, cx
   mov  bx, dx
   mul  bx
-banshee_copy_set_start2:
+banshee_copy_set_start_dst:
   pop  bx
   add  ax, bx
-  jnc  banshee_copy_noinc1
+  jnc  banshee_copy_noinc1d
   inc  dx
-banshee_copy_noinc1:
+banshee_copy_noinc1d:
   shl  dx, #1
   test ax, #0x8000
-  jz   banshee_copy_noinc2
+  jz   banshee_copy_noinc2d
   and  ax, #0x7fff
   or   dx, #0x0001
-banshee_copy_noinc2:
+banshee_copy_noinc2d:
   mov  di, ax
   mov  ax, dx
-  test ax, #0x0001
-  jz   banshee_copy_no_xor
-  xor  si, #0x8000
-banshee_copy_no_xor:
-  mov  bl, #0x03
+  mov  bl, #0x01
   call banshee_set_bank
   mov  ax, #0xa000
   mov  ds, ax
