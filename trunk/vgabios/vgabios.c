@@ -1607,8 +1607,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
              if((i<rul+nblines)||(nblines==0))
               vgamem_fill_pl4(cul,i,cols,nbcols,cheight,attr);
              else
-              vgamem_copy_pl4(cul,i,i-nblines,cols,nbcols,cheight);
-             if (i>rlr) break;
+              vgamem_copy_pl4(cul,i-nblines,i,cols,nbcols,cheight);
             }
           }
          break;
@@ -1636,8 +1635,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
              if((i<rul+nblines)||(nblines==0))
               vgamem_fill_cga(cul,i,cols,nbcols,cheight,attr);
              else
-              vgamem_copy_cga(cul,i,i-nblines,cols,nbcols,cheight);
-             if (i>rlr) break;
+              vgamem_copy_cga(cul,i-nblines,i,cols,nbcols,cheight);
             }
           }
          break;
@@ -1659,8 +1657,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
              if(i<rul+nblines)
               vgamem_fill_lin(cul,i,cols,1,nbcols,cheight,attr);
              else
-              vgamem_copy_lin(cul,i,i-nblines,cols,nbcols,cheight);
-             if (i>rlr) break;
+              vgamem_copy_lin(cul,i-nblines,i,cols,nbcols,cheight);
             }
           }
          break;
