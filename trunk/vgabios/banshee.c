@@ -573,6 +573,16 @@ banshee_switch_mode:
   out  dx, al
   mov ax, #0x01
   out  dx, al
+  mov  al, [si+1]
+  cmp  al, #0x08
+  jne  no_8bpp_mode
+  mov  al, #0x03
+  xor  ah, ah
+  push ax
+  call _load_dac_palette
+  inc  sp
+  inc  sp
+no_8bpp_mode:
   call banshee_get_io_base_address
   xor  eax, eax
   mov  dl, #0x4c ;; dacMode
@@ -1428,6 +1438,115 @@ banshee_vesa_03h_1:
   pop  ds
   ret
 
+banshee_vesa_04h:
+  cmp  dl, #0x01
+  jb   banshee_read_state_size
+  je   banshee_save_state
+  cmp  dl, #0x02
+  je   banshee_restore_state
+  jmp  banshee_vesa_unimplemented
+banshee_read_state_size:
+  call biosfn_read_video_state_size2
+  test cx, #0x08
+  jz   no_banshee_state_size
+  mov  ax, #0x20 ;; 8 x 32-bit regs
+  add  bx, ax
+no_banshee_state_size:
+  add  bx, #0x3f
+  shr  bx, #6
+  mov  ax, #0x004f
+  ret
+banshee_save_state:
+  test cx, #0x07
+  jz   no_save_vga_state
+  call save_vga_state
+no_save_vga_state:
+  test cx, #0x08
+  jz   no_save_banshee_state
+  push dx
+  push di
+  mov  di, bx
+  call banshee_get_io_base_address
+  mov  dl, #0x28 ;; vgaInit0
+  in   eax, dx
+  stosd
+  mov  dl, #0x2c ;; vgaInit1
+  in   eax, dx
+  stosd
+  mov  dl, #0x40 ;; pllCtrl0
+  in   eax, dx
+  stosd
+  mov  dl, #0x4c ;; dacMode
+  in   eax, dx
+  stosd
+  mov  dl, #0x98 ;; vidScreenSize
+  in   eax, dx
+  stosd
+  mov  dl, #0xe4 ;; vidDesktopStartAddr
+  in   eax, dx
+  stosd
+  mov  dl, #0xe8 ;; vidDesktopOverlayStride
+  in   eax, dx
+  stosd
+  mov  dl, #0x5c ;; vidProcCfg
+  in   eax, dx
+  stosd
+  pop  di
+  pop  dx
+no_save_banshee_state:
+  mov  ax, #0x004f
+  ret
+banshee_restore_state:
+  test cx, #0x07
+  jz   no_restore_vga_state
+  call restore_vga_state
+no_restore_vga_state:
+  test cx, #0x08
+  jz   no_rest_banshee_state
+  push dx
+  push si
+  push ds
+  mov  si, bx
+  push es
+  pop  ds
+  call banshee_get_io_base_address
+  mov  dl, #0x28 ;; vgaInit0
+  lodsd
+  out  dx, eax
+  mov  dl, #0x2c ;; vgaInit1
+  lodsd
+  out  dx, eax
+  mov  dl, #0x40 ;; pllCtrl0
+  lodsd
+  out  dx, eax
+  mov  dl, #0x4c ;; dacMode
+  lodsd
+  out  dx, eax
+  mov  dl, #0x98 ;; vidScreenSize
+  lodsd
+  out  dx, eax
+  mov  dl, #0xe4 ;; vidDesktopStartAddr
+  lodsd
+  out  dx, eax
+  mov  dl, #0xe8 ;; vidDesktopOverlayStride
+  lodsd
+  out  dx, eax
+  mov  dl, #0x5c ;; vidProcCfg
+  lodsd
+  test al, #0x01
+  jz   no_rest_banshee_mode
+  and  al, 0xfe
+  out  dx, eax
+  or   al, #0x01
+no_rest_banshee_mode:
+  out  dx, eax
+  pop  ds
+  pop  si
+  pop  dx
+no_rest_banshee_state:
+  mov  ax, #0x004f
+  ret
+
 banshee_vesa_05h_farentry:
   call banshee_vesa_05h
   retf
@@ -1883,7 +2002,7 @@ banshee_vesa_handlers:
   dw banshee_vesa_02h
   dw banshee_vesa_03h
   ;; 04h
-  dw banshee_vesa_unimplemented
+  dw banshee_vesa_04h
   dw banshee_vesa_05h
   dw banshee_vesa_06h
   dw banshee_vesa_07h
