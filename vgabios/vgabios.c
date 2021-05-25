@@ -117,7 +117,6 @@ static void biosfn_load_gfx_user_chars();
 static void biosfn_load_gfx_8_14_chars();
 static void biosfn_load_gfx_8_8_dd_chars();
 static void biosfn_load_gfx_8_16_chars();
-static void biosfn_get_font_info();
 static void biosfn_alternate_prtsc();
 static void biosfn_switch_video_interface();
 static void biosfn_enable_video_refresh_control();
@@ -362,8 +361,12 @@ int10_test_0B:
   jmp   biosfn_group_0B
 int10_test_1103:
   cmp   ax, #0x1103
-  jne   int10_test_12
+  jne   int10_test_1130
   jmp   biosfn_set_text_block_specifier
+int10_test_1130:
+  cmp   ax, #0x1130
+  jne   int10_test_12
+  jmp   biosfn_get_font_info
 int10_test_12:
   cmp   ah, #0x12
   jne   int10_test_10
@@ -705,9 +708,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
        case 0x24:
         biosfn_load_gfx_8_16_chars(GET_BL());
         break;
-       case 0x30:
-        biosfn_get_font_info(GET_BH(),&ES,&BP,&CX,&DX);
-        break;
 #ifdef DEBUG
        default:
         unknown();
@@ -769,47 +769,67 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
   }
 }
 
-static void load_dac_palette(num) Bit8u num;
-{
-  Bit8u *palette;
-  Bit16u i;
+ASM_START
+dac_palette_table:
+.word _palette0
+.word _palette1
+.word _palette2
+.word _palette3
 
-  // Set the whole dac always, from 0
-  outb(VGAREG_DAC_WRITE_ADDRESS,0x00);
-
-  // From which palette
-  switch (num)
-  {
-    case 0:
-      palette=&palette0;
-      break;
-    case 1:
-      palette=&palette1;
-      break;
-    case 2:
-      palette=&palette2;
-      break;
-    case 3:
-      palette=&palette3;
-      break;
-  }
-  // Always 256*3 values
-  for (i=0;i<0x0100;i++)
-  {
-    if(i<=dac_regs[num])
-    {
-      outb(VGAREG_DAC_DATA,palette[(i*3)+0]);
-      outb(VGAREG_DAC_DATA,palette[(i*3)+1]);
-      outb(VGAREG_DAC_DATA,palette[(i*3)+2]);
-    }
-    else
-    {
-      outb(VGAREG_DAC_DATA,0);
-      outb(VGAREG_DAC_DATA,0);
-      outb(VGAREG_DAC_DATA,0);
-    }
-  }
-}
+_load_dac_palette:
+  push  bp
+  mov   bp, sp
+  push  ax
+  push  bx
+  push  cx
+  push  dx
+  push  si
+  push  ds
+  mov   ax, #0xc000
+  mov   ds, ax
+  mov   al, 4[bp] ; palette num
+  xor   ah, ah
+  push  ax
+  shl   ax, #1
+  mov   bx, #dac_palette_table
+  add   bx, ax
+  mov   si, [bx]
+  pop   ax
+  mov   bx, #_dac_regs
+  add   bx, ax
+  mov   al, [bx]
+  mov   bl, #0x03
+  mul   bl
+  add   ax, #0x03
+  mov   cx, ax
+  mov   bx, #0x0300
+  mov   al, #0x00
+  mov   dx, #VGAREG_DAC_WRITE_ADDRESS
+  out   dx, al
+  cld
+  mov   dx, #VGAREG_DAC_DATA
+dac_load_loop:
+  lodsb
+  out   dx, al
+  dec   bx
+  loop  dac_load_loop
+  or    bx, bx
+  jz    no_fill_dac
+  mov   cx, bx
+  xor   al, al
+dac_fill_loop:
+  out   dx, al
+  loop  dac_fill_loop
+no_fill_dac:
+  pop   ds
+  pop   si
+  pop   dx
+  pop   cx
+  pop   bx
+  pop   ax
+  pop   bp
+  ret
+ASM_END
 
 // ============================================================================================
 //
@@ -3283,55 +3303,75 @@ ASM_END
 }
 
 // --------------------------------------------------------------------------------------------
-static void biosfn_get_font_info (BH,ES,BP,CX,DX)
-Bit8u BH;Bit16u *ES;Bit16u *BP;Bit16u *CX;Bit16u *DX;
-{Bit16u ss=get_SS();
-
- switch(BH)
-  {case 0x00:
-    write_word(ss,ES,read_word(0x00,0x1f*4));
-    write_word(ss,BP,read_word(0x00,(0x1f*4)+2));
-    break;
-   case 0x01:
-    write_word(ss,ES,read_word(0x00,0x43*4));
-    write_word(ss,BP,read_word(0x00,(0x43*4)+2));
-    break;
-   case 0x02:
-    write_word(ss,ES,0xC000);
-    write_word(ss,BP,vgafont14);
-    break;
-   case 0x03:
-    write_word(ss,ES,0xC000);
-    write_word(ss,BP,vgafont8);
-    break;
-   case 0x04:
-    write_word(ss,ES,0xC000);
-    write_word(ss,BP,vgafont8+128*8);
-    break;
-   case 0x05:
-    write_word(ss,ES,0xC000);
-    write_word(ss,BP,vgafont14alt);
-    break;
-   case 0x06:
-    write_word(ss,ES,0xC000);
-    write_word(ss,BP,vgafont16);
-    break;
-   case 0x07:
-    write_word(ss,ES,0xC000);
-    write_word(ss,BP,vgafont16alt);
-    break;
-   default:
-    #ifdef DEBUG
-     printf("Get font info BH(%02x) was discarded\n",BH);
-    #endif
-    return;
-  }
- // Set byte/char of on screen font
- write_word(ss,CX,(Bit16u)read_bda_byte(BIOSMEM_CHAR_HEIGHT));
-
- // Set Highest char row
- write_word(ss,DX,(Bit16u)read_bda_byte(BIOSMEM_NB_ROWS));
-}
+ASM_START
+biosfn_get_font_info:
+  cmp  bh, #0x07
+  ja   get_font_info_unknown
+  push ax
+  push bx
+  push ds
+  or   bh, bh
+  jnz  get_font_info_1
+  xor  ax, ax
+  mov  ds, ax
+  mov  bx, #0x007c ;; INT 0x1F
+  mov  bp, [bx]
+  mov  ax, [bx+2]
+  mov  es, ax
+  jmp  get_bda_data
+get_font_info_1:
+  cmp  bh, #0x01
+  jne  get_font_info_2
+  xor  ax, ax
+  mov  ds, ax
+  mov  bx, #0x010c ;; INT 0x43
+  mov  bp, [bx]
+  mov  ax, [bx+2]
+  mov  es, ax
+  jmp  get_bda_data
+get_font_info_2:
+  mov  ax, #0xc000
+  mov  es, ax
+  cmp  bh, #0x02
+  jne  get_font_info_3
+  mov  bp, #_vgafont14
+  jmp  get_bda_data
+get_font_info_3:
+  cmp  bh, #0x03
+  jne  get_font_info_4
+  mov  bp, #_vgafont8
+  jmp  get_bda_data
+get_font_info_4:
+  cmp  bh, #0x04
+  jne  get_font_info_5
+  mov  bp, #_vgafont8
+  add  bp, #0x0400
+  jmp  get_bda_data
+get_font_info_5:
+  cmp  bh, #0x05
+  jne  get_font_info_6
+  mov  bp, #_vgafont14alt
+  jmp  get_bda_data
+get_font_info_6:
+  cmp  bh, #0x06
+  jne  get_font_info_7
+  mov  bp, #_vgafont16
+  jmp  get_bda_data
+get_font_info_7:
+  mov  bp, #_vgafont16alt
+get_bda_data:
+  mov  ax, #BIOSMEM_SEG
+  mov  ds, ax
+  mov  cl, BIOSMEM_CHAR_HEIGHT
+  xor  ch, ch
+  mov  dl, BIOSMEM_NB_ROWS
+  xor  dh, dh
+  pop  ds
+  pop  bx
+  pop  ax
+get_font_info_unknown:
+  ret
+ASM_END
 
 // --------------------------------------------------------------------------------------------
 ASM_START
@@ -4115,7 +4155,7 @@ _biosfn_restore_video_state:
   mov   ax, 6[bp] ; ES
   mov   es, ax
   mov   bx, 8[bp] ; BX
-  call  save_vga_state
+  call  restore_vga_state
   mov   ax, bx
   pop   es
   pop   bx
