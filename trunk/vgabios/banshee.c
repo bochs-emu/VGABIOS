@@ -1446,7 +1446,7 @@ banshee_vesa_04h:
   je   banshee_restore_state
   jmp  banshee_vesa_unimplemented
 banshee_read_state_size:
-  call biosfn_read_video_state_size2
+  call read_vga_state_size
   test cx, #0x08
   jz   no_banshee_state_size
   mov  ax, #0x20 ;; 8 x 32-bit regs
@@ -1457,6 +1457,7 @@ no_banshee_state_size:
   mov  ax, #0x004f
   ret
 banshee_save_state:
+  push bx
   test cx, #0x07
   jz   no_save_vga_state
   call save_vga_state
@@ -1494,9 +1495,11 @@ no_save_vga_state:
   pop  di
   pop  dx
 no_save_banshee_state:
+  pop  bx
   mov  ax, #0x004f
   ret
 banshee_restore_state:
+  push bx
   test cx, #0x07
   jz   no_restore_vga_state
   call restore_vga_state
@@ -1544,6 +1547,7 @@ no_rest_banshee_mode:
   pop  si
   pop  dx
 no_rest_banshee_state:
+  pop  bx
   mov  ax, #0x004f
   ret
 

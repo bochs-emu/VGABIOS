@@ -51,6 +51,11 @@
 
 #ifdef VBE
 #include "vbe.h"
+#define VGAEXT
+#define VGAEXT_is_8bpp_mode    vbe_is_8bpp_mode
+#define VGAEXT_8bpp_write_char vbe_8bpp_write_char
+#define VGAEXT_8bpp_copy       vbe_8bpp_copy
+#define VGAEXT_8bpp_fill       vbe_8bpp_fill
 #endif
 #ifdef CIRRUS
 #define VGAEXT
@@ -121,8 +126,6 @@ static void biosfn_alternate_prtsc();
 static void biosfn_switch_video_interface();
 static void biosfn_enable_video_refresh_control();
 static void biosfn_write_string();
-static Bit16u biosfn_save_video_state();
-static Bit16u biosfn_restore_video_state();
 extern Bit8u video_save_pointer_table[];
 
 // This is for compiling with gcc2 and gcc3
@@ -750,9 +753,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
           break;
          case 0x02:
           vbe_biosfn_set_mode(&AX,BX);
-          break;
-         case 0x04:
-          vbe_biosfn_save_restore_state(&AX, CX, DX, ES, &BX);
           break;
        }
      } else {
@@ -3724,7 +3724,7 @@ ASM_END
 // -----------------------------------------------------------------------------
 ASM_START
 ; called from VBE code
-biosfn_read_video_state_size2:
+read_vga_state_size:
   xor   bx, bx
   test  cx, #0x01
   jz    no_hw_state
@@ -3741,7 +3741,7 @@ no_dac_state:
   ret
 
 biosfn_read_video_state_size:
-  call  biosfn_read_video_state_size2
+  call  read_vga_state_size
   add   bx, #0x3f
   shr   bx, #6
   mov   ax, #0x001c
@@ -3927,25 +3927,6 @@ biosfn_save_video_state:
   pop   bx
   mov   ax, #0x001c
   ret
-
-; called from VBE C code
-_biosfn_save_video_state:
-  push  bp
-  mov   bp, sp
-  push  cx
-  push  bx
-  push  es
-  mov   cx, 4[bp] ; CX
-  mov   ax, 6[bp] ; ES
-  mov   es, ax
-  mov   bx, 8[bp] ; BX
-  call  save_vga_state
-  mov   ax, bx
-  pop   es
-  pop   bx
-  pop   cx
-  pop   bp
-  ret
 ASM_END
 
 // -----------------------------------------------------------------------------
@@ -4053,7 +4034,7 @@ rest_grdc_loop:
   inc   bx
   seg   es
   mov   al, [bx]
-  mov   dx, #VGAREG_WRITE_FEATURE_CTL
+  mov   dx, #VGAREG_VGA_WRITE_FEATURE_CTL
   pop   bx
   pop   dx
   pop   cx
@@ -4142,25 +4123,6 @@ biosfn_restore_video_state:
   call  restore_vga_state
   pop   bx
   mov   ax, #0x001c
-  ret
-
-; called from VBE C code
-_biosfn_restore_video_state:
-  push  bp
-  mov   bp, sp
-  push  cx
-  push  bx
-  push  es
-  mov   cx, 4[bp] ; CX
-  mov   ax, 6[bp] ; ES
-  mov   es, ax
-  mov   bx, 8[bp] ; BX
-  call  restore_vga_state
-  mov   ax, bx
-  pop   es
-  pop   bx
-  pop   cx
-  pop   bp
   ret
 ASM_END
 

@@ -447,35 +447,25 @@ ASM_END
 static void dispi_set_bank_farcall()
 {
 ASM_START
-  cmp bx,#0x0100
+  cmp  bx, #0x0100
   je dispi_set_bank_farcall_get
-  or bx,bx
-  jnz dispi_set_bank_farcall_error
-  mov ax,dx
-  push dx
-  push ax
-  mov ax,# VBE_DISPI_INDEX_BANK
-  mov dx,# VBE_DISPI_IOPORT_INDEX
-  out dx,ax
-  pop ax
-  mov dx,# VBE_DISPI_IOPORT_DATA
-  out dx,ax
-  in  ax,dx
-  pop dx
-  cmp dx,ax
-  jne dispi_set_bank_farcall_error
-  mov ax, #0x004f
+  or   bx, bx
+  jnz  dispi_set_bank_farcall_error
+  mov  ax, dx
+  call _dispi_set_bank
+  in   ax, dx
+  pop  dx
+  cmp  dx, ax
+  jne  dispi_set_bank_farcall_error
+  mov  ax, #0x004f
   retf
 dispi_set_bank_farcall_get:
-  mov ax,# VBE_DISPI_INDEX_BANK
-  mov dx,# VBE_DISPI_IOPORT_INDEX
-  out dx,ax
-  mov dx,# VBE_DISPI_IOPORT_DATA
-  in ax,dx
-  mov dx,ax
+  call dispi_get_bank
+  mov  dx, ax
+  mov  ax, #0x004f
   retf
 dispi_set_bank_farcall_error:
-  mov ax,#0x014F
+  mov  ax, #0x014F
   retf
 ASM_END
 }
@@ -705,6 +695,182 @@ bit9_clear:
 vga_compat_end:
   pop  dx
   pop  ax
+
+;; code for 'write character' support in 8bpp graphics modes
+
+;; called from C code
+_vbe_is_8bpp_mode:
+vbe_is_8bpp_mode:
+  call _vbe_has_vbe_display
+  test ax, #0x01
+  jz   no_vbe_8bpp_mode
+  call dispi_get_enable
+  and  ax, # VBE_DISPI_ENABLED
+  jz   no_vbe_8bpp_mode
+  call dispi_get_bpp
+  cmp  al, #0x08
+  je   is_8bpp_mode
+no_vbe_8bpp_mode:
+  xor  ax, ax
+is_8bpp_mode:
+  ret
+
+vbe_8bpp_write_char:
+  push ax
+  push bx
+  push cx
+  push dx
+  push ds
+  push es
+  push si
+  push di
+  xor  ax, ax
+  mov  ds, ax
+  mov  bx, #0x10c ;; INT 0x43
+  mov  si, [bx]
+  mov  ax, [bx+2]
+  mov  ds, ax
+  mov  bx, 14[bp] ;; cheight
+  mov  al, 4[bp]  ;; character
+  mul  bl
+  add  si, ax
+  mov  ax, 8[bp] ;; xcurs
+  shl  ax, #3
+  push ax
+  mov  dx, 10[bp] ;; ycurs
+  or   dx, dx
+  jz   vbe_wc_set_start
+  mov  al, 12[bp] ;; nbcols
+  mov  bl, 14[bp] ;; cheight
+  mul  bl
+  shl  ax, #3
+  mov  bx, dx
+  mul  bx
+vbe_wc_set_start:
+  pop  bx
+  add  ax, bx
+  jnc  vbe_wc_noinc1
+  inc  dx
+vbe_wc_noinc1:
+  shl  dx, #1
+  test ax, #0x8000
+  jz   vbe_wc_noinc2
+  and  ax, #0x7fff
+  or   dx, #0x0001
+vbe_wc_noinc2:
+  mov  di, ax
+  mov  ax, dx
+  call _dispi_set_bank
+  mov  ax, #0xa000
+  mov  es, ax
+  mov  bl, 14[bp] ;; cheight
+  mov  dx, 12[bp] ;; nbcols
+  shl  dx, #3
+vbe_wc_loop1:
+  push di
+  lodsb
+  mov  cx, #0x08
+  cld
+vbe_wc_loop2:
+  shl  al, #1
+  push ax
+  jnc  vbe_wc_set_bkgnd
+  mov  al, 6[bp] ;; attr
+  db    0xa9 ;; skip next opcode (TEST AX, #0xC030)
+vbe_wc_set_bkgnd:
+  xor  al, al
+  stosb
+  pop  ax
+  loop vbe_wc_loop2
+  pop  di
+  dec  bl
+  jz   vbe_wc_end
+  add  di, dx
+  jmp  vbe_wc_loop1
+vbe_wc_end:
+  pop  di
+  pop  si
+  pop  es
+  pop  ds
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  ret
+
+vbe_8bpp_copy:
+  ;; TODO
+  ret
+
+vbe_8bpp_fill:
+  push ax
+  push bx
+  push cx
+  push dx
+  push es
+  push di
+vbe_fill_next_row:
+  mov  ax, 4[bp] ;; xstart
+  shl  ax, #3
+  push ax
+  xor  ax, ax
+  mov  dx, 6[bp] ;; ystart
+  or   dx, dx
+  jz   vbe_fill_set_start
+  mov  al, 12[bp] ;; nbcols
+  mov  bl, 14[bp] ;; cheight
+  mul  bl
+  shl  ax, #3
+  mov  bx, dx
+  mul  bx
+vbe_fill_set_start:
+  pop  bx
+  add  ax, bx
+  jnc  vbe_fill_noinc1
+  inc  dx
+vbe_fill_noinc1:
+  shl  dx, #1
+  test ax, #0x8000
+  jz   vbe_fill_noinc2
+  and  ax, #0x7fff
+  or   dx, #0x0001
+vbe_fill_noinc2:
+  mov  di, ax
+  mov  ax, dx
+  mov  bl, #0x01
+  call _dispi_set_bank
+  mov  ax, #0xa000
+  mov  es, ax
+  mov  al, 16[bp] ;; attr
+  mov  ah, al
+  mov  bl, 14[bp] ;; cheight
+  mov  cx, 8[bp] ;; cols
+  shl  cx, #2
+  mov  dx, 12[bp] ;; nbcols
+  shl  dx, #3
+vbe_fill_loop:
+  push cx
+  push di
+  cld
+  rep
+    stosw
+  pop  di
+  pop  cx
+  dec  bl
+  jz   vbe_fill_check_row
+  add  di, dx
+  jmp  vbe_fill_loop
+vbe_fill_check_row:
+  inc  6[bp] ;; ystart
+  dec  10[bp] ;; rows
+  jnz  vbe_fill_next_row
+  pop  di
+  pop  es
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  ret
 ASM_END
 
 
@@ -1104,6 +1270,7 @@ Bit16u *AX;Bit16u BX;
 ASM_START
             SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
 ASM_END
+            write_bda_byte(BIOSMEM_CURRENT_MODE,0x5f); // FIXME
 
             result = 0x4f;
         } else {
@@ -1150,64 +1317,6 @@ vbe_03_ok:
   ret
 ASM_END
 
-
-void vbe_biosfn_save_video_state(ES, BX)
-     Bit16u ES; Bit16u BX;
-{
-    Bit16u enable, i;
-
-    outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
-    enable = inw(VBE_DISPI_IOPORT_DATA);
-    write_word(ES, BX, enable);
-    BX += 2;
-    if (!(enable & VBE_DISPI_ENABLED))
-        return;
-    for(i = VBE_DISPI_INDEX_XRES; i <= VBE_DISPI_INDEX_Y_OFFSET; i++) {
-        if ((i != VBE_DISPI_INDEX_ENABLE) && (i != VBE_DISPI_INDEX_VIRT_HEIGHT)) {
-            outw(VBE_DISPI_IOPORT_INDEX, i);
-            write_word(ES, BX, inw(VBE_DISPI_IOPORT_DATA));
-            BX += 2;
-        }
-    }
-}
-
-
-void vbe_biosfn_restore_video_state(ES, BX)
-     Bit16u ES; Bit16u BX;
-{
-    Bit16u enable, i;
-
-    enable = read_word(ES, BX);
-    BX += 2;
-
-    outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
-    if (!(enable & VBE_DISPI_ENABLED)) {
-        outw(VBE_DISPI_IOPORT_DATA, enable);
-    } else {
-        outw(VBE_DISPI_IOPORT_DATA, VBE_DISPI_DISABLED); // disable VBE if active
-        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_XRES);
-        outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
-        BX += 2;
-        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_YRES);
-        outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
-        BX += 2;
-        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_BPP);
-        outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
-        BX += 2;
-        outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
-        outw(VBE_DISPI_IOPORT_DATA, enable);
-        vga_compat_setup();
-
-        for(i = VBE_DISPI_INDEX_BANK; i <= VBE_DISPI_INDEX_Y_OFFSET; i++) {
-            if (i != VBE_DISPI_INDEX_VIRT_HEIGHT) {
-                outw(VBE_DISPI_IOPORT_INDEX, i);
-                outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
-                BX += 2;
-            }
-        }
-    }
-}
-
 /** Function 04h - Save/Restore State
  *
  * Input:
@@ -1224,57 +1333,143 @@ void vbe_biosfn_restore_video_state(ES, BX)
  */
 ASM_START
 vbe_biosfn_save_restore_state:
-  cmp   dl, #0x01
-  jb    read_state_size
-  jmp   vbe_normal
-read_state_size:
-  call  biosfn_read_video_state_size2
-  test  cx, #0x08
-  jz    no_svga_state
-  mov   ax, #VBE_DISPI_INDEX_Y_OFFSET
-  dec   ax
-  shl   ax, #1
-  add   bx, ax
-no_svga_state:
-  add   bx, #0x3f
-  shr   bx, #6
-  mov   ax, #0x004f
+  cmp  dl, #0x01
+  jb   vbe_read_state_size
+  je   vbe_save_state
+  cmp  dl, #0x02
+  je   vbe_restore_state
+  jmp  vbe_unimplemented
+vbe_read_state_size:
+  call read_vga_state_size
+  test cx, #0x08
+  jz   no_vbe_state_size
+  mov  ax, #VBE_DISPI_INDEX_Y_OFFSET
+  dec  ax
+  shl  ax, #1
+  add  bx, ax
+no_vbe_state_size:
+  add  bx, #0x3f
+  shr  bx, #6
+  mov  ax, #0x004f
+  ret
+vbe_save_state:
+  push bx
+  test cx, #0x07
+  jz   no_save_vga_state
+  call save_vga_state
+no_save_vga_state:
+  test cx, #0x08
+  jz   no_save_vbe_state
+  call vbe_biosfn_save_video_state
+no_save_vbe_state:
+  pop  bx
+  mov  ax, #0x004f
+  ret
+vbe_restore_state:
+  push bx
+  test cx, #0x07
+  jz   no_restore_vga_state
+  call restore_vga_state
+no_restore_vga_state:
+  test cx, #0x08
+  jz   no_rest_vbe_state
+  call vbe_biosfn_restore_video_state
+no_rest_vbe_state:
+  pop  bx
+  mov  ax, #0x004f
+  ret
+
+vbe_biosfn_save_video_state:
+  call dispi_get_enable
+  seg  es
+  mov  [bx], ax
+  add  bx, #0x02
+  test ax, #VBE_DISPI_ENABLED
+  jnz  vbe_save_full_state
+  ret
+vbe_save_full_state:
+  push cx
+  push dx
+  mov  cx, #VBE_DISPI_INDEX_XRES
+vbe_save_loop:
+  cmp  cx, #VBE_DISPI_INDEX_ENABLE
+  je   vbe_save_next_reg
+  cmp  cx, #VBE_DISPI_INDEX_VIRT_HEIGHT
+  je   vbe_save_next_reg
+  mov  dx, #VBE_DISPI_IOPORT_INDEX
+  mov  ax, cx
+  out  dx, ax
+  mov  dx, #VBE_DISPI_IOPORT_DATA
+  in   ax, dx
+  seg  es
+  mov  [bx], ax
+  add  bx, #0x02
+vbe_save_next_reg:
+  inc  cx
+  cmp  cx, #VBE_DISPI_INDEX_Y_OFFSET
+  jbe  vbe_save_loop
+  pop  dx
+  pop  cx
+  ret
+
+vbe_biosfn_restore_video_state:
+  seg  es
+  mov  ax, [bx]
+  add  bx, #0x02
+  test ax, #VBE_DISPI_ENABLED
+  jnz  vbe_restore_full_state
+  call _dispi_set_enable
+  ret
+vbe_restore_full_state:
+  push ax
+  xor  ax, ax
+  call _dispi_set_enable
+  seg  es
+  mov  ax, [bx]
+  push ax
+  call _dispi_set_xres
+  inc  sp
+  inc  sp
+  add  bx, #0x02
+  seg  es
+  mov  ax, [bx]
+  push ax
+  call _dispi_set_yres
+  inc  sp
+  inc  sp
+  add  bx, #0x02
+  seg  es
+  mov  ax, [bx]
+  push ax
+  call _dispi_set_bpp
+  inc  sp
+  inc  sp
+  add  bx, #0x02
+  pop  ax
+  call _dispi_set_enable
+  call _vga_compat_setup
+  push cx
+  push dx
+  mov  cx, #VBE_DISPI_INDEX_BANK
+vbe_restore_loop:
+  cmp  cx, #VBE_DISPI_INDEX_VIRT_HEIGHT
+  je   vbe_save_next_reg
+  mov  dx, #VBE_DISPI_IOPORT_INDEX
+  mov  ax, cx
+  out  dx, ax
+  mov  dx, #VBE_DISPI_IOPORT_DATA
+  seg  es
+  mov  ax, [bx]
+  out  dx, ax
+  add  bx, #0x02
+vbe_restore_next_reg:
+  inc  cx
+  cmp  cx, #VBE_DISPI_INDEX_Y_OFFSET
+  jbe  vbe_restore_loop
+  pop  dx
+  pop  cx
   ret
 ASM_END
-
-void vbe_biosfn_save_restore_state(AX, CX, DX, ES, BX)
-Bit16u *AX; Bit16u CX; Bit16u DX; Bit16u ES; Bit16u *BX;
-{
-    Bit16u ss=get_SS();
-    Bit16u result, val;
-
-    result = 0x4f;
-    switch(GET_DL()) {
-    case 0x01:
-        val = read_word(ss, BX);
-        val = biosfn_save_video_state(CX, ES, val);
-#ifdef DEBUG
-        printf("VGA save_state offset=%x\n", val);
-#endif
-        if (CX & 8)
-            vbe_biosfn_save_video_state(ES, val);
-        break;
-    case 0x02:
-        val = read_word(ss, BX);
-        val = biosfn_restore_video_state(CX, ES, val);
-#ifdef DEBUG
-        printf("VGA restore_state offset=%x\n", val);
-#endif
-        if (CX & 8)
-            vbe_biosfn_restore_video_state(ES, val);
-        break;
-    default:
-        // function failed
-        result = 0x100;
-        break;
-    }
-    write_word(ss, AX, result);
-}
 
 /** Function 05h - Display Window Control
  *

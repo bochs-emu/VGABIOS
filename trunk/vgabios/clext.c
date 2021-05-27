@@ -1799,7 +1799,7 @@ cirrus_set_line_offset:
   inc  dx
   shl  ah, #4
   in   al, dx
-  and  al, #ef
+  and  al, #0xef
   or   al, ah
   out  dx, al
   ret
