@@ -17,7 +17,6 @@ void dispi_set_enable(enable);
 void vbe_biosfn_return_controller_information(AX, ES, DI);
 void vbe_biosfn_return_mode_information(AX, CX, ES, DI);
 void vbe_biosfn_set_mode(AX, BX);
-void vbe_biosfn_save_restore_state(AX, CX, DX, ES, BX);
 
 // The official VBE Information Block
 typedef struct VbeInfoBlock
