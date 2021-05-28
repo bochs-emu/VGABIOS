@@ -421,7 +421,7 @@ dispi_get_enable:
   pop  dx
   ret
 
-_dispi_set_bank:
+dispi_set_bank:
   push dx
   push ax
   mov  dx, # VBE_DISPI_IOPORT_INDEX
@@ -452,7 +452,7 @@ ASM_START
   or   bx, bx
   jnz  dispi_set_bank_farcall_error
   mov  ax, dx
-  call _dispi_set_bank
+  call dispi_set_bank
   in   ax, dx
   pop  dx
   cmp  dx, ax
@@ -760,7 +760,7 @@ vbe_wc_noinc1:
 vbe_wc_noinc2:
   mov  di, ax
   mov  ax, dx
-  call _dispi_set_bank
+  call dispi_set_bank
   mov  ax, #0xa000
   mov  es, ax
   mov  bl, 14[bp] ;; cheight
@@ -798,8 +798,94 @@ vbe_wc_end:
   pop  ax
   ret
 
+;; FIXME: this code works for scroll up one line only
 vbe_8bpp_copy:
-  ;; TODO
+  push ax
+  push bx
+  push cx
+  push dx
+  push ds
+  push es
+  push si
+  push di
+  mov  ax, 4[bp] ;; xstart
+  shl  ax, #3
+  push ax
+  mov  al, 12[bp] ;; nbcols
+  mov  bl, 14[bp] ;; cheight
+  mul  bl
+  shl  ax, #3
+  mov  cx, ax
+  xor  ax, ax
+  mov  dx, 6[bp] ;; ysrc
+  or   dx, dx
+  jz   vbe_copy_set_start1
+  mov  ax, cx
+  mov  bx, dx
+  mul  bx
+vbe_copy_set_start1:
+  pop  bx
+  push bx
+  add  ax, bx
+  mov  si, ax
+  xor  ax, ax
+  mov  dx, 8[bp] ;; ydest
+  or   dx, dx
+  jz   vbe_copy_set_start2
+  mov  ax, cx
+  mov  bx, dx
+  mul  bx
+vbe_copy_set_start2:
+  pop  bx
+  add  ax, bx
+  jnc  vbe_copy_noinc1
+  inc  dx
+vbe_copy_noinc1:
+  shl  dx, #1
+  test ax, #0x8000
+  jz   vbe_copy_noinc2
+  and  ax, #0x7fff
+  or   dx, #0x0001
+vbe_copy_noinc2:
+  mov  di, ax
+  mov  ax, dx
+  test ax, #0x0001
+  jz   vbe_copy_no_xor
+  xor  si, #0x8000
+vbe_copy_no_xor:
+  call dispi_set_bank
+  mov  ax, #0xa000
+  mov  ds, ax
+  mov  es, ax
+  mov  bl, 14[bp] ;; cheight
+  mov  cx, 10[bp] ;; cols
+  shl  cx, #2
+  mov  dx, 12[bp] ;; nbcols
+  shl  dx, #3
+vbe_copy_loop:
+  push cx
+  push si
+  push di
+  cld
+  rep
+    movsw
+  pop  di
+  pop  si
+  pop  cx
+  dec  bl
+  jz   vbe_copy_end
+  add  si, dx
+  add  di, dx
+  jmp  vbe_copy_loop
+vbe_copy_end:
+  pop  di
+  pop  si
+  pop  es
+  pop  ds
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
   ret
 
 vbe_8bpp_fill:
@@ -837,8 +923,7 @@ vbe_fill_noinc1:
 vbe_fill_noinc2:
   mov  di, ax
   mov  ax, dx
-  mov  bl, #0x01
-  call _dispi_set_bank
+  call dispi_set_bank
   mov  ax, #0xa000
   mov  es, ax
   mov  al, 16[bp] ;; attr
@@ -1254,7 +1339,10 @@ Bit16u *AX;Bit16u BX;
             dispi_set_bpp(cur_info->info.BitsPerPixel);
             dispi_set_xres(cur_info->info.XResolution);
             dispi_set_yres(cur_info->info.YResolution);
-            dispi_set_bank(0);
+ASM_START
+            xor  ax, ax
+            call dispi_set_bank
+ASM_END
             support_bank_gr_32k = dispi_support_bank_granularity_32k();
             dispi_set_enable(VBE_DISPI_ENABLED | support_bank_gr_32k |
                              no_clear | lfb_flag);
@@ -1502,7 +1590,7 @@ vbe_biosfn_display_window_control:
   ret
 set_display_window:
   mov  ax, dx
-  call _dispi_set_bank
+  call dispi_set_bank
   call dispi_get_bank
   cmp  ax, dx
   jne  vbe_05_failed
