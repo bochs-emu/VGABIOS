@@ -1588,7 +1588,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
   }
  else
   {
-   // FIXME gfx mode (Bochs VBE and Banshee / Cirrus (> 8 bpp) not supported)
+   // FIXME gfx modes > 8 bpp not supported
    cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    if(nblines==0&&rul==0&&cul==0&&rlr==nbrows-1&&clr==nbcols-1&&vga_modes[line].memmodel!=LINEAR8)
     {
@@ -1997,7 +1997,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
   }
  else
   {
-   // FIXME gfx mode (Bochs VBE and Banshee / Cirrus (> 8 bpp) not supported)
+   // FIXME gfx modes > 8 bpp not supported
    cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
@@ -2062,7 +2062,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
   }
  else
   {
-   // FIXME gfx mode (Bochs VBE and Banshee / Cirrus (> 8 bpp) not supported)
+   // FIXME gfx modes > 8 bpp not supported
    cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
    bpp=vga_modes[line].pixbits;
    while((count-->0) && (xcurs<nbcols))
@@ -2376,7 +2376,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
      }
     else
      {
-      // FIXME gfx mode (Bochs VBE and Banshee / Cirrus (> 8 bpp) not supported)
+      // FIXME gfx modes > 8 bpp not supported
       cheight=read_bda_byte(BIOSMEM_CHAR_HEIGHT);
       bpp=vga_modes[line].pixbits;
       switch(vga_modes[line].memmodel)
