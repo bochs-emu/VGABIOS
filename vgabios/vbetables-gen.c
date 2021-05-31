@@ -117,16 +117,26 @@ int main(int argc, char **argv)
         printf("{ /*Bit16u ModeAttributes*/ %s,\n", 
                "VBE_MODE_ATTRIBUTE_SUPPORTED | "
                "VBE_MODE_ATTRIBUTE_EXTENDED_INFORMATION_AVAILABLE | "
-               "VBE_MODE_ATTRIBUTE_COLOR_MODE | "
                "VBE_MODE_ATTRIBUTE_TTY_BIOS_SUPPORT | "
+               "VBE_MODE_ATTRIBUTE_COLOR_MODE | "
                "VBE_MODE_ATTRIBUTE_GRAPHICS_MODE");
+      else if (pm->depth == 8)
+        printf("{ /*Bit16u ModeAttributes*/ %s,\n", 
+               "VBE_MODE_ATTRIBUTE_SUPPORTED | "
+               "VBE_MODE_ATTRIBUTE_EXTENDED_INFORMATION_AVAILABLE | "
+               "VBE_MODE_ATTRIBUTE_TTY_BIOS_SUPPORT | "
+               "VBE_MODE_ATTRIBUTE_COLOR_MODE | "
+               "VBE_MODE_ATTRIBUTE_GRAPHICS_MODE | "
+               "VBE_MODE_ATTRIBUTE_NOT_VGA_COMPATIBLE | "
+               "VBE_MODE_ATTRIBUTE_LINEAR_FRAME_BUFFER_MODE");
       else
         printf("{ /*Bit16u ModeAttributes*/ %s,\n", 
                "VBE_MODE_ATTRIBUTE_SUPPORTED | "
                "VBE_MODE_ATTRIBUTE_EXTENDED_INFORMATION_AVAILABLE | "
                "VBE_MODE_ATTRIBUTE_COLOR_MODE | "
-               "VBE_MODE_ATTRIBUTE_LINEAR_FRAME_BUFFER_MODE | "
-               "VBE_MODE_ATTRIBUTE_GRAPHICS_MODE");
+               "VBE_MODE_ATTRIBUTE_GRAPHICS_MODE | "
+               "VBE_MODE_ATTRIBUTE_NOT_VGA_COMPATIBLE | "
+               "VBE_MODE_ATTRIBUTE_LINEAR_FRAME_BUFFER_MODE");
       printf("/*Bit8u  WinAAttributes*/ %s,\n",
              "VBE_WINDOW_ATTRIBUTE_RELOCATABLE | "
              "VBE_WINDOW_ATTRIBUTE_READABLE | "
