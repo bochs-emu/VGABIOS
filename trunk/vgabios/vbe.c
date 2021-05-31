@@ -422,6 +422,14 @@ dispi_get_enable:
   ret
 
 dispi_set_bank:
+  test bl, #0x01
+  jz   no_wr_bank
+  or   ax, #VBE_DISPI_BANK_WR
+no_wr_bank:
+  test bl, #0x02
+  jz   no_rd_bank
+  or   ax, #VBE_DISPI_BANK_RD
+no_rd_bank:
   push dx
   push ax
   mov  dx, # VBE_DISPI_IOPORT_INDEX
@@ -452,6 +460,7 @@ ASM_START
   or   bx, bx
   jnz  dispi_set_bank_farcall_error
   mov  ax, dx
+  or   ax, #VBE_DISPI_BANK_RW
   call dispi_set_bank
   in   ax, dx
   pop  dx
@@ -760,6 +769,7 @@ vbe_wc_noinc1:
 vbe_wc_noinc2:
   mov  di, ax
   mov  ax, dx
+  mov  bl, #0x01
   call dispi_set_bank
   mov  ax, #0xa000
   mov  es, ax
@@ -798,7 +808,6 @@ vbe_wc_end:
   pop  ax
   ret
 
-;; FIXME: this code works for scroll up one line only
 vbe_8bpp_copy:
   push ax
   push bx
@@ -819,40 +828,49 @@ vbe_8bpp_copy:
   xor  ax, ax
   mov  dx, 6[bp] ;; ysrc
   or   dx, dx
-  jz   vbe_copy_set_start1
+  jz   vbe_copy_set_start_src
   mov  ax, cx
   mov  bx, dx
   mul  bx
-vbe_copy_set_start1:
+vbe_copy_set_start_src:
   pop  bx
   push bx
   add  ax, bx
+  jnc  vbe_copy_noinc1s
+  inc  dx
+vbe_copy_noinc1s:
+  shl  dx, #1
+  test ax, #0x8000
+  jz   vbe_copy_noinc2s
+  and  ax, #0x7fff
+  or   dx, #0x0001
+vbe_copy_noinc2s:
   mov  si, ax
+  mov  ax, dx
+  mov  bl, #0x02
+  call dispi_set_bank
   xor  ax, ax
   mov  dx, 8[bp] ;; ydest
   or   dx, dx
-  jz   vbe_copy_set_start2
+  jz   vbe_copy_set_start_dst
   mov  ax, cx
   mov  bx, dx
   mul  bx
-vbe_copy_set_start2:
+vbe_copy_set_start_dst:
   pop  bx
   add  ax, bx
-  jnc  vbe_copy_noinc1
+  jnc  vbe_copy_noinc1d
   inc  dx
-vbe_copy_noinc1:
+vbe_copy_noinc1d:
   shl  dx, #1
   test ax, #0x8000
-  jz   vbe_copy_noinc2
+  jz   vbe_copy_noinc2d
   and  ax, #0x7fff
   or   dx, #0x0001
-vbe_copy_noinc2:
+vbe_copy_noinc2d:
   mov  di, ax
   mov  ax, dx
-  test ax, #0x0001
-  jz   vbe_copy_no_xor
-  xor  si, #0x8000
-vbe_copy_no_xor:
+  mov  bl, #0x01
   call dispi_set_bank
   mov  ax, #0xa000
   mov  ds, ax
@@ -923,6 +941,7 @@ vbe_fill_noinc1:
 vbe_fill_noinc2:
   mov  di, ax
   mov  ax, dx
+  mov  bl, #0x01
   call dispi_set_bank
   mov  ax, #0xa000
   mov  es, ax
@@ -1340,7 +1359,7 @@ Bit16u *AX;Bit16u BX;
             dispi_set_xres(cur_info->info.XResolution);
             dispi_set_yres(cur_info->info.YResolution);
 ASM_START
-            xor  ax, ax
+            mov  ax, #VBE_DISPI_BANK_RW
             call dispi_set_bank
 ASM_END
             support_bank_gr_32k = dispi_support_bank_granularity_32k();
@@ -1590,6 +1609,7 @@ vbe_biosfn_display_window_control:
   ret
 set_display_window:
   mov  ax, dx
+  or   ax, #VBE_DISPI_BANK_RW
   call dispi_set_bank
   call dispi_get_bank
   cmp  ax, dx
