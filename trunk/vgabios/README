@@ -18,7 +18,7 @@ Voodoo Banshee PCI extension
 ----------------------------
 
 The Voodoo Banshee PCI extension is designed for the Banshee emulation in Bochs.
-qemu. The parts of the initial version are based on the Cirrus extension code.
+Some parts of the initial version are based on the Cirrus extension code.
 
 
 Install
