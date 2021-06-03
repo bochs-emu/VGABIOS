@@ -74,8 +74,7 @@ vgabios-banshee.bin      : $(VGA_FILES) banshee.c biossums
 
 release: 
 	VGABIOS_VERS=\"-DVGABIOS_VERS=\\\"$(RELVERS)\\\"\" make bios cirrus-bios banshee-bios
-	/bin/rm -f  *.o *.s *.ld86 \
-          temp.awk.* vgabios.*.orig _vgabios_.*.c core *.bak .#*
+	make clean
 	tar czvf ../$(RELEASE)-bin.tgz $(RELEASE_BIN_LIST)
 	tar czvf ../$(RELEASE).tgz --exclude .svn -C .. $(RELEASE)/
 
