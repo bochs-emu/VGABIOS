@@ -94,9 +94,7 @@ vesa_pm_start:
   dw vesa_pm_io_ports_table - vesa_pm_start
 vesa_pm_io_ports_table:
   dw VBE_DISPI_IOPORT_INDEX
-  dw VBE_DISPI_IOPORT_INDEX + 1
   dw VBE_DISPI_IOPORT_DATA
-  dw VBE_DISPI_IOPORT_DATA + 1
   dw 0xffff
   dw 0xffff
 
@@ -1331,8 +1329,15 @@ Bit16u *AX;Bit16u BX;
         // this allows for going back to textmode with a VBE call (some applications expect that to work)
 
         mode=(BX & 0xff);
-        biosfn_set_video_mode(mode);
-        result = 0x4f;
+        if ((mode & 0x80) == 0) {
+          if (no_clear != 0) {
+            mode |= 0x80;
+          }
+          biosfn_set_video_mode(mode);
+          result = 0x4f;
+        } else {
+          result = 0x014f;
+        }
     } else {
 
         cur_info = mode_info_find_mode(BX, using_lfb, &cur_info);
@@ -1384,7 +1389,7 @@ ASM_END
 #ifdef DEBUG
             printf("VBE *NOT* found mode %x\n" , BX);
 #endif
-            result = 0x0100;
+            result = 0x014f;
         }
     }
 

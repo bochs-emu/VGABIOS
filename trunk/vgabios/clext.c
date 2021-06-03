@@ -1283,7 +1283,6 @@ cirrus_vesa_01h_5:
   ret
 
 cirrus_vesa_02h:
-  ;; XXX support CRTC registers
   test bx, #0x3e00
   jnz cirrus_vesa_02h_2 ;; unknown flags
   mov ax, bx
@@ -1294,12 +1293,18 @@ cirrus_vesa_02h:
   cmp ax, #0xffff
   jnz cirrus_vesa_02h_1
 cirrus_vesa_02h_2:
-  jmp cirrus_vesa_unimplemented
+  jmp  cirrus_vesa_unimplemented
 cirrus_vesa_02h_legacy:
+  test al, #0x80
+  jnz  cirrus_vesa_02h_2
+  test bx, #0x8000
+  jz   cirrus_vesa_02h_legacy_noclear
+  or   al, #0x80
+cirrus_vesa_02h_legacy_noclear:
 #ifdef CIRRUS_VESA3_PMINFO
  db 0x2e ;; cs:
-  cmp byte ptr [cirrus_vesa_is_protected_mode], #0
-  jnz cirrus_vesa_02h_2
+  cmp  byte ptr [cirrus_vesa_is_protected_mode], #0
+  jnz  cirrus_vesa_02h_2
 #endif // CIRRUS_VESA3_PMINFO
   int #0x10
   mov ax, #0x004F
