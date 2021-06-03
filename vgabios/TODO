@@ -6,7 +6,7 @@ General
   - Add new functionalities and modify static functionality table
   - Performance : 16 bits IO
 
-v0.8
+v0.9
   - Implement the remaining functions (don't know if all are needed):
     - display switch interface ah=12 bl=35
     - video refresh control ah=12 bl=36
@@ -19,5 +19,6 @@ v1.0
 VBE:
 ----
 Long term:
-- have text io functions in vbe mode
+- VGA compatible mode numbers for VBE modes
+- Text io functions in VBE modes > 8 bpp
 

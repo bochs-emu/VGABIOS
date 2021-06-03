@@ -1403,15 +1403,34 @@ banshee_vesa_02h:
   mov  ax, bx
   and  ax, #0x01ff
   cmp  ax, #0x0100
-  jb   banshee_vesa_set_mode
+  jb   banshee_vesa_legacy
   call banshee_vesamode_to_mode
   cmp  ax, #0xffff
-  je   banshee_vesa_unimplemented
+  jnz  banshee_vesa_set_mode
+  jmp  banshee_vesa_unimplemented
+banshee_vesa_legacy:
+  test al, #0x80
+  jnz  banshee_vesa_unimplemented
   test bx, #0x8000
-  jz   banshee_vesa_set_mode
+  jz   banshee_vesa_legacy_clear
   or   al, #0x80
-banshee_vesa_set_mode:
+banshee_vesa_legacy_clear:
   int  #0x10
+  mov  ax, #0x004F
+  ret
+banshee_vesa_set_mode:
+  push si
+  push ax
+  call banshee_get_modeentry
+  call banshee_switch_mode
+  test bx, #0x8000
+  jnz  banshee_vesa_noclear
+  call banshee_clear_vram
+banshee_vesa_noclear:
+  pop  ax
+  call banshee_set_video_mode_bda
+  SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
+  pop  si
   push bx
   mov  ax, bx
   mov  bx, #PM_BIOSMEM_VBE_MODE

@@ -2,11 +2,11 @@ VBE Display API
 -------------------------------------------------------------------------------------------------------------
   This document is part of the Bochs/VBEBios documentation,
   it specifies the bochs host <-> vbebios client communication.
-  
+
   That means, the display code implementation and the vbebios code depend
   very heavily on each other. As such, this documents needs be synchronised
   between bochs CVS and the vgabios CVS.
-  
+
   This document does not describe how the VBEBios implements the VBE2/3 spec.
   This document does not describe how the Bochs display code will display gfx based upon this spec.
 
@@ -214,6 +214,10 @@ API
 
 [0xb0c4]
   * VBE_DISPI_TOTAL_VIDEO_MEMORY_MB set to 8 (moved to auto-generated vbetables.h)
+
+[0xb0c5]
+  * VBE video memory increased to 16 MB.
+  * Video memory size stored in new register VBE_DISPI_INDEX_VIDEO_MEMORY_64K.
 
 Displaying GFX (banked mode)
 --------------
