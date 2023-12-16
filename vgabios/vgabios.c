@@ -740,27 +740,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
    case 0x13:
      biosfn_write_string(GET_AL(),GET_BH(),GET_BL(),CX,GET_DH(),GET_DL(),ES,BP);
      break;
-#ifdef VBE
-   case 0x4f:
-     if (vbe_has_vbe_display()) {
-       switch(GET_AL()) {
-         case 0x00:
-          vbe_biosfn_return_controller_information(&AX,ES,DI);
-          break;
-         case 0x01:
-          vbe_biosfn_return_mode_information(&AX,CX,ES,DI);
-          break;
-         case 0x02:
-          vbe_biosfn_set_mode(&AX,BX);
-          break;
-       }
-     } else {
-       // No VBE display
-       AX=0x0100;
-     }
-     break;
-#endif
-
 #ifdef DEBUG
    default:
      unknown();

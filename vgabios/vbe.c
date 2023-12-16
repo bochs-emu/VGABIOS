@@ -1082,6 +1082,27 @@ lmulul:
 ASM_END
 
 
+// --------------------------------------------------------------------------------------------
+/*
+ * int10 VBE dispatcher
+ */
+static void int10_vbe_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
+  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
+{
+  switch(GET_AL()) {
+    case 0x00:
+      vbe_biosfn_return_controller_information(&AX,ES,DI);
+      break;
+    case 0x01:
+        vbe_biosfn_return_mode_information(&AX,CX,ES,DI);
+        break;
+    case 0x02:
+      vbe_biosfn_set_mode(&AX,BX);
+      break;
+  }
+}
+
+
 /** Function 00h - Return VBE Controller Information
  *
  * Input:
@@ -2136,7 +2157,7 @@ vbe_normal:
   pusha
   mov   bx, #0xc000
   mov   ds, bx
-  call _int10_func
+  call _int10_vbe_func
   popa
   pop ds
   pop es
