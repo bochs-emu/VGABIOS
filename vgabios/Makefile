@@ -17,9 +17,9 @@ RELDATE = `date '+%d %b %Y'`
 RELVERS = `pwd | sed "s-.*/--" | sed "s/vgabios//" | sed "s/-//"`
 
 VGABIOS_DATE = "-DVGABIOS_DATE=\"$(RELDATE)\""
-RELEASE_BIN_LIST=README VGABIOS-lgpl-latest.bin VGABIOS-lgpl-latest.debug.bin \
-                 VGABIOS-lgpl-latest.cirrus.bin VGABIOS-lgpl-latest.cirrus.debug.bin \
-                 VGABIOS-lgpl-latest.banshee.bin
+RELEASE_BIN_LIST=README VGABIOS-lgpl-latest.bin VGABIOS-lgpl-latest-debug.bin \
+                 VGABIOS-lgpl-latest-cirrus.bin VGABIOS-lgpl-latest-cirrus-debug.bin \
+                 VGABIOS-lgpl-latest-banshee.bin
 
 all: bios cirrus-bios banshee-bios
 
@@ -49,10 +49,10 @@ vgabios-banshee.bin      : VGAFLAGS := -DBANSHEE -DPCIBIOS
 
 # dist names
 vgabios.bin              : DISTNAME := VGABIOS-lgpl-latest.bin
-vgabios.debug.bin        : DISTNAME := VGABIOS-lgpl-latest.debug.bin
-vgabios-cirrus.bin       : DISTNAME := VGABIOS-lgpl-latest.cirrus.bin
-vgabios-cirrus.debug.bin : DISTNAME := VGABIOS-lgpl-latest.cirrus.debug.bin
-vgabios-banshee.bin      : DISTNAME := VGABIOS-lgpl-latest.banshee.bin
+vgabios.debug.bin        : DISTNAME := VGABIOS-lgpl-latest-debug.bin
+vgabios-cirrus.bin       : DISTNAME := VGABIOS-lgpl-latest-cirrus.bin
+vgabios-cirrus.debug.bin : DISTNAME := VGABIOS-lgpl-latest-cirrus.debug.bin
+vgabios-banshee.bin      : DISTNAME := VGABIOS-lgpl-latest-banshee.bin
 
 # dependencies
 vgabios.bin              : $(VGA_FILES) $(VBE_FILES) biossums

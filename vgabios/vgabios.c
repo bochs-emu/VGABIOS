@@ -317,6 +317,7 @@ ASM_END
 ASM_START
 vgabios_int10_handler:
   pushf
+  push bp
 #ifdef DEBUG
   push es
   push ds
@@ -328,13 +329,13 @@ vgabios_int10_handler:
   pop ds
   pop es
 #endif
+  push  #int10_end
 #ifdef VBE
   cmp   ah, #0x4f
   jne   int10_no_vbefn
   jmp   vbe_main_handler
 #endif
 int10_no_vbefn:
-  push  #int10_end
   cmp   ah, #0x01
   jne   int10_test_02
   jmp   biosfn_set_cursor_shape
@@ -430,6 +431,7 @@ int10_normal:
   ret
 
 int10_end:
+  pop  bp
   popf
   iret
 ASM_END
@@ -4623,16 +4625,26 @@ void unknown()
 }
 #endif
 
+ASM_START
+imodu:
+  push dx
+  xor  dx, dx
+  div  bx
+  mov  ax, dx
+  pop  dx
+  ret
+ASM_END
+
 // --------------------------------------------------------------------------------------------
 #if defined(USE_BX_INFO) || defined(DEBUG) || defined(CIRRUS_DEBUG)
 void printf(s)
   Bit8u *s;
 {
   Bit8u c, format_char;
-  Boolean  in_format;
+  Boolean  in_format, in_value;
   unsigned format_width, i;
   Bit16u  *arg_ptr;
-  Bit16u   arg_seg, arg, digit, nibble, shift_count;
+  Bit16u   arg_seg, arg, digit, nibble, divider;
 
   arg_ptr = &s;
   arg_seg = get_SS();
@@ -4644,12 +4656,10 @@ void printf(s)
     if ( c == '%' ) {
       in_format = 1;
       format_width = 0;
-      }
-    else if (in_format) {
+    } else if (in_format) {
       if ( (c>='0') && (c<='9') ) {
         format_width = (format_width * 10) + (c - '0');
-        }
-      else if (c == 'x') {
+      } else if (c == 'x') {
         arg_ptr++; // increment to next arg
         arg = read_word(arg_seg, arg_ptr);
         if (format_width == 0)
@@ -4663,18 +4673,29 @@ void printf(s)
           else
             outb(0x0500, (nibble - 10) + 'A');
           digit--;
-          }
-        in_format = 0;
         }
-      //else if (c == 'd') {
-      //  in_format = 0;
-      //  }
+        in_format = 0;
+      } else if (c == 'd') {
+        arg_ptr++; // increment to next arg
+        arg = read_word(arg_seg, arg_ptr);
+        divider = 10000;
+        in_value = 0;
+        while (divider > 0) {
+          digit = arg / divider;
+          if ((digit > 0) || in_value) {
+            outb(0x0500, digit + '0');
+            in_value = 1;
+          }
+          arg = arg % divider;
+          divider /= 10;
+        }
+        in_format = 0;
       }
-    else {
+    } else {
       outb(0x0500, c);
-      }
-    s ++;
     }
+    s++;
+  }
 }
 #endif
 

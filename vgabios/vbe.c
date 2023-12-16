@@ -1125,16 +1125,11 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
         if (((vbe_info_block.VbeSignature[0] == 'V') &&
              (vbe_info_block.VbeSignature[1] == 'B') &&
              (vbe_info_block.VbeSignature[2] == 'E') &&
-             (vbe_info_block.VbeSignature[3] == '2')) ||
-
-            ((vbe_info_block.VbeSignature[0] == 'V') &&
-             (vbe_info_block.VbeSignature[1] == 'E') &&
-             (vbe_info_block.VbeSignature[2] == 'S') &&
-             (vbe_info_block.VbeSignature[3] == 'A')) )
+             (vbe_info_block.VbeSignature[3] == '2')))
         {
                 vbe2_info = 1;
 #ifdef DEBUG
-                printf("VBE correct VESA/VBE2 signature found\n");
+                printf("VBE correct VBE2 signature found\n");
 #endif
         }
 #endif
@@ -1202,7 +1197,9 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
                   cur_ptr+=2;
                 } else {
 #ifdef DEBUG
-                  printf("VBE mode %x (xres=%x / bpp=%02x) not supported \n", cur_info->mode,cur_info->info.XResolution,cur_info->info.BitsPerPixel);
+                  printf("VBE mode %x (%d x %d x %d) not supported \n", cur_info->mode,
+                         cur_info->info.XResolution,cur_info->info.XResolution,
+                         cur_info->info.BitsPerPixel);
 #endif
                 }
                 cur_info++;
@@ -2123,13 +2120,9 @@ vbe_main_handler:
   call _vbe_has_vbe_display
   shr  al, #1
   pop  ax
-  jnc  vbe_unsupported
+  jnc  vbe_unimplemented
   cmp  al, #0x15
-  jbe  vbe_call_table
-vbe_unsupported:
-  mov  ax, #0x014F ;; unsupported
-  jmp  int10_end
-vbe_call_table:
+  ja   vbe_unimplemented
   push bx
   xor  bx, bx
   mov  bl, al
@@ -2137,7 +2130,6 @@ vbe_call_table:
  db 0x2e ;; cs:
   mov  bp, vbe_handlers[bx]
   pop  bx
-  push #int10_end
   push bp
   ret
 
