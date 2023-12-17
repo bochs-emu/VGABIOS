@@ -62,7 +62,7 @@ _vbebios_product_name:
 .byte        0x00
 
 _vbebios_product_revision:
-.ascii       "ID: vbe.c 2023-12-16"
+.ascii       "ID: vbe.c 2023-12-17"
 .byte        0x00
 
 _vbebios_info_string:
@@ -79,7 +79,7 @@ _no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2023-12-16"
+.ascii "VBE Bios ID: vbe.c 2023-12-17"
 .byte  0x0a,0x00
 #endif
 
@@ -1079,28 +1079,34 @@ lmulul:
   mov ebx, eax
   shr ebx, #16
   ret
+
+; helper function for function 00h
+
+_strlen:
+  push bp
+  mov  bp, sp
+  push ds
+  push di
+  push cx
+  xor  cx, cx
+  mov  di, 4[bp]
+  mov  ax, #0xc000
+  mov  ds, ax
+strlen_loop:
+  mov  al, [di]
+  or   al, al
+  jz   strlen_ok
+  inc  di
+  inc  cx
+  jnz  strlen_loop
+strlen_ok:
+  mov  ax, cx
+  pop  cx
+  pop  di
+  pop  ds
+  pop  bp
+  ret
 ASM_END
-
-
-// --------------------------------------------------------------------------------------------
-/*
- * int10 VBE dispatcher
- */
-static void int10_vbe_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
-  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
-{
-  switch(GET_AL()) {
-    case 0x00:
-      vbe_biosfn_return_controller_information(&AX,ES,DI);
-      break;
-    case 0x01:
-        vbe_biosfn_return_mode_information(&AX,CX,ES,DI);
-        break;
-    case 0x02:
-      vbe_biosfn_set_mode(&AX,BX);
-      break;
-  }
-}
 
 
 /** Function 00h - Return VBE Controller Information
@@ -1125,6 +1131,8 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
         Bit16u            cur_mode=0;
         Bit16u            cur_ptr=34;
         Bit16u            size_64k;
+        Bit16u            strptr;
+        Bit16u            length;
         ModeInfoListItem  *cur_info=&mode_info_list;
 
         status = read_word(ss, AX);
@@ -1172,7 +1180,7 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
         vbe_info_block.Capabilities[3] = 0;
 
         // VBE Video Mode Pointer (dynamicly generated from the mode_info_list)
-        vbe_info_block.VideoModePtr_Seg= ES ;
+        vbe_info_block.VideoModePtr_Seg= ES;
         vbe_info_block.VideoModePtr_Off= DI + 34;
 
         // VBE Total Memory (in 64k blocks)
@@ -1181,14 +1189,28 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
 
         if (vbe2_info)
         {
+                strptr = 0x100;
+                vbe_info_block.OemStringPtr_Seg = ES;
+                vbe_info_block.OemStringPtr_Off = DI + strptr;
+                length = strlen(&vbebios_copyright);
+                memcpyb(ss, (Bit16u)&vbe_info_block + strptr, 0xc000, &vbebios_copyright, length + 1);
+                strptr += (length + 1);
                 // OEM Stuff
                 vbe_info_block.OemSoftwareRev = VBE_OEM_SOFTWARE_REV;
-                vbe_info_block.OemVendorNamePtr_Seg = 0xc000;
-                vbe_info_block.OemVendorNamePtr_Off = &vbebios_vendor_name;
-                vbe_info_block.OemProductNamePtr_Seg = 0xc000;
-                vbe_info_block.OemProductNamePtr_Off = &vbebios_product_name;
-                vbe_info_block.OemProductRevPtr_Seg = 0xc000;
-                vbe_info_block.OemProductRevPtr_Off = &vbebios_product_revision;
+                vbe_info_block.OemVendorNamePtr_Seg = ES;
+                vbe_info_block.OemVendorNamePtr_Off = DI + strptr;
+                length = strlen(&vbebios_vendor_name);
+                memcpyb(ss, (Bit16u)&vbe_info_block + strptr, 0xc000, &vbebios_vendor_name, length + 1);
+                strptr += (length + 1);
+                vbe_info_block.OemProductNamePtr_Seg = ES;
+                vbe_info_block.OemProductNamePtr_Off = DI + strptr;
+                length = strlen(&vbebios_product_name);
+                memcpyb(ss, (Bit16u)&vbe_info_block + strptr, 0xc000, &vbebios_product_name, length + 1);
+                strptr += (length + 1);
+                vbe_info_block.OemProductRevPtr_Seg = ES;
+                vbe_info_block.OemProductRevPtr_Off = DI + strptr;
+                length = strlen(&vbebios_product_revision);
+                memcpyb(ss, (Bit16u)&vbe_info_block + strptr, 0xc000, &vbebios_product_revision, length + 1);
 
                 // copy updates in vbe_info_block back
                 memcpyb(ES, DI, ss, &vbe_info_block, sizeof(vbe_info_block));
@@ -1410,6 +1432,28 @@ ASM_END
 
     write_word(ss, AX, result);
 }
+
+
+// --------------------------------------------------------------------------------------------
+/*
+ * int10 VBE dispatcher
+ */
+static void int10_vbe_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
+  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
+{
+  switch(GET_AL()) {
+    case 0x00:
+      vbe_biosfn_return_controller_information(&AX,ES,DI);
+      break;
+    case 0x01:
+        vbe_biosfn_return_mode_information(&AX,CX,ES,DI);
+        break;
+    case 0x02:
+      vbe_biosfn_set_mode(&AX,BX);
+      break;
+  }
+}
+
 
 /** Function 03h - Return Current VBE Mode
  *

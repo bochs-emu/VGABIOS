@@ -10,14 +10,6 @@
 // DISPI helper function
 void dispi_set_enable(enable);
 
-/** VBE int10 API
- *
- *  See the function descriptions in vbe.c for more information
- */
-void vbe_biosfn_return_controller_information(AX, ES, DI);
-void vbe_biosfn_return_mode_information(AX, CX, ES, DI);
-void vbe_biosfn_set_mode(AX, BX);
-
 // The official VBE Information Block
 typedef struct VbeInfoBlock
 { 
