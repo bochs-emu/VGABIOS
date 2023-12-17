@@ -1,11 +1,8 @@
-/*
- * $Id$
- */
 //
 //  QEMU Cirrus CLGD 54xx VGABIOS Extension.
 //
 //  Copyright (c) 2004      Makoto Suzuki (suzu)
-//  Copyright (C) 2004-2021 Volker Ruppert
+//  Copyright (C) 2004-2023 Volker Ruppert
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -2061,7 +2058,7 @@ cirrus_vesa_handlers:
   dw cirrus_vesa_07h
   ;; 08h
   dw cirrus_vesa_unimplemented
-  dw cirrus_vesa_unimplemented
+  dw vbe_biosfn_set_get_palette_data
   dw cirrus_vesa_unimplemented
   dw cirrus_vesa_unimplemented
   ;; 0Ch

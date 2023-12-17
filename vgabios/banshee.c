@@ -1,10 +1,7 @@
-/*
- * $Id$
- */
 //
 //  3dfx Banshee VGABIOS Extension.
 //
-//  Copyright (C) 2021  Volker Ruppert
+//  Copyright (C) 2021-2023  Volker Ruppert
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -2031,7 +2028,7 @@ banshee_vesa_handlers:
   dw banshee_vesa_07h
   ;; 08h
   dw banshee_vesa_unimplemented
-  dw banshee_vesa_unimplemented
+  dw vbe_biosfn_set_get_palette_data
   dw banshee_vesa_unimplemented
   dw banshee_vesa_unimplemented
   ;; 0Ch
