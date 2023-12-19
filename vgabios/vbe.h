@@ -4,9 +4,6 @@
 
 #include "vgabios.h"
 
-// DISPI helper function
-void dispi_set_enable(enable);
-
 // The official VBE Information Block
 typedef struct VbeInfoBlock
 { 

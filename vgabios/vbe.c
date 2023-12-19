@@ -65,13 +65,13 @@ _vbebios_product_revision:
 .ascii       "ID: vbe.c 2023-12-17"
 .byte        0x00
 
-_vbebios_info_string:
+vbebios_info_string:
 .ascii      "Bochs VBE Display Adapter enabled"
 .byte	0x0a,0x0d
 .byte	0x0a,0x0d
 .byte	0x00
 
-_no_vbebios_info_string:
+no_vbebios_info_string:
 .ascii      "NO Bochs VBE Support available!"
 .byte	0x0a,0x0d
 .byte	0x0a,0x0d
@@ -318,7 +318,7 @@ _dispi_get_max_xres:
   call dispi_get_enable
   mov  bx, ax
   or   ax, # VBE_DISPI_GETCAPS
-  call _dispi_set_enable
+  call dispi_set_enable
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_XRES
   out  dx, ax
@@ -326,7 +326,7 @@ _dispi_get_max_xres:
   in   ax, dx
   push ax
   mov  ax, bx
-  call _dispi_set_enable
+  call dispi_set_enable
   pop  ax
   pop  bx
   pop  dx
@@ -338,7 +338,7 @@ _dispi_get_max_yres:
   call dispi_get_enable
   mov  bx, ax
   or   ax, # VBE_DISPI_GETCAPS
-  call _dispi_set_enable
+  call dispi_set_enable
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_YRES
   out  dx, ax
@@ -346,7 +346,7 @@ _dispi_get_max_yres:
   in   ax, dx
   push ax
   mov  ax, bx
-  call _dispi_set_enable
+  call dispi_set_enable
   pop  ax
   pop  bx
   pop  dx
@@ -358,7 +358,7 @@ _dispi_get_max_bpp:
   call dispi_get_enable
   mov  bx, ax
   or   ax, # VBE_DISPI_GETCAPS
-  call _dispi_set_enable
+  call dispi_set_enable
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_BPP
   out  dx, ax
@@ -366,7 +366,7 @@ _dispi_get_max_bpp:
   in   ax, dx
   push ax
   mov  ax, bx
-  call _dispi_set_enable
+  call dispi_set_enable
   pop  ax
   pop  bx
   pop  dx
@@ -378,7 +378,7 @@ _dispi_support_bank_granularity_32k:
   call dispi_get_enable
   mov  bx, ax
   or   ax, # VBE_DISPI_GETCAPS
-  call _dispi_set_enable
+  call dispi_set_enable
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_BANK
   out  dx, ax
@@ -386,7 +386,7 @@ _dispi_support_bank_granularity_32k:
   in   ax, dx
   push ax
   mov  ax, bx
-  call _dispi_set_enable
+  call dispi_set_enable
   pop  ax
   shr  ax, #8
   and  al, #VBE_DISPI_BANK_GRANULARITY_32K
@@ -395,6 +395,7 @@ _dispi_support_bank_granularity_32k:
   ret
 
 _dispi_set_enable:
+dispi_set_enable:
   push dx
   push ax
   mov  dx, # VBE_DISPI_IOPORT_INDEX
@@ -705,7 +706,7 @@ vga_compat_end:
 ;; called from C code
 _vbe_is_8bpp_mode:
 vbe_is_8bpp_mode:
-  call _vbe_has_vbe_display
+  call vbe_has_vbe_display
   test ax, #0x01
   jz   no_vbe_8bpp_mode
   call dispi_get_enable
@@ -1009,7 +1010,7 @@ ASM_START
 
 ; Has VBE display - Returns true if VBE display detected
 
-_vbe_has_vbe_display:
+vbe_has_vbe_display:
   push ds
   push bx
   mov  ax, # BIOSMEM_SEG
@@ -1055,17 +1056,17 @@ no_vbe_interface:
 ; VBE Display Info - Display information on screen about the VBE
 
 vbe_display_info:
-  call _vbe_has_vbe_display
+  call vbe_has_vbe_display
   or   ax, ax
   jz   no_vbe_flag
   mov  ax, #0xc000
   mov  ds, ax
-  mov  si, #_vbebios_info_string
+  mov  si, #vbebios_info_string
   jmp  _display_string
 no_vbe_flag:
   mov  ax, #0xc000
   mov  ds, ax
-  mov  si, #_no_vbebios_info_string
+  mov  si, #no_vbebios_info_string
   jmp  _display_string
 
 ; helper function for memory size calculation
@@ -1361,7 +1362,10 @@ Bit16u *AX;Bit16u BX;
     if (BX<VBE_MODE_VESA_DEFINED) {
         Bit8u   mode;
 
-        dispi_set_enable(VBE_DISPI_DISABLED);
+ASM_START
+        mov  ax, #VBE_DISPI_DISABLED
+        call dispi_set_enable
+ASM_END
         // call the vgabios in order to set the video mode
         // this allows for going back to textmode with a VBE call (some applications expect that to work)
 
@@ -1389,7 +1393,10 @@ Bit16u *AX;Bit16u BX;
 #endif
 
             // first disable current mode (when switching between vesa modi)
-            dispi_set_enable(VBE_DISPI_DISABLED);
+ASM_START
+            mov  ax, #VBE_DISPI_DISABLED
+            call dispi_set_enable
+ASM_END
 
             if (cur_info->info.BitsPerPixel == 4) {
                 biosfn_set_video_mode(0x6a);
@@ -1589,12 +1596,12 @@ vbe_biosfn_restore_video_state:
   add  bx, #0x02
   test ax, #VBE_DISPI_ENABLED
   jnz  vbe_restore_full_state
-  call _dispi_set_enable
+  call dispi_set_enable
   ret
 vbe_restore_full_state:
   push ax
   xor  ax, ax
-  call _dispi_set_enable
+  call dispi_set_enable
   seg  es
   mov  ax, [bx]
   push ax
@@ -1617,7 +1624,7 @@ vbe_restore_full_state:
   inc  sp
   add  bx, #0x02
   pop  ax
-  call _dispi_set_enable
+  call dispi_set_enable
   call _vga_compat_setup
   push cx
   push dx
@@ -1847,7 +1854,7 @@ set_dac_palette_format:
 set_normal_dac:
   and  ax, #~ VBE_DISPI_8BIT_DAC
 set_dac_mode:
-  call _dispi_set_enable
+  call dispi_set_enable
 get_dac_palette_format:
   mov  bh, #0x06
   call dispi_get_enable
@@ -2127,7 +2134,7 @@ vbe_unimplemented:
 ; Handle INT 10h AH 4Fh
 vbe_main_handler:
   push ax
-  call _vbe_has_vbe_display
+  call vbe_has_vbe_display
   shr  al, #1
   pop  ax
   jnc  vbe_unimplemented

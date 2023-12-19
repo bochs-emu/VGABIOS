@@ -826,9 +826,14 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
   Bit16u crtc_addr;
 
 #ifdef VBE
-  if (vbe_has_vbe_display()) {
-    dispi_set_enable(VBE_DISPI_DISABLED);
-  }
+ASM_START
+  call vbe_has_vbe_display
+  or   ax, ax
+  jz   no_vbe_display
+  mov  ax, #VBE_DISPI_DISABLED
+  call dispi_set_enable
+no_vbe_display:
+ASM_END
 #endif // def VBE
 
   // The real mode
@@ -4752,6 +4757,7 @@ get_crtc_address:
   pop  ax
   ret
 
+; shared code for the VBE support of all extensions
 #if defined(VBE) || defined(CIRRUS) || defined(BANSHEE)
 vbe_biosfn_set_get_palette_data:
   cmp   bl, #0x80
@@ -4774,7 +4780,7 @@ vbe_set_palette_data:
   mov   dx, # VGAREG_DAC_DATA
   cld
 vbe_set_dac_loop:
-  lodsb
+  inc   si
   lodsb
   out   dx, al
   lodsb
