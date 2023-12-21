@@ -5,6 +5,7 @@
 #include "vgabios.h"
 
 // The official VBE Information Block
+/*
 typedef struct VbeInfoBlock
 { 
    Bit8u  VbeSignature[4];
@@ -25,7 +26,7 @@ typedef struct VbeInfoBlock
    Bit16u  Reserved[111]; // used for dynamicly generated mode list
    Bit8u  OemData[256];
 } VbeInfoBlock;
-
+*/
 
 // This one is for compactly storing a static list of mode info blocks
 // this saves us 189 bytes per block

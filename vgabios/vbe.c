@@ -42,26 +42,21 @@
 // The current OEM Software Revision of this VBE Bios
 #define VBE_OEM_SOFTWARE_REV 0x0002;
 
-extern char vbebios_copyright;
-extern char vbebios_vendor_name;
-extern char vbebios_product_name;
-extern char vbebios_product_revision;
-
 ASM_START
 // FIXME: 'merge' these (c) etc strings with the vgabios.c strings?
-_vbebios_copyright:
+vbebios_copyright:
 .ascii       "Bochs VBE (C) 2002-2021 http://savannah.nongnu.org/projects/vgabios/"
 .byte        0x00
 
-_vbebios_vendor_name:
+vbebios_vendor_name:
 .ascii       "LGPL VGABIOS Developers"
 .byte        0x00
 
-_vbebios_product_name:
+vbebios_product_name:
 .ascii       "Bochs VBE Adapter"
 .byte        0x00
 
-_vbebios_product_revision:
+vbebios_product_revision:
 .ascii       "ID: vbe.c 2023-12-17"
 .byte        0x00
 
@@ -782,7 +777,7 @@ vbe_wc_loop2:
   push ax
   jnc  vbe_wc_set_bkgnd
   mov  al, 6[bp] ;; attr
-  db    0xa9 ;; skip next opcode (TEST AX, #0xC030)
+  db   0xa9 ;; skip next opcode (TEST AX, #0xC030)
 vbe_wc_set_bkgnd:
   xor  al, al
   stosb
@@ -1121,6 +1116,83 @@ ASM_END
  *              AX      = VBE Return Status
  *
  */
+ASM_START
+vbe_biosfn_return_controller_information:
+  push ds
+  push si
+  mov  bp, di
+  push es
+  pop  ds
+  cld
+  mov  ax, [di]
+  cmp  ax, #0x4256 ;; VB
+  jnz  vbe00_1
+  mov  ax, [di+2]
+  cmp  ax, #0x3245 ;; E2
+  jnz  vbe00_1
+  ;; VBE2
+  lea  di, 0x14[bp]
+  mov  ax, #VBE_OEM_SOFTWARE_REV
+  stosw
+  mov  ax, #vbebios_vendor_name
+  stosw
+  mov  ax, cs
+  stosw
+  mov  ax, #vbebios_product_name
+  stosw
+  mov  ax, cs
+  stosw
+  mov  ax, #vbebios_product_revision
+  stosw
+  mov  ax, cs
+  stosw
+vbe00_1:
+  mov  di, bp
+  mov  ax, #0x4556 ;; VE
+  stosw
+  mov  ax, #0x4153 ;; SA
+  stosw
+  mov  ax, #0x0200 ;; v2.00
+  stosw
+  mov  ax, #vbebios_copyright
+  stosw
+  mov  ax, cs
+  stosw
+  mov  ax, #VBE_CAPABILITY_8BIT_DAC ;; caps
+  stosw
+  xor  ax, ax
+  stosw
+  lea  ax, 0x22[bp]
+  stosw
+  mov  ax, es
+  stosw
+  push dx
+  mov  dx, #VBE_DISPI_IOPORT_INDEX
+  mov  ax, #VBE_DISPI_INDEX_VIDEO_MEMORY_64K
+  out  dx, ax
+  mov  dx, #VBE_DISPI_IOPORT_DATA
+  in   ax, dx
+  pop  dx
+  stosw
+
+  push cs
+  pop  ds
+  lea  di, 0x22[bp]
+  mov  si, #vbebios_modelist
+vbe00_2:
+  lodsw
+  stosw
+  cmp  ax, #0xffff
+  jnz  vbe00_2
+
+  mov  ax, #0x004F
+  mov  di, bp
+  pop  si
+  pop  ds
+  ret
+ASM_END
+
+/*
 void vbe_biosfn_return_controller_information(AX, ES, DI)
 Bit16u *AX;Bit16u ES;Bit16u DI;
 {
@@ -1239,7 +1311,7 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
                 } else {
 #ifdef DEBUG
                   printf("VBE mode %x (%d x %d x %d) not supported \n", cur_info->mode,
-                         cur_info->info.XResolution,cur_info->info.XResolution,
+                         cur_info->info.XResolution,cur_info->info.YResolution,
                          cur_info->info.BitsPerPixel);
 #endif
                 }
@@ -1253,6 +1325,7 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
 
         write_word(ss, AX, result);
 }
+*/
 
 
 /** Function 01h - Return VBE Mode Information
@@ -1265,72 +1338,91 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
  *              AX      = VBE Return Status
  *
  */
-void vbe_biosfn_return_mode_information(AX, CX, ES, DI)
-Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
-{
-        Bit16u            result=0x0100;
-        Bit16u            ss=get_SS();
-        ModeInfoBlock     info;
-        ModeInfoListItem  *cur_info;
-        Boolean           using_lfb;
-        Bit16u            lfb_addr;
-        Bit16u            support_bank_gr_32k;
-
-#ifdef DEBUG
-        printf("VBE vbe_biosfn_return_mode_information ES%x DI%x CX%x\n",ES,DI,CX);
-#endif
-
-        using_lfb=((CX & VBE_MODE_LINEAR_FRAME_BUFFER) == VBE_MODE_LINEAR_FRAME_BUFFER);
-
-        CX = (CX & 0x1ff);
-
-        cur_info = mode_info_find_mode(CX, using_lfb, &cur_info);
-
-        if (cur_info != 0)
-        {
-#ifdef DEBUG
-                printf("VBE found mode %x\n",CX);
-#endif
-                memsetb(ss, &info, 0, sizeof(ModeInfoBlock));
-                memcpyb(ss, &info, 0xc000, &(cur_info->info), sizeof(ModeInfoBlockCompact));
-                if (using_lfb) {
-                  info.NumberOfBanks = 1;
-                }
+ASM_START
+vbe_biosfn_return_mode_information:
+  push ds
+  push si
+  push bx
+  mov  bp, di
+  push cs
+  pop  ds
+  push cx
+  mov  ax, cx
+  and  ax, #VBE_MODE_LINEAR_FRAME_BUFFER
+  jz   mode_no_lfb_1
+  mov  ax, #0x0001
+mode_no_lfb_1:
+  push ax
+  and  cx, #0x01ff
+  push cx
+  call _mode_info_find_mode
+  inc  sp
+  inc  sp
+  pop  bx
+  or   ax, ax
+  jz   mode_not_found
+  add  ax, #2
+  mov  si, ax
+  mov  cx, #0x0043
+  rep
+    movsb
+  xor  ax, ax
+  mov  cx, #0x00bd
+  rep
+    stosb
+  mov  di, bp
+  or   bx, bx
+  jz   mode_no_lfb_2
+  mov  al, #0x01
+  seg  es
+  mov  [di+26], al
 #ifdef PCI_VID
-                lfb_addr = pci_get_lfb_addr(PCI_VID);
+  mov ax, #PCI_VID
 #else
-                lfb_addr = pci_get_lfb_addr(0x1234); // experimental vendor
+  mov ax, #0x1234 // experimental vendor
 #endif
-                if (lfb_addr > 0) {
-                  info.PhysBasePtr = ((Bit32u)lfb_addr << 16);
-                }
-                support_bank_gr_32k = dispi_support_bank_granularity_32k();
-                if (support_bank_gr_32k != 0) {
-                  info.WinGranularity = VBE_DISPI_BANK_GRANULARITY_KB;
-                }
-                if (info.WinAAttributes & VBE_WINDOW_ATTRIBUTE_RELOCATABLE) {
-                  info.WinFuncPtr = 0xC0000000UL;
-                  *(Bit16u *)&(info.WinFuncPtr) = (Bit16u)(dispi_set_bank_farcall);
-                }
+  push ax
+  call _pci_get_lfb_addr
+  inc  sp
+  inc  sp
+  seg  es
+  mov  [di+42], ax
+  xor  ax, ax
+  seg  es
+  mov  [di+40], ax
+mode_no_lfb_2:
+  call _dispi_support_bank_granularity_32k
+  and  ax, #VBE_DISPI_BANK_GRANULARITY_32K
+  jz   no_gran_32k
+  mov  ax, #VBE_DISPI_BANK_GRANULARITY_KB
+  seg  es
+  mov  [di+4], ax
+no_gran_32k:
+  seg  es
+  mov  al, [di+2]
+  and  al, #VBE_WINDOW_ATTRIBUTE_RELOCATABLE
+  jz   no_win_reloc
+  mov  ax, #_dispi_set_bank_farcall
+  seg  es
+  mov  [di+12], ax
+  mov  ax, #0xc000
+  seg  es
+  mov  [di+14], ax
+no_win_reloc:
+  mov  ah, #0x00
+  db   0xa9 ; skip next opcode
+mode_not_found:
+  mov  ah, #0x01
+  mov  al, #0x4f
+mode_ok:
+  pop  cx
+  mov  di, bp
+  pop  bx
+  pop  si
+  pop  ds
+  ret
+ASM_END
 
-                result = 0x4f;
-        }
-        else
-        {
-#ifdef DEBUG
-                printf("VBE *NOT* found mode %x\n",CX);
-#endif
-                result = 0x100;
-        }
-
-        if (result == 0x4f)
-        {
-                // copy updates in mode_info_block back
-                memcpyb(ES, DI, ss, &info, sizeof(info));
-        }
-
-        write_word(ss, AX, result);
-}
 
 /** Function 02h - Set VBE Mode
  *
@@ -1449,12 +1541,6 @@ static void int10_vbe_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
   Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
 {
   switch(GET_AL()) {
-    case 0x00:
-      vbe_biosfn_return_controller_information(&AX,ES,DI);
-      break;
-    case 0x01:
-        vbe_biosfn_return_mode_information(&AX,CX,ES,DI);
-        break;
     case 0x02:
       vbe_biosfn_set_mode(&AX,BX);
       break;
@@ -2097,21 +2183,21 @@ vbe_edid_get_capabilities:
 
 vbe_read_EDID:
   call vbe_ddc_init
-  jnz  vbe_unimplemented
+  jnz  vbe_failed
   call vbe_ddc_start
   call vbe_ddc_delay
   mov  al, #0xa0
   call vbe_ddc_send_byte
-  jc   vbe_unimplemented
+  jc   vbe_failed
   mov  al, #0x00
   call vbe_ddc_send_byte
-  jc   vbe_unimplemented
+  jc   vbe_failed
   call vbe_ddc_stop
   call vbe_ddc_start
   call vbe_ddc_delay
   mov  al, #0xa1
   call vbe_ddc_send_byte
-  jc   vbe_unimplemented
+  jc   vbe_failed
   push cx
   push di
   mov  cx, #0x0080
@@ -2127,8 +2213,12 @@ vbe_read_edid_loop:
   mov  ax, #0x004f
   ret
 
+vbe_failed:
+  mov  ax, #0x014f ;; function failed
+  ret
+
 vbe_unimplemented:
-  mov  ax, #0x014F ;; not implemented
+  mov  ax, #0x0100 ;; not implemented
   ret
 
 ; Handle INT 10h AH 4Fh
@@ -2164,8 +2254,8 @@ vbe_normal:
 
 vbe_handlers:
   ;; 00h
-  dw vbe_normal
-  dw vbe_normal
+  dw vbe_biosfn_return_controller_information
+  dw vbe_biosfn_return_mode_information
   dw vbe_normal
   dw vbe_biosfn_return_current_mode
   ;; 04h
