@@ -4770,27 +4770,25 @@ vbe_biosfn_set_get_palette_data:
 vbe_set_palette_data:
   push  cx
   push  dx
-  push  si
-  push  ds
+  push  di
   mov   al, dl
   mov   dx, # VGAREG_DAC_WRITE_ADDRESS
   out   dx, al
-  mov   ax, es
-  mov   ds, ax
-  mov   si, di
   mov   dx, # VGAREG_DAC_DATA
   cld
 vbe_set_dac_loop:
-  inc   si
-  lodsb
+  seg   es
+  mov   al, [di+2]
   out   dx, al
-  lodsb
+  seg   es
+  mov   al, [di+1]
   out   dx, al
-  lodsb
+  seg   es
+  mov   al, [di]
   out   dx, al
+  add   di, #4
   loop  vbe_set_dac_loop
-  pop   ds
-  pop   si
+  pop   di
   pop   dx
   pop   cx
   mov   ax, #0x004f
@@ -4805,14 +4803,19 @@ vbe_get_palette_data:
   mov   dx, # VGAREG_DAC_DATA
   cld
 vbe_get_dac_loop:
+  in    al, dx
+  seg   es
+  mov   [di+2], al
+  in    al, dx
+  seg   es
+  mov   [di+1], al
+  in    al, dx
+  seg   es
+  mov   [di], al
   xor   al, al
-  stosb
-  in    al, dx
-  stosb
-  in    al, dx
-  stosb
-  in    al, dx
-  stosb
+  seg   es
+  mov   [di+3], al
+  add   di, #4
   loop  vbe_get_dac_loop
   pop   di
   pop   dx
