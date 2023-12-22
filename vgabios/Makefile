@@ -51,7 +51,7 @@ vgabios-banshee.bin      : VGAFLAGS := -DBANSHEE -DPCIBIOS
 vgabios.bin              : DISTNAME := VGABIOS-lgpl-latest.bin
 vgabios.debug.bin        : DISTNAME := VGABIOS-lgpl-latest-debug.bin
 vgabios-cirrus.bin       : DISTNAME := VGABIOS-lgpl-latest-cirrus.bin
-vgabios-cirrus.debug.bin : DISTNAME := VGABIOS-lgpl-latest-cirrus.debug.bin
+vgabios-cirrus.debug.bin : DISTNAME := VGABIOS-lgpl-latest-cirrus-debug.bin
 vgabios-banshee.bin      : DISTNAME := VGABIOS-lgpl-latest-banshee.bin
 
 # dependencies

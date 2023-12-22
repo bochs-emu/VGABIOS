@@ -1240,7 +1240,7 @@ cirrus_vesa_01h_3:
   xor ax, ax
   stosw
   mov ax, #0x1013 ;; vendor Cirrus
-  call _pci_get_lfb_addr
+  call pci_get_lfb_addr
   stosw
   or ax, ax
   jz cirrus_vesa_01h_4

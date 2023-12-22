@@ -4686,7 +4686,7 @@ ASM_START
   ; in - ax: PCI device vendor
   ; out - ax: LFB address (high 16 bit)
   ;; NOTE - may be called in protected mode
-_pci_get_lfb_addr:
+pci_get_lfb_addr:
   push bx
   push cx
   push dx
@@ -4768,12 +4768,13 @@ vbe_biosfn_set_get_palette_data:
   mov   ax, #0x024f ; unimplemented
   ret
 vbe_set_palette_data:
-  mov   al, dl
+  push  cx
   push  dx
+  push  si
+  push  ds
+  mov   al, dl
   mov   dx, # VGAREG_DAC_WRITE_ADDRESS
   out   dx, al
-  push  ds
-  push  si
   mov   ax, es
   mov   ds, ax
   mov   si, di
@@ -4788,21 +4789,23 @@ vbe_set_dac_loop:
   lodsb
   out   dx, al
   loop  vbe_set_dac_loop
-  pop   si
   pop   ds
+  pop   si
   pop   dx
+  pop   cx
   mov   ax, #0x004f
   ret
 vbe_get_palette_data:
-  mov   al, dl
+  push  cx
   push  dx
+  push  di
+  mov   al, dl
   mov   dx, # VGAREG_DAC_READ_ADDRESS
   out   dx, al
   mov   dx, # VGAREG_DAC_DATA
-  push  di
   cld
 vbe_get_dac_loop:
-  mov   al, #0x00
+  xor   al, al
   stosb
   in    al, dx
   stosb
@@ -4813,6 +4816,7 @@ vbe_get_dac_loop:
   loop  vbe_get_dac_loop
   pop   di
   pop   dx
+  pop   cx
   mov   ax, #0x004f
   ret
 #endif

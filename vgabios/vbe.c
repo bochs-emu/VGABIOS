@@ -1381,10 +1381,7 @@ mode_no_lfb_1:
 #else
   mov ax, #0x1234 // experimental vendor
 #endif
-  push ax
-  call _pci_get_lfb_addr
-  inc  sp
-  inc  sp
+  call pci_get_lfb_addr
   seg  es
   mov  [di+42], ax
   xor  ax, ax
