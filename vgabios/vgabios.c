@@ -314,7 +314,6 @@ ASM_END
 ASM_START
 vgabios_int10_handler:
   pushf
-  push bp
 #ifdef DEBUG
   push es
   push ds
@@ -326,13 +325,13 @@ vgabios_int10_handler:
   pop ds
   pop es
 #endif
-  push  #int10_end
 #ifdef VBE
   cmp   ah, #0x4f
   jne   int10_no_vbefn
   jmp   vbe_main_handler
 #endif
 int10_no_vbefn:
+  push  #int10_end
   cmp   ah, #0x01
   jne   int10_test_02
   jmp   biosfn_set_cursor_shape
@@ -428,7 +427,6 @@ int10_normal:
   ret
 
 int10_end:
-  pop  bp
   popf
   iret
 ASM_END

@@ -2227,6 +2227,7 @@ vbe_main_handler:
   jnc  vbe_unimplemented
   cmp  al, #0x15
   ja   vbe_unimplemented
+  push bp
   push bx
   xor  bx, bx
   mov  bl, al
@@ -2234,8 +2235,13 @@ vbe_main_handler:
  db 0x2e ;; cs:
   mov  bp, vbe_handlers[bx]
   pop  bx
+  push #vbe_return
   push bp
   ret
+
+vbe_return:
+  pop  bp
+  jmp  int10_end
 
 vbe_normal:
   push es
