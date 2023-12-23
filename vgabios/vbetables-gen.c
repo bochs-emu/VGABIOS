@@ -1,7 +1,3 @@
-/*
- * $Id$
- */
-
 /* Generate the VGABIOS VBE Tables */
 #include <stdlib.h>
 #include <stdio.h>

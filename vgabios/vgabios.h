@@ -1,6 +1,3 @@
-/*
- * $Id$
- */
 
 #ifndef vgabios_h_included
 #define vgabios_h_included
