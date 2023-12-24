@@ -307,7 +307,7 @@ get_bpp_noinc:
 
 ; get display capabilities
 
-_dispi_get_max_xres:
+dispi_get_max_xres:
   push dx
   push bx
   call dispi_get_enable
@@ -327,7 +327,7 @@ _dispi_get_max_xres:
   pop  dx
   ret
 
-_dispi_get_max_yres:
+dispi_get_max_yres:
   push dx
   push bx
   call dispi_get_enable
@@ -347,7 +347,7 @@ _dispi_get_max_yres:
   pop  dx
   ret
 
-_dispi_get_max_bpp:
+dispi_get_max_bpp:
   push dx
   push bx
   call dispi_get_enable
@@ -1177,13 +1177,30 @@ vbe00_1:
 
   push cs
   pop  ds
+  push bx
   lea  di, 0x22[bp]
-  mov  si, #vbebios_modelist
+  mov  si, #_mode_info_list
 vbe00_2:
-  lodsw
+  mov  bx, [si]
+  cmp  bx, #0xffff
+  jz   vbe00_3
+  call dispi_get_max_xres
+  cmp  [si+20], ax
+  ja   vbe00_4
+  call dispi_get_max_yres
+  cmp  [si+22], ax
+  ja   vbe00_4
+  call dispi_get_max_bpp
+  cmp  [si+27], al
+  ja   vbe00_4
+vbe00_3:
+  mov  ax, bx
   stosw
-  cmp  ax, #0xffff
+vbe00_4:
+  add  si, #0x44
+  cmp  bx, #0xffff
   jnz  vbe00_2
+  pop  bx
 
   mov  ax, #0x004F
   mov  di, bp
@@ -1363,13 +1380,13 @@ mode_no_lfb_1:
   jz   mode_not_found
   add  ax, #2
   mov  si, ax
-  mov  cx, #0x0043
+  mov  cx, #0x0021
   rep
-    movsb
+    movsw
   xor  ax, ax
-  mov  cx, #0x00bd
+  mov  cx, #0x005f
   rep
-    stosb
+    stosw
   mov  di, bp
   or   bx, bx
   jz   mode_no_lfb_2
@@ -1475,7 +1492,7 @@ ASM_END
         if (cur_info != 0) {
 #ifdef DEBUG
             printf("VBE found mode %x, setting:\n", BX);
-            printf("\txres%x yres%x bpp%x\n",
+            printf("\t%d x %d / %d bpp\n",
                    cur_info->info.XResolution,
                    cur_info->info.YResolution,
                    cur_info->info.BitsPerPixel);

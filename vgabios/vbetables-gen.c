@@ -268,13 +268,5 @@ int main(int argc, char **argv)
   printf("{ 0,\n");
   printf("} },\n");
   printf("};\n");
-  printf("\n");
-  printf("ASM_START\n");
-  printf("vbebios_modelist:\n");
-  for (int i = 0; i < n_modes; i++) {
-    printf(".word 0x%04x\n", modelist[i]);
-  }
-  printf(".word 0xffff\n");
-  printf("ASM_END\n");
   return 0;
 }
