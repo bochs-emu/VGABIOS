@@ -19,7 +19,7 @@
 //
 // ============================================================================================
 //
-//  This VBE is part of the VGA Bios specific to the plex86/bochs Emulated VGA card.
+//  This VBE is part of the VGA Bios specific to the VGA card emulated by Bochs.
 //  You can NOT drive any physical vga card with it.
 //
 // ============================================================================================
@@ -45,7 +45,7 @@
 ASM_START
 // FIXME: 'merge' these (c) etc strings with the vgabios.c strings?
 vbebios_copyright:
-.ascii       "Bochs VBE (C) 2002-2021 http://savannah.nongnu.org/projects/vgabios/"
+.ascii       "Bochs VBE (C) 2002-2023 http://savannah.nongnu.org/projects/vgabios/"
 .byte        0x00
 
 vbebios_vendor_name:
@@ -1078,29 +1078,23 @@ lmulul:
 
 ; helper function for function 00h
 
-_strlen:
-  push bp
-  mov  bp, sp
+strcpy:
+  push cx
   push ds
   push di
-  push cx
-  xor  cx, cx
-  mov  di, 4[bp]
-  mov  ax, #0xc000
+  mov  ax, cs
   mov  ds, ax
-strlen_loop:
-  mov  al, [di]
-  or   al, al
-  jz   strlen_ok
-  inc  di
+  xor  cx, cx
+strcpy_loop:
+  lodsb
+  stosb
   inc  cx
-  jnz  strlen_loop
-strlen_ok:
+  or   al, al
+  jnz  strcpy_loop
   mov  ax, cx
-  pop  cx
   pop  di
   pop  ds
-  pop  bp
+  pop  cx
   ret
 ASM_END
 
@@ -1120,9 +1114,11 @@ ASM_START
 vbe_biosfn_return_controller_information:
   push ds
   push si
+  push bx
   mov  bp, di
   push es
   pop  ds
+  xor  bx, bx
   cld
   mov  ax, [di]
   cmp  ax, #0x4256 ;; VB
@@ -1131,20 +1127,47 @@ vbe_biosfn_return_controller_information:
   cmp  ax, #0x3245 ;; E2
   jnz  vbe00_1
   ;; VBE2
+  lea  di, 0x100[bp]
+  mov  bx, di
+  mov  si, #vbebios_copyright
+  call strcpy
+  add  bx, ax
+  mov  ax, di
+  lea  di, 0x06[bp]
+  stosw
+  mov  ax, es
+  stosw
   lea  di, 0x14[bp]
   mov  ax, #VBE_OEM_SOFTWARE_REV
   stosw
-  mov  ax, #vbebios_vendor_name
+  push di
+  mov  si, #vbebios_vendor_name
+  mov  di, bx
+  call strcpy
+  add  bx, ax
+  mov  ax, di
+  pop  di
   stosw
-  mov  ax, cs
+  mov  ax, es
   stosw
-  mov  ax, #vbebios_product_name
+  push di
+  mov  si, #vbebios_product_name
+  mov  di, bx
+  call strcpy
+  add  bx, ax
+  mov  ax, di
+  pop  di
   stosw
-  mov  ax, cs
+  mov  ax, es
   stosw
-  mov  ax, #vbebios_product_revision
+  push di
+  mov  si, #vbebios_product_revision
+  mov  di, bx
+  call strcpy
+  mov  ax, di
+  pop  di
   stosw
-  mov  ax, cs
+  mov  ax, es
   stosw
 vbe00_1:
   mov  di, bp
@@ -1154,10 +1177,16 @@ vbe00_1:
   stosw
   mov  ax, #0x0200 ;; v2.00
   stosw
+  or   bx, bx
+  jnz  vbe00_2 ; already set for VBE 2.0
   mov  ax, #vbebios_copyright
   stosw
   mov  ax, cs
   stosw
+  jz   vbe00_3
+vbe00_2:
+  add  di, #4
+vbe00_3:
   mov  ax, #VBE_CAPABILITY_8BIT_DAC ;; caps
   stosw
   xor  ax, ax
@@ -1175,35 +1204,34 @@ vbe00_1:
   pop  dx
   stosw
 
-  push cs
+  push cs ; build dynamic mode list
   pop  ds
-  push bx
   lea  di, 0x22[bp]
   mov  si, #_mode_info_list
-vbe00_2:
+vbe00_4:
   mov  bx, [si]
   cmp  bx, #0xffff
-  jz   vbe00_3
+  jz   vbe00_5
   call dispi_get_max_xres
   cmp  [si+20], ax
-  ja   vbe00_4
+  ja   vbe00_6
   call dispi_get_max_yres
   cmp  [si+22], ax
-  ja   vbe00_4
+  ja   vbe00_6
   call dispi_get_max_bpp
   cmp  [si+27], al
-  ja   vbe00_4
-vbe00_3:
+  ja   vbe00_6
+vbe00_5:
   mov  ax, bx
   stosw
-vbe00_4:
+vbe00_6:
   add  si, #0x44
   cmp  bx, #0xffff
-  jnz  vbe00_2
-  pop  bx
+  jnz  vbe00_4
 
-  mov  ax, #0x004F
+  mov  ax, #0x004F ; no error
   mov  di, bp
+  pop  bx
   pop  si
   pop  ds
   ret

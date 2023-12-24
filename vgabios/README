@@ -1,10 +1,16 @@
 Bochs VGABios
 -------------
 
-The goal of this project is to have a LGPL'd Video Bios in Bochs and qemu.
+The goal of this project is to have a LGPL'd Video Bios in Bochs and QEMU.
 This VGA Bios is very specific to the emulated VGA card.
 It is NOT meant to drive a physical vga card.
 
+
+Bochs VBE extension
+---------------------
+
+The Bochs VBE extension and it's Bochs device backend has been written by
+Jeroen Janssen (japj). It implements support for VBE version 2.0.
 
 Cirrus SVGA extension
 ---------------------
@@ -30,7 +36,7 @@ To compile the VGA Bios you will need the following packages:
 
 Untar the archive, and type 'make'. You should get this set of binary files:
 "VGABIOS-lgpl-latest.bin", "VGABIOS-lgpl-latest-debug.bin",
-"VGABIOS-lgpl-latest-cirrus.bin", "VGABIOS-lgpl-latest-cirrus.debug.bin" and
+"VGABIOS-lgpl-latest-cirrus.bin", "VGABIOS-lgpl-latest-cirrus-debug.bin" and
 "VGABIOS-lgpl-latest-banshee.bin".
 Alternatively, you can use one of the precompiled binary files present in
 the archive.

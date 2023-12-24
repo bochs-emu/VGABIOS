@@ -31,7 +31,7 @@ To compile the VGA Bios you will need the following packages:
 
 Untar the archive, and type 'make'. You should get this set of binary files:
 "VGABIOS-lgpl-latest.bin", "VGABIOS-lgpl-latest-debug.bin",
-"VGABIOS-lgpl-latest.cirrus.bin", "VGABIOS-lgpl-latest-cirrus-ebug.bin" and
+"VGABIOS-lgpl-latest-cirrus.bin", "VGABIOS-lgpl-latest-cirrus-debug.bin" and
 "VGABIOS-lgpl-latest-banshee.bin".
 Alternatively, you can use one of the precompiled binary files present in
 the archive.
