@@ -1185,9 +1185,11 @@ banshee_vesa_unimplemented:
 banshee_vesa_00h:
   push ds
   push si
+  push bx
   mov  bp, di
   push es
   pop  ds
+  xor  bx, bx
   cld
   mov  ax, [di]
   cmp  ax, #0x4256 ;; VB
@@ -1196,20 +1198,47 @@ banshee_vesa_00h:
   cmp  ax, #0x3245 ;; E2
   jnz  bv00_1
   ;; VBE2
+  lea  di, 0x100[bp]
+  mov  bx, di
+  mov  si, #banshee_vesa_oemname
+  call strcpy
+  add  bx, ax
+  mov  ax, di
+  lea  di, 0x06[bp]
+  stosw
+  mov  ax, es
+  stosw
   lea  di, 0x14[bp]
   mov  ax, #0x0100 ;; soft ver.
   stosw
-  mov  ax, # banshee_vesa_vendorname
+  push di
+  mov  si, #banshee_vesa_vendorname
+  mov  di, bx
+  call strcpy
+  add  bx, ax
+  mov  ax, di
+  pop  di
   stosw
-  mov  ax, cs
+  mov  ax, es
   stosw
-  mov  ax, # banshee_vesa_productname
+  push di
+  mov  si, #banshee_vesa_productname
+  mov  di, bx
+  call strcpy
+  add  bx, ax
+  mov  ax, di
+  pop  di
   stosw
-  mov  ax, cs
+  mov  ax, es
   stosw
-  mov  ax, # banshee_vesa_productrevision
+  push di
+  mov  si, #banshee_vesa_productrevision
+  mov  di, bx
+  call strcpy
+  mov  ax, di
+  pop  di
   stosw
-  mov  ax, cs
+  mov  ax, es
   stosw
 bv00_1:
   mov  di, bp
@@ -1219,33 +1248,40 @@ bv00_1:
   stosw
   mov  ax, #0x0200 ;; v2.00
   stosw
-  mov  ax, # banshee_vesa_oemname
+  or   bx, bx
+  jnz  bv00_2 ; already set for VBE 2.0
+  mov  ax, #banshee_vesa_oemname
   stosw
   mov  ax, cs
   stosw
+  jz   bv00_3
+bv00_2:
+  add  di, #4
+bv00_3:
   xor  ax, ax ;; caps
   stosw
   stosw
-  lea  ax, 0x40[bp]
+  lea  ax, 0x22[bp]
   stosw
   mov  ax, es
   stosw
   mov  ax, #0x0100;; vram in 64k
   stosw
 
-  push cs
+  push cs ; build mode list
   pop  ds
-  lea  di, 0x40[bp]
+  lea  di, 0x22[bp]
   mov  si, #banshee_vesa_modelist
-bv00_2:
+bv00_4:
   lodsw
   stosw
   add  si, #2
   cmp  ax, #0xffff
-  jnz  bv00_2
+  jnz  bv00_4
 
-  mov  ax, #0x004F
+  mov  ax, #0x004F ; no error
   mov  di, bp
+  pop  bx
   pop  si
   pop  ds
   ret

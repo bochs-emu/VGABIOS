@@ -4757,6 +4757,28 @@ get_crtc_address:
 
 ; shared code for the VBE support of all extensions
 #if defined(VBE) || defined(CIRRUS) || defined(BANSHEE)
+
+; helper function for function 00h
+strcpy:
+  push cx
+  push ds
+  push di
+  mov  ax, cs
+  mov  ds, ax
+  xor  cx, cx
+strcpy_loop:
+  lodsb
+  stosb
+  inc  cx
+  or   al, al
+  jnz  strcpy_loop
+  mov  ax, cx
+  pop  di
+  pop  ds
+  pop  cx
+  ret
+
+; VBE function 09h
 vbe_biosfn_set_get_palette_data:
   cmp   bl, #0x80
   je    vbe_set_palette_data
@@ -4820,6 +4842,7 @@ vbe_get_dac_loop:
   pop   cx
   mov   ax, #0x004f
   ret
+
 #endif
 ASM_END
 

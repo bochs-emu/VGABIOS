@@ -1075,27 +1075,6 @@ lmulul:
   mov ebx, eax
   shr ebx, #16
   ret
-
-; helper function for function 00h
-
-strcpy:
-  push cx
-  push ds
-  push di
-  mov  ax, cs
-  mov  ds, ax
-  xor  cx, cx
-strcpy_loop:
-  lodsb
-  stosb
-  inc  cx
-  or   al, al
-  jnz  strcpy_loop
-  mov  ax, cx
-  pop  di
-  pop  ds
-  pop  cx
-  ret
 ASM_END
 
 

@@ -1067,70 +1067,106 @@ cirrus_extbios_unimplemented:
 cirrus_vesa_00h:
   push ds
   push si
-  mov bp, di
+  push bx
+  mov  bp, di
   push es
-  pop ds
+  pop  ds
+  xor  bx, bx
   cld
-  mov ax, [di]
-  cmp ax, #0x4256 ;; VB
-  jnz cv00_1
-  mov ax, [di+2]
-  cmp ax, #0x3245 ;; E2
-  jnz cv00_1
+  mov  ax, [di]
+  cmp  ax, #0x4256 ;; VB
+  jnz  cv00_1
+  mov  ax, [di+2]
+  cmp  ax, #0x3245 ;; E2
+  jnz  cv00_1
   ;; VBE2
-  lea di, 0x14[bp]
-  mov ax, #0x0100 ;; soft ver.
+  lea  di, 0x100[bp]
+  mov  bx, di
+  mov  si, #cirrus_vesa_oemname
+  call strcpy
+  add  bx, ax
+  mov  ax, di
+  lea  di, 0x06[bp]
   stosw
-  mov ax, # cirrus_vesa_vendorname
+  mov  ax, es
   stosw
-  mov ax, cs
+  lea  di, 0x14[bp]
+  mov  ax, #0x0100 ;; soft ver.
   stosw
-  mov ax, # cirrus_vesa_productname
+  push di
+  mov  si, #cirrus_vesa_vendorname
+  mov  di, bx
+  call strcpy
+  add  bx, ax
+  mov  ax, di
+  pop  di
   stosw
-  mov ax, cs
+  mov  ax, es
   stosw
-  mov ax, # cirrus_vesa_productrevision
+  push di
+  mov  si, #cirrus_vesa_productname
+  mov  di, bx
+  call strcpy
+  add  bx, ax
+  mov  ax, di
+  pop  di
   stosw
-  mov ax, cs
+  mov  ax, es
+  stosw
+  push di
+  mov  si, #cirrus_vesa_productrevision
+  mov  di, bx
+  call strcpy
+  mov  ax, di
+  pop  di
+  stosw
+  mov  ax, es
   stosw
 cv00_1:
-  mov di, bp
-  mov ax, #0x4556 ;; VE
+  mov  di, bp
+  mov  ax, #0x4556 ;; VE
   stosw
-  mov ax, #0x4153 ;; SA
+  mov  ax, #0x4153 ;; SA
   stosw
-  mov ax, #0x0200 ;; v2.00
+  mov  ax, #0x0200 ;; v2.00
   stosw
-  mov ax, # cirrus_vesa_oemname
+  or   bx, bx
+  jnz  cv00_2 ; already set for VBE 2.0
+  mov  ax, #cirrus_vesa_oemname
   stosw
-  mov ax, cs
+  mov  ax, cs
   stosw
-  xor ax, ax ;; caps
+  jz   cv00_3
+cv00_2:
+  add  di, #4
+cv00_3:
+  xor  ax, ax ;; caps
   stosw
   stosw
-  lea ax, 0x40[bp]
+  lea  ax, 0x22[bp]
   stosw
-  mov ax, es
+  mov  ax, es
   stosw
   call cirrus_extbios_85h ;; vram in 64k
-  mov ah, #0x00
+  mov  ah, #0x00
   stosw
 
-  push cs
-  pop ds
-  lea di, 0x40[bp]
-  mov si, #_cirrus_vesa_modelist
-cv00_2:
+  push cs ; build mode list
+  pop  ds
+  lea  di, 0x22[bp]
+  mov  si, #_cirrus_vesa_modelist
+cv00_4:
   lodsw
   stosw
-  add si, #2
-  cmp ax, #0xffff
-  jnz cv00_2
+  add  si, #2
+  cmp  ax, #0xffff
+  jnz  cv00_4
 
-  mov ax, #0x004F
-  mov di, bp
-  pop si
-  pop ds
+  mov  ax, #0x004F ; no error
+  mov  di, bp
+  pop  bx
+  pop  si
+  pop  ds
   ret
 
 cirrus_vesa_01h:
