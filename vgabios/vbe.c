@@ -74,7 +74,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2023-12-23"
+.ascii "VBE Bios ID: vbe.c 2023-12-26"
 .byte  0x0a,0x00
 #endif
 
@@ -234,58 +234,40 @@ dispi_set_id:
   pop  dx
   ret
 
-_dispi_set_xres:
-  push bp
-  mov  bp, sp
-  push ax
+dispi_set_xres:
   push dx
-
+  push ax
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_XRES
   out  dx, ax
   mov  dx, # VBE_DISPI_IOPORT_DATA
-  mov  ax, 4[bp] ; xres
-  out  dx, ax
-
-  pop  dx
   pop  ax
-  pop  bp
+  out  dx, ax
+  pop  dx
   ret
 
-_dispi_set_yres:
-  push bp
-  mov  bp, sp
-  push ax
+dispi_set_yres:
   push dx
-
+  push ax
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_YRES
   out  dx, ax
   mov  dx, # VBE_DISPI_IOPORT_DATA
-  mov  ax, 4[bp] ; yres
-  out  dx, ax
-
-  pop  dx
   pop  ax
-  pop  bp
+  out  dx, ax
+  pop  dx
   ret
 
-_dispi_set_bpp:
-  push bp
-  mov  bp, sp
-  push ax
+dispi_set_bpp:
   push dx
-
+  push ax
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_BPP
   out  dx, ax
   mov  dx, # VBE_DISPI_IOPORT_DATA
-  mov  ax, 4[bp] ; bpp
-  out  dx, ax
-
-  pop  dx
   pop  ax
-  pop  bp
+  out  dx, ax
+  pop  dx
   ret
 
 ; AL = bits per pixel / AH = bytes per pixel
@@ -367,7 +349,7 @@ dispi_get_max_bpp:
   pop  dx
   ret
 
-_dispi_support_bank_granularity_32k:
+dispi_support_bank_granularity_32k:
   push dx
   push bx
   call dispi_get_enable
@@ -562,11 +544,10 @@ dispi_get_virt_height:
   pop  dx
   ret
 
-_vga_compat_setup:
+vga_compat_setup:
   push ax
   push dx
-
-  ; set CRT X resolution
+  ;; set CRTC X resolution
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_XRES
   out  dx, ax
@@ -585,8 +566,7 @@ _vga_compat_setup:
   out  dx, ax
   pop  ax
   call vga_set_virt_width
-
-  ; set CRT Y resolution
+  ;; set CRTC Y resolution
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_YRES
   out  dx, ax
@@ -613,8 +593,7 @@ bit8_clear:
   or   al, #0x40
 bit9_clear:
   out  dx, al
-
-  ; other settings
+  ;; other settings
   mov  dx, # VGAREG_VGA_CRTC_ADDRESS
   mov  ax, #0x0009
   out  dx, ax
@@ -642,8 +621,7 @@ bit9_clear:
   mov  dx, # VGAREG_SEQU_ADDRESS
   mov  ax, #0x0f02
   out  dx, ax
-
-  ; settings for >= 8bpp
+  ;; settings for >= 8bpp
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_BPP
   out  dx, ax
@@ -685,7 +663,6 @@ bit9_clear:
   and  al, #0x9f
   or   al, #0x40
   out  dx, al
-
 vga_compat_end:
   pop  dx
   pop  ax
@@ -1058,6 +1035,65 @@ no_vbe_flag:
   mov  si, #no_vbebios_info_string
   jmp  _display_string
 
+_dispi_set_mode:
+  push bp
+  mov  bp, sp
+  push ax
+  push si
+  push ds
+  push cs
+  pop  ds
+  ;; first disable current mode (when switching between vesa modi)
+  mov  ax, #VBE_DISPI_DISABLED
+  call dispi_set_enable
+  mov  si, 6[bp] ;; pointer to info block
+  mov  ax, [si+25] ;; bpp
+  xor  ah, ah
+  cmp  al, #4
+  jnz  no_vga_4bpp
+  push ax
+  mov  ax, #0x6a
+  push ax
+  call _biosfn_set_video_mode
+  inc  sp
+  inc  sp
+  pop  ax
+  jnz  set_vbe_params
+no_vga_4bpp:
+  cmp  al, #8
+  jnz  set_vbe_params
+  push ax
+  mov  ax, #3
+  push ax
+  call _load_dac_palette
+  inc  sp
+  inc  sp
+  pop  ax
+set_vbe_params:
+  call dispi_set_bpp
+  mov  ax, [si+18] ;; xres
+  call dispi_set_xres
+  mov  ax, [si+20] ;; yres
+  call dispi_set_yres
+  mov  ax, #VBE_DISPI_BANK_RW
+  call dispi_set_bank
+  call dispi_support_bank_granularity_32k
+  or   ax, #VBE_DISPI_ENABLED
+  test 4[bp], #VBE_MODE_LINEAR_FRAME_BUFFER
+  jz   set_mode_no_lfb
+  or   ax, #VBE_DISPI_LFB_ENABLED
+set_mode_no_lfb:
+  test 4[bp], #VBE_MODE_PRESERVE_DISPLAY_MEMORY
+  jz   set_mode_clear_mem
+  or   ax, #VBE_DISPI_NOCLEARMEM
+set_mode_clear_mem:
+  call dispi_set_enable
+  pop  ds
+  pop  si
+  pop  ax
+  pop  bp
+  ret
+
 msg_vbe2_sig_found:
 .ascii       "VBE 00h: VBE2 signature found\n"
 .byte        0x00
@@ -1153,7 +1189,7 @@ vbe00_1:
   mov  ax, #0x0200 ;; v2.00
   stosw
   or   bx, bx
-  jnz  vbe00_2 ; already set for VBE 2.0
+  jnz  vbe00_2 ;; already set for VBE 2.0
   mov  ax, #vbebios_copyright
   stosw
   mov  ax, cs
@@ -1178,8 +1214,7 @@ vbe00_3:
   in   ax, dx
   pop  dx
   stosw
-
-  push cs ; build dynamic mode list
+  push cs ;; build dynamic mode list
   pop  ds
   xor  cx, cx
   lea  di, 0x22[bp]
@@ -1212,8 +1247,7 @@ vbe00_6:
   call _printf
   add  sp, #4
 #endif
-
-  mov  ax, #0x004F ; no error
+  mov  ax, #0x004F ;; no error
   mov  di, bp
   pop  cx
   pop  bx
@@ -1283,7 +1317,7 @@ mode_no_lfb_1:
   seg  es
   mov  [di+40], ax
 mode_no_lfb_2:
-  call _dispi_support_bank_granularity_32k
+  call dispi_support_bank_granularity_32k
   and  ax, #VBE_DISPI_BANK_GRANULARITY_32K
   jz   no_gran_32k
   mov  ax, #VBE_DISPI_BANK_GRANULARITY_KB
@@ -1333,17 +1367,12 @@ Bit16u *AX;Bit16u BX;
     ModeInfoListItem  *cur_info;
     Boolean           using_lfb;
     Bit8u             no_clear;
-    Bit8u             lfb_flag;
-    Bit16u            support_bank_gr_32k;
 
     using_lfb=((BX & VBE_MODE_LINEAR_FRAME_BUFFER) == VBE_MODE_LINEAR_FRAME_BUFFER);
-    lfb_flag=using_lfb?VBE_DISPI_LFB_ENABLED:0;
     no_clear=((BX & VBE_MODE_PRESERVE_DISPLAY_MEMORY) == VBE_MODE_PRESERVE_DISPLAY_MEMORY)?VBE_DISPI_NOCLEARMEM:0;
 
-    BX = (BX & 0x1ff);
-
     // check for non vesa mode
-    if (BX<VBE_MODE_VESA_DEFINED) {
+    if ((BX & 0x1ff) < VBE_MODE_VESA_DEFINED) {
         Bit8u   mode;
 
 ASM_START
@@ -1365,47 +1394,25 @@ ASM_END
         }
     } else {
 
-        cur_info = mode_info_find_mode(BX, using_lfb, &cur_info);
+        cur_info = mode_info_find_mode((BX & 0x1ff), using_lfb, &cur_info);
 
         if (cur_info != 0) {
 #ifdef DEBUG
             printf("VBE found mode %x, setting:\n", BX);
-            printf("\t%d x %d / %d bpp\n",
+            printf("\t%d x %d x %d bpp\n",
                    cur_info->info.XResolution,
                    cur_info->info.YResolution,
                    cur_info->info.BitsPerPixel);
 #endif
 
-            // first disable current mode (when switching between vesa modi)
-ASM_START
-            mov  ax, #VBE_DISPI_DISABLED
-            call dispi_set_enable
-ASM_END
+            dispi_set_mode(BX, &cur_info->info);
 
-            if (cur_info->info.BitsPerPixel == 4) {
-                biosfn_set_video_mode(0x6a);
-            } else if (cur_info->info.BitsPerPixel == 8) {
-                load_dac_palette(3);
-            }
-
-            dispi_set_bpp(cur_info->info.BitsPerPixel);
-            dispi_set_xres(cur_info->info.XResolution);
-            dispi_set_yres(cur_info->info.YResolution);
-ASM_START
-            mov  ax, #VBE_DISPI_BANK_RW
-            call dispi_set_bank
-ASM_END
-            support_bank_gr_32k = dispi_support_bank_granularity_32k();
-            dispi_set_enable(VBE_DISPI_ENABLED | support_bank_gr_32k |
-                             no_clear | lfb_flag);
-            vga_compat_setup();
-
-            write_bda_word(BIOSMEM_NB_COLS,cur_info->info.XResolution>>3);
-            write_bda_word(BIOSMEM_NB_ROWS,(cur_info->info.YResolution>>4)-1);
-            write_bda_word(BIOSMEM_CHAR_HEIGHT,16);
-            write_bda_word(BIOSMEM_CURRENT_PAGE,0);
-            write_bda_word(BIOSMEM_CURSOR_POS,0);
-            write_bda_word(BIOSMEM_VBE_MODE,BX);
+            write_bda_word(BIOSMEM_NB_COLS, cur_info->info.XResolution >> 3);
+            write_bda_word(BIOSMEM_NB_ROWS, (cur_info->info.YResolution >> 4) - 1);
+            write_bda_word(BIOSMEM_CHAR_HEIGHT, 16);
+            write_bda_word(BIOSMEM_CURRENT_PAGE, 0);
+            write_bda_word(BIOSMEM_CURSOR_POS, 0);
+            write_bda_word(BIOSMEM_VBE_MODE, BX & 0x1ff);
             write_bda_byte(BIOSMEM_VIDEO_CTL,(0x60 | no_clear));
 ASM_START
             SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
@@ -1582,28 +1589,19 @@ vbe_restore_full_state:
   call dispi_set_enable
   seg  es
   mov  ax, [bx]
-  push ax
-  call _dispi_set_xres
-  inc  sp
-  inc  sp
+  call dispi_set_xres
   add  bx, #0x02
   seg  es
   mov  ax, [bx]
-  push ax
-  call _dispi_set_yres
-  inc  sp
-  inc  sp
+  call dispi_set_yres
   add  bx, #0x02
   seg  es
   mov  ax, [bx]
-  push ax
-  call _dispi_set_bpp
-  inc  sp
-  inc  sp
+  call dispi_set_bpp
   add  bx, #0x02
   pop  ax
   call dispi_set_enable
-  call _vga_compat_setup
+  call vga_compat_setup
   push cx
   push dx
   mov  cx, #VBE_DISPI_INDEX_BANK
