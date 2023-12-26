@@ -441,13 +441,10 @@ dispi_get_bank:
   in   ax, dx
   pop  dx
   ret
-ASM_END
 
-static void dispi_set_bank_farcall()
-{
-ASM_START
+dispi_set_bank_farcall:
   cmp  bx, #0x0100
-  je dispi_set_bank_farcall_get
+  je   dispi_set_bank_farcall_get
   or   bx, bx
   jnz  dispi_set_bank_farcall_error
   mov  ax, dx
@@ -467,10 +464,7 @@ dispi_set_bank_farcall_get:
 dispi_set_bank_farcall_error:
   mov  ax, #0x014F
   retf
-ASM_END
-}
 
-ASM_START
 dispi_set_x_offset:
   push dx
   push ax
@@ -1064,17 +1058,12 @@ no_vbe_flag:
   mov  si, #no_vbebios_info_string
   jmp  _display_string
 
-; helper function for memory size calculation
-
-lmulul:
-  and eax, #0x0000FFFF
-  shl ebx, #16
-  or  eax, ebx
-  SEG SS
-  mul eax, dword ptr [di]
-  mov ebx, eax
-  shr ebx, #16
-  ret
+msg_vbe2_sig_found:
+.ascii       "VBE 00h: VBE2 signature found\n"
+.byte        0x00
+msg_vbe_modelist:
+.ascii       "VBE 00h: reporting %d VBE modes supported\n"
+.byte        0x00
 ASM_END
 
 
@@ -1094,6 +1083,7 @@ vbe_biosfn_return_controller_information:
   push ds
   push si
   push bx
+  push cx
   mov  bp, di
   push es
   pop  ds
@@ -1105,6 +1095,12 @@ vbe_biosfn_return_controller_information:
   mov  ax, [di+2]
   cmp  ax, #0x3245 ;; E2
   jnz  vbe00_1
+#ifdef DEBUG
+  push #msg_vbe2_sig_found
+  call _printf
+  inc  sp
+  inc  sp
+#endif
   ;; VBE2
   lea  di, 0x100[bp]
   mov  bx, di
@@ -1185,6 +1181,7 @@ vbe00_3:
 
   push cs ; build dynamic mode list
   pop  ds
+  xor  cx, cx
   lea  di, 0x22[bp]
   mov  si, #_mode_info_list
 vbe00_4:
@@ -1203,153 +1200,27 @@ vbe00_4:
 vbe00_5:
   mov  ax, bx
   stosw
+  inc  cx
 vbe00_6:
   add  si, #0x44
   cmp  bx, #0xffff
   jnz  vbe00_4
+#ifdef DEBUG
+  dec  cx
+  push cx
+  push #msg_vbe_modelist
+  call _printf
+  add  sp, #4
+#endif
 
   mov  ax, #0x004F ; no error
   mov  di, bp
+  pop  cx
   pop  bx
   pop  si
   pop  ds
   ret
 ASM_END
-
-/*
-void vbe_biosfn_return_controller_information(AX, ES, DI)
-Bit16u *AX;Bit16u ES;Bit16u DI;
-{
-        Bit16u            ss=get_SS();
-        VbeInfoBlock      vbe_info_block;
-        Bit16u            status;
-        Bit16u            result;
-        Bit16u            vbe2_info;
-        Bit16u            cur_mode=0;
-        Bit16u            cur_ptr=34;
-        Bit16u            size_64k;
-        Bit16u            strptr;
-        Bit16u            length;
-        ModeInfoListItem  *cur_info=&mode_info_list;
-
-        status = read_word(ss, AX);
-
-#ifdef DEBUG
-        printf("VBE vbe_biosfn_return_vbe_info ES%x DI%x AX%x\n",ES,DI,status);
-#endif
-
-        vbe2_info = 0;
-#ifdef VBE2_NO_VESA_CHECK
-#else
-        // get vbe_info_block into local variable
-        memcpyb(ss, &vbe_info_block, ES, DI, sizeof(vbe_info_block));
-
-        // check for VBE2 signature
-        if (((vbe_info_block.VbeSignature[0] == 'V') &&
-             (vbe_info_block.VbeSignature[1] == 'B') &&
-             (vbe_info_block.VbeSignature[2] == 'E') &&
-             (vbe_info_block.VbeSignature[3] == '2')))
-        {
-                vbe2_info = 1;
-#ifdef DEBUG
-                printf("VBE correct VBE2 signature found\n");
-#endif
-        }
-#endif
-
-        // VBE Signature
-        vbe_info_block.VbeSignature[0] = 'V';
-        vbe_info_block.VbeSignature[1] = 'E';
-        vbe_info_block.VbeSignature[2] = 'S';
-        vbe_info_block.VbeSignature[3] = 'A';
-
-        // VBE Version supported
-        vbe_info_block.VbeVersion = 0x0200;
-
-        // OEM String
-        vbe_info_block.OemStringPtr_Seg = 0xc000;
-        vbe_info_block.OemStringPtr_Off = &vbebios_copyright;
-
-        // Capabilities
-        vbe_info_block.Capabilities[0] = VBE_CAPABILITY_8BIT_DAC;
-        vbe_info_block.Capabilities[1] = 0;
-        vbe_info_block.Capabilities[2] = 0;
-        vbe_info_block.Capabilities[3] = 0;
-
-        // VBE Video Mode Pointer (dynamicly generated from the mode_info_list)
-        vbe_info_block.VideoModePtr_Seg= ES;
-        vbe_info_block.VideoModePtr_Off= DI + 34;
-
-        // VBE Total Memory (in 64k blocks)
-        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_VIDEO_MEMORY_64K);
-        vbe_info_block.TotalMemory = inw(VBE_DISPI_IOPORT_DATA);
-
-        if (vbe2_info)
-        {
-                strptr = 0x100;
-                vbe_info_block.OemStringPtr_Seg = ES;
-                vbe_info_block.OemStringPtr_Off = DI + strptr;
-                length = strlen(&vbebios_copyright);
-                memcpyb(ss, (Bit16u)&vbe_info_block + strptr, 0xc000, &vbebios_copyright, length + 1);
-                strptr += (length + 1);
-                // OEM Stuff
-                vbe_info_block.OemSoftwareRev = VBE_OEM_SOFTWARE_REV;
-                vbe_info_block.OemVendorNamePtr_Seg = ES;
-                vbe_info_block.OemVendorNamePtr_Off = DI + strptr;
-                length = strlen(&vbebios_vendor_name);
-                memcpyb(ss, (Bit16u)&vbe_info_block + strptr, 0xc000, &vbebios_vendor_name, length + 1);
-                strptr += (length + 1);
-                vbe_info_block.OemProductNamePtr_Seg = ES;
-                vbe_info_block.OemProductNamePtr_Off = DI + strptr;
-                length = strlen(&vbebios_product_name);
-                memcpyb(ss, (Bit16u)&vbe_info_block + strptr, 0xc000, &vbebios_product_name, length + 1);
-                strptr += (length + 1);
-                vbe_info_block.OemProductRevPtr_Seg = ES;
-                vbe_info_block.OemProductRevPtr_Off = DI + strptr;
-                length = strlen(&vbebios_product_revision);
-                memcpyb(ss, (Bit16u)&vbe_info_block + strptr, 0xc000, &vbebios_product_revision, length + 1);
-
-                // copy updates in vbe_info_block back
-                memcpyb(ES, DI, ss, &vbe_info_block, sizeof(vbe_info_block));
-        }
-        else
-        {
-                // copy updates in vbe_info_block back (VBE 1.x compatibility)
-                memcpyb(ES, DI, ss, &vbe_info_block, 256);
-        }
-
-        do
-        {
-                size_64k = (Bit16u)((Bit32u)cur_info->info.XResolution * cur_info->info.XResolution * cur_info->info.BitsPerPixel) >> 19;
-
-                if ((cur_info->info.XResolution <= dispi_get_max_xres()) &&
-                    (cur_info->info.YResolution <= dispi_get_max_yres()) &&
-                    (cur_info->info.BitsPerPixel <= dispi_get_max_bpp()) &&
-                    (size_64k <= vbe_info_block.TotalMemory)) {
-#ifdef DEBUG
-                  printf("VBE found mode %x => %x\n", cur_info->mode,cur_mode);
-#endif
-                  write_word(ES, DI + cur_ptr, cur_info->mode);
-                  cur_mode++;
-                  cur_ptr+=2;
-                } else {
-#ifdef DEBUG
-                  printf("VBE mode %x (%d x %d x %d) not supported \n", cur_info->mode,
-                         cur_info->info.XResolution,cur_info->info.YResolution,
-                         cur_info->info.BitsPerPixel);
-#endif
-                }
-                cur_info++;
-        } while (cur_info->mode != VBE_VESA_MODE_END_OF_LIST);
-
-        // Add vesa mode list terminator
-        write_word(ES, DI + cur_ptr, cur_info->mode);
-
-        result = 0x4f;
-
-        write_word(ss, AX, result);
-}
-*/
 
 
 /** Function 01h - Return VBE Mode Information
@@ -1423,7 +1294,7 @@ no_gran_32k:
   mov  al, [di+2]
   and  al, #VBE_WINDOW_ATTRIBUTE_RELOCATABLE
   jz   no_win_reloc
-  mov  ax, #_dispi_set_bank_farcall
+  mov  ax, #dispi_set_bank_farcall
   seg  es
   mov  [di+12], ax
   mov  ax, #0xc000
@@ -1991,6 +1862,7 @@ ASM_END
  *              AX      = VBE Return Status
  *
  */
+
 // Code moved to vgabios.c (shared with Banshee and Cirrus)
 
 
