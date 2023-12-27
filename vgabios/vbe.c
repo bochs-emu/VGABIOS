@@ -57,7 +57,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2023-12-23"
+.ascii       "ID: vbe.c 2023-12-27"
 .byte        0x00
 
 vbebios_info_string:
@@ -74,7 +74,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2023-12-26"
+.ascii "VBE Bios ID: vbe.c 2023-12-27"
 .byte  0x0a,0x00
 #endif
 
@@ -622,11 +622,7 @@ bit9_clear:
   mov  ax, #0x0f02
   out  dx, ax
   ;; settings for >= 8bpp
-  mov  dx, # VBE_DISPI_IOPORT_INDEX
-  mov  ax, # VBE_DISPI_INDEX_BPP
-  out  dx, ax
-  mov  dx, # VBE_DISPI_IOPORT_DATA
-  in   ax, dx
+  call dispi_get_bpp
   cmp  al, #0x08
   jb   vga_compat_end
   mov  dx, # VGAREG_VGA_CRTC_ADDRESS
@@ -1052,23 +1048,18 @@ _dispi_set_mode:
   cmp  al, #4
   jnz  no_vga_4bpp
   push ax
-  mov  ax, #0x6a
-  push ax
+  push #0x6a
   call _biosfn_set_video_mode
   inc  sp
   inc  sp
   pop  ax
-  jnz  set_vbe_params
 no_vga_4bpp:
   cmp  al, #8
   jnz  set_vbe_params
-  push ax
-  mov  ax, #3
-  push ax
+  push #3
   call _load_dac_palette
   inc  sp
   inc  sp
-  pop  ax
 set_vbe_params:
   call dispi_set_bpp
   mov  ax, [si+18] ;; xres
@@ -1088,6 +1079,7 @@ set_mode_no_lfb:
   or   ax, #VBE_DISPI_NOCLEARMEM
 set_mode_clear_mem:
   call dispi_set_enable
+  call vga_compat_setup
   pop  ds
   pop  si
   pop  ax
@@ -1360,16 +1352,15 @@ ASM_END
  *
  */
 void vbe_biosfn_set_mode(AX, BX)
-Bit16u *AX;Bit16u BX;
+Bit16u AX; Bit16u BX;
 {
     Bit16u            ss = get_SS();
-    Bit16u            result;
     ModeInfoListItem  *cur_info;
     Boolean           using_lfb;
     Bit8u             no_clear;
 
-    using_lfb=((BX & VBE_MODE_LINEAR_FRAME_BUFFER) == VBE_MODE_LINEAR_FRAME_BUFFER);
-    no_clear=((BX & VBE_MODE_PRESERVE_DISPLAY_MEMORY) == VBE_MODE_PRESERVE_DISPLAY_MEMORY)?VBE_DISPI_NOCLEARMEM:0;
+    using_lfb = ((BX & VBE_MODE_LINEAR_FRAME_BUFFER) == VBE_MODE_LINEAR_FRAME_BUFFER);
+    no_clear = ((BX & VBE_MODE_PRESERVE_DISPLAY_MEMORY) == VBE_MODE_PRESERVE_DISPLAY_MEMORY)?VBE_DISPI_NOCLEARMEM:0;
 
     // check for non vesa mode
     if ((BX & 0x1ff) < VBE_MODE_VESA_DEFINED) {
@@ -1382,19 +1373,19 @@ ASM_END
         // call the vgabios in order to set the video mode
         // this allows for going back to textmode with a VBE call (some applications expect that to work)
 
-        mode=(BX & 0xff);
+        mode = BX & 0xff;
         if ((mode & 0x80) == 0) {
           if (no_clear != 0) {
             mode |= 0x80;
           }
           biosfn_set_video_mode(mode);
-          result = 0x4f;
+          AX = 0x4f;
         } else {
-          result = 0x014f;
+          AX = 0x014f;
         }
     } else {
 
-        cur_info = mode_info_find_mode((BX & 0x1ff), using_lfb, &cur_info);
+        cur_info = mode_info_find_mode(BX & 0x1ff, using_lfb, &cur_info);
 
         if (cur_info != 0) {
 #ifdef DEBUG
@@ -1404,7 +1395,6 @@ ASM_END
                    cur_info->info.YResolution,
                    cur_info->info.BitsPerPixel);
 #endif
-
             dispi_set_mode(BX, &cur_info->info);
 
             write_bda_word(BIOSMEM_NB_COLS, cur_info->info.XResolution >> 3);
@@ -1413,37 +1403,22 @@ ASM_END
             write_bda_word(BIOSMEM_CURRENT_PAGE, 0);
             write_bda_word(BIOSMEM_CURSOR_POS, 0);
             write_bda_word(BIOSMEM_VBE_MODE, BX & 0x1ff);
-            write_bda_byte(BIOSMEM_VIDEO_CTL,(0x60 | no_clear));
+            write_bda_byte(BIOSMEM_VIDEO_CTL, (0x60 | no_clear));
 ASM_START
             SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
 ASM_END
-            write_bda_byte(BIOSMEM_CURRENT_MODE,0x5f); // FIXME
+            if (cur_info->info.BitsPerPixel != 4) {
+              write_bda_byte(BIOSMEM_CURRENT_MODE, 0x5f); // FIXME
+            }
 
-            result = 0x4f;
+            AX = 0x4f;
         } else {
 #ifdef DEBUG
             printf("VBE *NOT* found mode %x\n" , BX);
 #endif
-            result = 0x014f;
+            AX = 0x014f;
         }
     }
-
-    write_word(ss, AX, result);
-}
-
-
-// --------------------------------------------------------------------------------------------
-/*
- * int10 VBE dispatcher
- */
-static void int10_vbe_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
-  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
-{
-  switch(GET_AL()) {
-    case 0x02:
-      vbe_biosfn_set_mode(&AX,BX);
-      break;
-  }
 }
 
 
@@ -2137,23 +2112,24 @@ vbe_return:
   pop  bp
   jmp  int10_end
 
-vbe_normal:
-  push es
+;; call remaining C function
+vbe_biosfn_set_mode:
   push ds
-  pusha
-  mov   bx, #0xc000
-  mov   ds, bx
-  call _int10_vbe_func
-  popa
-  pop ds
-  pop es
+  push bx
+  push ax
+  mov  bx, #0xc000
+  mov  ds, bx
+  call _vbe_biosfn_set_mode
+  pop  ax
+  pop  bx
+  pop  ds
   ret
 
 vbe_handlers:
   ;; 00h
   dw vbe_biosfn_return_controller_information
   dw vbe_biosfn_return_mode_information
-  dw vbe_normal
+  dw vbe_biosfn_set_mode
   dw vbe_biosfn_return_current_mode
   ;; 04h
   dw vbe_biosfn_save_restore_state
