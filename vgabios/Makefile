@@ -1,5 +1,5 @@
 #
-#  Copyright (C) 2001-2021 The LGPL VGABios developers Team
+#  Copyright (C) 2001-2023 The LGPL VGABios developers Team
 #
 
 SHELL = /bin/sh

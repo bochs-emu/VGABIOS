@@ -106,6 +106,13 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
+vgabios-0.8b : Dec 28 2023
+  - Volker
+    - added VBE get/set palette data support for Banshee and Cirrus versions
+    - fixed order of colors in VBE function get/set palette data
+    - VESA BIOS function 0x4f00 now stores strings in OemData (for VBE 2.0)
+    - some VBE functions rewritten in assembler including bugfixes
+
 vgabios-0.8a : Jun 03 2021
   - Volker
     - added initial version of the VGABIOS for Voodoo Banshee PCI
@@ -115,6 +122,7 @@ vgabios-0.8a : Jun 03 2021
     - fixed text output in VGA graphics modes (using INT 0x43 vector as expected)
     - fixed general 'scroll down' bug in graphics modes
     - some functions rewritten in assembler and some other code optimizations
+
 vgabios-0.7b : Jan 03 2020
   - Volker
     - added VESA BIOS function 0x4f09 (set/get palette data) to the Bochs VBE
