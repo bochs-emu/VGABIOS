@@ -956,44 +956,39 @@ vbe_fill_check_row:
   pop  bx
   pop  ax
   ret
-ASM_END
 
+;; ModeInfo helper function
 
-// ModeInfo helper function
-static ModeInfoListItem* mode_info_find_mode(mode, using_lfb)
-  Bit16u mode; Boolean using_lfb;
-{
-  ModeInfoListItem  *cur_info=&mode_info_list;
+_mode_info_find_mode:
+  push bp
+  mov  bp, sp
+  push bx
+  mov  ax, 4[bp]
+  mov  si, #_mode_info_list
+find_mode_loop:
+  mov  bx, [si]
+  cmp  bx, #0xffff
+  jz   vbe_mode_not_found
+  cmp  ax, bx
+  jnz  next_mode_info
+  mov  ax, si
+  mov  bx, 6[bp] ;; LFB requested ?
+  or   bx, bx
+  jz   vbe_mode_found
+  mov  bx, [si+2]
+  test bx, #VBE_MODE_ATTRIBUTE_LINEAR_FRAME_BUFFER_MODE
+  jnz  vbe_mode_found
+next_mode_info:
+  add  si, #0x44
+  jnz  find_mode_loop
+vbe_mode_not_found:
+  xor  ax, ax
+vbe_mode_found:
+  pop  bx
+  pop  bp
+  ret
 
-  while (cur_info->mode != VBE_VESA_MODE_END_OF_LIST)
-  {
-    if (cur_info->mode == mode)
-    {
-      if (!using_lfb)
-      {
-        return cur_info;
-      }
-      else if (cur_info->info.ModeAttributes & VBE_MODE_ATTRIBUTE_LINEAR_FRAME_BUFFER_MODE)
-      {
-        return cur_info;
-      }
-      else
-      {
-        cur_info++;
-      }
-    }
-    else
-    {
-      cur_info++;
-    }
-  }
-
-  return 0;
-}
-
-ASM_START
-
-; Has VBE display - Returns true if VBE display detected
+;; Has VBE display - Returns true if VBE display detected
 
 vbe_has_vbe_display:
   push ds
@@ -1008,8 +1003,8 @@ vbe_has_vbe_display:
   pop  ds
   ret
 
-; VBE Init - Initialise the Vesa Bios Extension Code
-; This function does a sanity check on the host side display code interface.
+;; VBE Init - Initialise the Vesa Bios Extension Code
+;; This function does a sanity check on the host side display code interface.
 
 vbe_init:
   mov  ax, # VBE_DISPI_ID0
@@ -1038,7 +1033,7 @@ no_vbe_interface:
 #endif
   ret
 
-; VBE Display Info - Display information on screen about the VBE
+;; VBE Display Info - Display information on screen about the VBE
 
 vbe_display_info:
   call vbe_has_vbe_display
@@ -1054,19 +1049,23 @@ no_vbe_flag:
   mov  si, #no_vbebios_info_string
   jmp  _display_string
 
+;; set VBE mode helper function
+
 _dispi_set_mode:
   push bp
   mov  bp, sp
   push ax
+  push bx
   push si
   push ds
+  push es
   push cs
   pop  ds
   ;; first disable current mode (when switching between vesa modi)
   mov  ax, #VBE_DISPI_DISABLED
   call dispi_set_enable
   mov  si, 6[bp] ;; pointer to info block
-  mov  ax, [si+25] ;; bpp
+  mov  al, [si+25] ;; bpp
   xor  ah, ah
   cmp  al, #4
   jnz  no_vga_4bpp
@@ -1103,10 +1102,59 @@ set_mode_no_lfb:
 set_mode_clear_mem:
   call dispi_set_enable
   call vga_compat_setup
+  mov  ax, #BIOSMEM_SEG
+  mov  es, ax
+  mov  bx, #BIOSMEM_NB_COLS
+  mov  ax, [si+18]
+  shr  ax, #3
+  seg  es
+  mov [bx], ax
+  mov  bx, #BIOSMEM_NB_ROWS
+  mov  ax, [si+20]
+  shr  ax, #4
+  dec  ax
+  seg  es
+  mov [bx], ax
+  mov  bx, #BIOSMEM_CHAR_HEIGHT
+  mov  ax, #16
+  seg  es
+  mov [bx], ax
+  mov  bx, #BIOSMEM_CURRENT_PAGE
+  xor  ax, ax
+  seg  es
+  mov [bx], ax
+  mov  bx, #BIOSMEM_CURSOR_POS
+  seg  es
+  mov [bx], ax
+  mov  bx, #BIOSMEM_VBE_MODE
+  mov  ax, 4[bp]
+  and  ax, #0x1ff
+  seg  es
+  mov [bx], ax
+  mov  bx, #BIOSMEM_VIDEO_CTL
+  mov  al, #0x60
+  test 4[bp], #VBE_MODE_PRESERVE_DISPLAY_MEMORY
+  jz   set_bda_clear_mem
+  or   al, #0x80
+set_bda_clear_mem:
+  seg  es
+  mov [bx], al
+  mov  al, [si+25] ;; bpp
+  cmp  al, #4
+  jz   vga_compat_mode
+  mov  bx, #BIOSMEM_CURRENT_MODE
+  mov  ax, #0x5f ;; FIXME
+  seg  es
+  mov [bx], al
+vga_compat_mode:
+  SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
+  pop  es
   pop  ds
   pop  si
+  pop  bx
   pop  ax
   pop  bp
+  mov  ax, #0x004f
   ret
 
 msg_vbe2_sig_found:
@@ -1418,23 +1466,7 @@ ASM_END
                    cur_info->info.YResolution,
                    cur_info->info.BitsPerPixel);
 #endif
-            dispi_set_mode(BX, &cur_info->info);
-
-            write_bda_word(BIOSMEM_NB_COLS, cur_info->info.XResolution >> 3);
-            write_bda_word(BIOSMEM_NB_ROWS, (cur_info->info.YResolution >> 4) - 1);
-            write_bda_word(BIOSMEM_CHAR_HEIGHT, 16);
-            write_bda_word(BIOSMEM_CURRENT_PAGE, 0);
-            write_bda_word(BIOSMEM_CURSOR_POS, 0);
-            write_bda_word(BIOSMEM_VBE_MODE, BX & 0x1ff);
-            write_bda_byte(BIOSMEM_VIDEO_CTL, (0x60 | no_clear));
-ASM_START
-            SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
-ASM_END
-            if (cur_info->info.BitsPerPixel != 4) {
-              write_bda_byte(BIOSMEM_CURRENT_MODE, 0x5f); // FIXME
-            }
-
-            AX = 0x4f;
+            AX = dispi_set_mode(BX, &cur_info->info);
         } else {
 #ifdef DEBUG
             printf("VBE *NOT* found mode %x\n" , BX);
@@ -2054,8 +2086,6 @@ ASM_END
  *           CX    =         Unchanged
  *           ES:DI =         Unchanged
  */
-
-
 ASM_START
 vbe_biosfn_display_identification_extensions:
   cmp  bl,#0x01
