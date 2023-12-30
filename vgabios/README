@@ -106,6 +106,10 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
+vgabios-github-current : Dec 30 2023
+  - Volker
+    - added VBE set palette data support to protected mode interface
+
 vgabios-0.8b : Dec 28 2023
   - Volker
     - added VBE get/set palette data support for Banshee and Cirrus versions

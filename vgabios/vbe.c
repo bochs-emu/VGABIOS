@@ -57,7 +57,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2023-12-28"
+.ascii       "ID: vbe.c 2023-12-30"
 .byte        0x00
 
 vbebios_info_string:
@@ -82,7 +82,7 @@ msg_vbe_init:
 vesa_pm_start:
   dw vesa_pm_set_window - vesa_pm_start
   dw vesa_pm_set_display_start - vesa_pm_start
-  dw vesa_pm_unimplemented - vesa_pm_start
+  dw vesa_pm_set_palette_data - vesa_pm_start
   dw vesa_pm_io_ports_table - vesa_pm_start
 vesa_pm_io_ports_table:
   dw VBE_DISPI_IOPORT_INDEX
@@ -204,8 +204,31 @@ set_xy_regs:
   mov  ax, #0x004f
   ret
 
-vesa_pm_unimplemented:
-  mov ax, #0x014f
+vesa_pm_set_palette_data:
+  push  ecx
+  push  edx
+  push  edi
+  mov   al, dl
+  mov   dx, # VGAREG_DAC_WRITE_ADDRESS
+  out   dx, al
+  mov   dx, # VGAREG_DAC_DATA
+  cld
+vesa_pm_set_dac_loop:
+  seg   es
+  mov   al, [edi+2]
+  out   dx, al
+  seg   es
+  mov   al, [edi+1]
+  out   dx, al
+  seg   es
+  mov   al, [edi]
+  out   dx, al
+  add   edi, #4
+  loop  vesa_pm_set_dac_loop
+  pop   edi
+  pop   edx
+  pop   ecx
+  mov   ax, #0x004f
   ret
   USE16
 vesa_pm_end:

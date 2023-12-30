@@ -187,7 +187,7 @@ vgabios_name:
 
 vgabios_version:
 #ifndef VGABIOS_VERS
-.ascii	"current-svn"
+.ascii	"github-current"
 #else
 .ascii VGABIOS_VERS
 #endif
