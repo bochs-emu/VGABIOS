@@ -1,6 +1,6 @@
 // ============================================================================================
 //
-//  Copyright (C) 2001-2023 The LGPL VGABios developers Team
+//  Copyright (C) 2001-2024 The LGPL VGABios developers Team
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -199,7 +199,7 @@ vgabios_date:
 .byte	0x00
 
 vgabios_copyright:
-.ascii	"(C) 2002-2023 the LGPL VGABios developers Team"
+.ascii	"(C) 2002-2024 the LGPL VGABios developers Team"
 .byte	0x0a,0x0d
 .byte	0x00
 
@@ -463,7 +463,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios ID: vgabios.c 2023-12-28"
+.ascii "VGABios ID: vgabios.c 2024-01-07"
 .byte  0x0a,0x00
 #endif
 ASM_END
