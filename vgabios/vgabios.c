@@ -121,7 +121,6 @@ static void biosfn_load_gfx_8_8_dd_chars();
 static void biosfn_load_gfx_8_16_chars();
 static void biosfn_alternate_prtsc();
 static void biosfn_switch_video_interface();
-static void biosfn_enable_video_refresh_control();
 static void biosfn_write_string();
 extern Bit8u video_save_pointer_table[];
 
@@ -391,8 +390,12 @@ int10_test_BL33:
   jmp   biosfn_enable_grayscale_summing
 int10_test_BL34:
   cmp   bl, #0x34
-  jne   int10_normal
+  jne   int10_test_BL36
   jmp   biosfn_enable_cursor_emulation
+int10_test_BL36:
+  cmp   bl, #0x36
+  jne   int10_normal
+  jmp   biosfn_enable_video_refresh_control
 int10_test_10:
   cmp   ah, #0x10
   jne   int10_test_1B
@@ -723,10 +726,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
         break;
        case 0x35:
         biosfn_switch_video_interface(GET_AL(),ES,DX);
-        SET_AL(0x12);
-        break;
-       case 0x36:
-        biosfn_enable_video_refresh_control(GET_AL());
         SET_AL(0x12);
         break;
 #ifdef DEBUG
@@ -3502,7 +3501,6 @@ biosfn_enable_video_addressing:
   pop   bx
   ret
 
-
 biosfn_enable_grayscale_summing:
   push  ds
   push  bx
@@ -3524,7 +3522,6 @@ biosfn_enable_grayscale_summing:
   pop   ds
   ret
 
-
 biosfn_enable_cursor_emulation:
   push  ds
   push  bx
@@ -3544,16 +3541,29 @@ biosfn_enable_cursor_emulation:
   pop   bx
   pop   ds
   ret
+
+biosfn_enable_video_refresh_control:
+  push bx
+  push dx
+  and  al, #0x01
+  shl  al, #5
+  mov  bl, al
+  mov  dx, # VGAREG_SEQU_ADDRESS
+  mov  al, #0x01
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0xdf
+  or   al, bl
+  out  dx, al
+  mov  ax, #0x1212
+  pop  dx
+  pop  bx
+  ret
 ASM_END
 
 // --------------------------------------------------------------------------------------------
 static void biosfn_switch_video_interface (AL,ES,DX) Bit8u AL;Bit16u ES;Bit16u DX;
-{
-#ifdef DEBUG
- unimplemented();
-#endif
-}
-static void biosfn_enable_video_refresh_control (AL) Bit8u AL;
 {
 #ifdef DEBUG
  unimplemented();
@@ -4865,7 +4875,7 @@ ASM_START
 ASM_END
 
 ASM_START
-.ascii "vgabios ends here"
+.ascii "vgabios end."
 .byte  0x00
 vgabios_end:
 .byte 0xCB
