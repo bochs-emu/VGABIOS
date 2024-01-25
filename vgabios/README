@@ -106,6 +106,10 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
+vgabios-github-current : Jan 24 2024
+  - Volker
+    - Implemented AH=12h / BL=36h (video refresh control)
+
 vgabios-0.8c : Jan 07 2024
   - Volker
     - added VBE set palette data support to protected mode interface

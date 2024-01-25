@@ -119,8 +119,6 @@ static void biosfn_load_gfx_user_chars();
 static void biosfn_load_gfx_8_14_chars();
 static void biosfn_load_gfx_8_8_dd_chars();
 static void biosfn_load_gfx_8_16_chars();
-static void biosfn_alternate_prtsc();
-static void biosfn_switch_video_interface();
 static void biosfn_write_string();
 extern Bit8u video_save_pointer_table[];
 
@@ -370,8 +368,12 @@ int10_test_12:
   cmp   ah, #0x12
   jne   int10_test_10
   cmp   bl, #0x10
-  jne   int10_test_BL30
+  jne   int10_test_BL20
   jmp   biosfn_get_ega_info
+int10_test_BL20:
+  cmp   bl, #0x20
+  jne   int10_test_BL30
+  jmp   biosfn_alternate_prtsc
 int10_test_BL30:
   cmp   bl, #0x30
   jne   int10_test_BL31
@@ -390,8 +392,12 @@ int10_test_BL33:
   jmp   biosfn_enable_grayscale_summing
 int10_test_BL34:
   cmp   bl, #0x34
-  jne   int10_test_BL36
+  jne   int10_test_BL35
   jmp   biosfn_enable_cursor_emulation
+int10_test_BL35:
+  cmp   bl, #0x35
+  jne   int10_test_BL36
+  jmp   biosfn_switch_video_interface
 int10_test_BL36:
   cmp   bl, #0x36
   jne   int10_normal
@@ -717,22 +723,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
 #endif
       }
 
-     break;
-   case 0x12:
-     switch(GET_BL())
-      {
-       case 0x20:
-        biosfn_alternate_prtsc();
-        break;
-       case 0x35:
-        biosfn_switch_video_interface(GET_AL(),ES,DX);
-        SET_AL(0x12);
-        break;
-#ifdef DEBUG
-       default:
-        unknown();
-#endif
-      }
      break;
    case 0x13:
      biosfn_write_string(GET_AL(),GET_BH(),GET_BL(),CX,GET_DH(),GET_DL(),ES,BP);
@@ -3374,18 +3364,15 @@ mode_ega_color:
   pop   ax
   pop   ds
   ret
-ASM_END
 
-// --------------------------------------------------------------------------------------------
-static void biosfn_alternate_prtsc()
-{
+biosfn_alternate_prtsc:
 #ifdef DEBUG
- unimplemented();
+  push  ax
+  call  _unimplemented
+  pop   ax
 #endif
-}
+  ret
 
-// --------------------------------------------------------------------------------------------
-ASM_START
 biosfn_select_vert_res:
 
 ; res : 00 200 lines, 01 350 lines, 02 400 lines
@@ -3482,7 +3469,6 @@ biosfn_enable_default_palette_loading:
   pop   ds
   ret
 
-
 biosfn_enable_video_addressing:
   push  bx
   push  dx
@@ -3542,6 +3528,14 @@ biosfn_enable_cursor_emulation:
   pop   ds
   ret
 
+biosfn_switch_video_interface:
+#ifdef DEBUG
+  push  ax
+  call  _unimplemented
+  pop   ax
+#endif
+  ret
+
 biosfn_enable_video_refresh_control:
   push bx
   push dx
@@ -3562,13 +3556,6 @@ biosfn_enable_video_refresh_control:
   ret
 ASM_END
 
-// --------------------------------------------------------------------------------------------
-static void biosfn_switch_video_interface (AL,ES,DX) Bit8u AL;Bit16u ES;Bit16u DX;
-{
-#ifdef DEBUG
- unimplemented();
-#endif
-}
 
 // --------------------------------------------------------------------------------------------
 static void biosfn_write_string (flag,page,attr,count,row,col,seg,offset)
