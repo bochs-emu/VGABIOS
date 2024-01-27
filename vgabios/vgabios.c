@@ -472,7 +472,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios ID: vgabios.c 2024-01-07"
+.ascii "VGABios ID: vgabios.c 2024-01-27"
 .byte  0x0a,0x00
 #endif
 ASM_END
@@ -1206,13 +1206,12 @@ Bit8u page;
 {
  Bit16u cursor,crtc_addr;
  Bit16u pgsize,address;
- Bit8u mode,line;
+ Bit8u line;
 
  if(page>7)return;
 
  // Get the mode
- mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
- line=find_vga_entry(mode);
+ line=find_vga_entry(0xff); // current mode
  if(line==0xFF)return;
 
  // Get pos curs pos for the right page
@@ -1490,7 +1489,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
 {
  // page == 0xFF if current
 
- Bit8u mode,line,cheight,bpp,cols;
+ Bit8u line,cheight,bpp,cols;
  Bit16u nbcols,nbrows,i;
  Bit16u address,pgsize;
 
@@ -1498,12 +1497,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
  if(cul>clr)return;
 
  // Get the mode
- mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
- line=find_vga_entry(mode);
-#ifdef VGAEXT
- if (VGAEXT_is_8bpp_mode())
-  line = 14;
-#endif
+ line=find_vga_entry(0xff); // current mode
  if(line==0xFF)return;
 
  // Get the dimensions
@@ -1665,13 +1659,12 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
 static void biosfn_read_char_attr (page,car)
 Bit8u page;Bit16u *car;
 {Bit16u ss=get_SS();
- Bit8u xcurs,ycurs,mode,line;
+ Bit8u xcurs,ycurs,line;
  Bit16u nbcols,pgsize,address;
  Bit16u cursor;
 
  // Get the mode
- mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
- line=find_vga_entry(mode);
+ line=find_vga_entry(0xff); // current mode
  if(line==0xFF)return;
 
  // Get the cursor pos for the page
@@ -1935,17 +1928,12 @@ ASM_END
 static void biosfn_write_char_attr (car,page,attr,count)
 Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
 {
- Bit8u cheight,xcurs,ycurs,mode,line,bpp;
+ Bit8u cheight,xcurs,ycurs,line,bpp;
  Bit16u nbcols,pgsize,address;
  Bit16u cursor,carattr;
 
  // Get the mode
- mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
- line=find_vga_entry(mode);
-#ifdef VGAEXT
- if (VGAEXT_is_8bpp_mode())
-  line = 14;
-#endif
+ line=find_vga_entry(0xff); // current mode
  if(line==0xFF)return;
 
  // Get the cursor pos for the page
@@ -1998,17 +1986,12 @@ Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
 static void biosfn_write_char_only (car,page,attr,count)
 Bit8u car;Bit8u page;Bit8u attr;Bit16u count;
 {
- Bit8u cheight,xcurs,ycurs,mode,line,bpp;
+ Bit8u cheight,xcurs,ycurs,line,bpp;
  Bit16u nbcols,pgsize,address;
  Bit16u cursor;
 
  // Get the mode
- mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
- line=find_vga_entry(mode);
-#ifdef VGAEXT
- if (VGAEXT_is_8bpp_mode())
-  line = 14;
-#endif
+ line=find_vga_entry(0xff); // current mode
  if(line==0xFF)return;
 
  // Get the cursor pos for the page
@@ -2143,12 +2126,11 @@ ASM_END
 // --------------------------------------------------------------------------------------------
 static void biosfn_write_pixel (BH,AL,CX,DX) Bit8u BH;Bit8u AL;Bit16u CX;Bit16u DX;
 {
- Bit8u mode,line,mask,attr,data;
+ Bit8u line,mask,attr,data;
  Bit16u addr;
 
  // Get the mode
- mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
- line=find_vga_entry(mode);
+ line=find_vga_entry(0xff); // current mode
  if(line==0xFF)return;
  if(vga_modes[line].class==TEXT)return;
 
@@ -2222,13 +2204,12 @@ ASM_END
 // --------------------------------------------------------------------------------------------
 static void biosfn_read_pixel (BH,CX,DX,AX) Bit8u BH;Bit16u CX;Bit16u DX;Bit16u *AX;
 {
- Bit8u mode,line,mask,attr,data,i;
+ Bit8u line,mask,attr,data,i;
  Bit16u addr;
  Bit16u ss=get_SS();
 
  // Get the mode
- mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
- line=find_vga_entry(mode);
+ line=find_vga_entry(0xff); // current mode
  if(line==0xFF)return;
  if(vga_modes[line].class==TEXT)return;
 
@@ -2277,7 +2258,7 @@ static void biosfn_write_teletype (car, page, attr, flag)
 Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
 {// flag = WITH_ATTR / NO_ATTR
 
- Bit8u cheight,xcurs,ycurs,mode,line,bpp;
+ Bit8u cheight,xcurs,ycurs,line,bpp;
  Bit16u nbcols,nbrows,pgsize,address;
  Bit16u cursor;
 
@@ -2286,12 +2267,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
   page=read_bda_byte(BIOSMEM_CURRENT_PAGE);
 
  // Get the mode
- mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
- line=find_vga_entry(mode);
-#ifdef VGAEXT
- if (VGAEXT_is_8bpp_mode())
-  line = 14;
-#endif
+ line=find_vga_entry(0xff); // current mode
  if(line==0xFF)return;
 
  // Get the cursor pos for the page
@@ -4114,13 +4090,24 @@ ASM_END
 static Bit8u find_vga_entry(mode)
 Bit8u mode;
 {
- Bit8u i,line=0xFF;
- for(i=0;i<=MODE_MAX;i++)
-  if(vga_modes[i].svgamode==mode)
-   {line=i;
-    break;
-   }
- return line;
+  Bit8u i, line = 0xff, current=0;
+  if (mode == 0xff) {
+    mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
+    current = 1;
+  }
+  for (i = 0; i <= MODE_MAX; i++) {
+    if (vga_modes[i].svgamode == mode) {
+      line = i;
+      break;
+    }
+  }
+#ifdef VGAEXT
+  if ((current == 1) && (line==0xff)) {
+    if (VGAEXT_is_8bpp_mode())
+      line = 14;
+  }
+#endif
+  return line;
 }
 
 /* =========================================================== */
