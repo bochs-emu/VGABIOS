@@ -110,6 +110,7 @@ vgabios-github-current : Jan 27 2024
   - Volker
     - Implemented AH=12h / BL=36h (video refresh control)
     - Fixed video mode detection for TTY functions
+    - Fixed Cirrus vertical timing parameters for 800 x 600 modes
 
 vgabios-0.8c : Jan 07 2024
   - Volker
