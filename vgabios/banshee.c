@@ -1737,6 +1737,42 @@ banshee_vesa_07h_bl1:
   mov  ax, #0x004f
   ret
 
+banshee_vesa_08h:
+  cmp  bl, #0x01
+  je   banshee_get_dac_pal_format
+  jb   banshee_set_dac_pal_format
+  mov  ax, #0x0100
+  ret
+banshee_set_dac_pal_format:
+  push dx
+  call banshee_get_dac_mode
+  cmp  bh, #0x06
+  je   banshee_set_normal_dac
+  cmp  bh, #0x08
+  jne  banshee_vesa_08h_unsupported
+  or   eax, #0x0004
+  jnz  banshee_set_dac_mode
+banshee_set_normal_dac:
+  and  eax, #~0x0004
+banshee_set_dac_mode:
+  out  dx, eax
+  pop  dx
+banshee_get_dac_pal_format:
+  push dx
+  mov  bh, #0x06
+  call banshee_get_dac_mode
+  and  eax, #0x0004
+  jz   banshee_vesa_08h_ok
+  mov  bh, #0x08
+banshee_vesa_08h_ok:
+  pop  dx
+  mov  ax, #0x004f
+  ret
+banshee_vesa_08h_unsupported:
+  pop  dx
+  mov  ax, #0x014f
+  ret
+
 banshee_vesa_15h:
   cmp bl, #0x01
   jb  banshee_vesa_get_capabilities
@@ -1906,6 +1942,12 @@ banshee_set_start_addr:
   out  dx, eax
   ret
 
+banshee_get_dac_mode:
+  call banshee_get_io_base_address
+  mov  dl, #0x28 ;; vgaInit0
+  in   eax, dx
+  ret
+
 ;; DDC helper functions for VESA 15h
 
 banshee_ddc_init:
@@ -2063,7 +2105,7 @@ banshee_vesa_handlers:
   dw banshee_vesa_06h
   dw banshee_vesa_07h
   ;; 08h
-  dw banshee_vesa_unimplemented
+  dw banshee_vesa_08h
   dw vbe_biosfn_set_get_palette_data
   dw banshee_vesa_unimplemented
   dw banshee_vesa_unimplemented
