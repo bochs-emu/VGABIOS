@@ -57,7 +57,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-01-07"
+.ascii       "ID: vbe.c 2024-02-03"
 .byte        0x00
 
 vbebios_info_string:
@@ -74,7 +74,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-01-07"
+.ascii "VBE Bios ID: vbe.c 2024-02-03"
 .byte  0x0a,0x00
 #endif
 
@@ -578,8 +578,13 @@ vga_compat_setup:
   in   ax, dx
   push ax
   mov  dx, # VGAREG_VGA_CRTC_ADDRESS
-  mov  ax, #0x0011
-  out  dx, ax
+  mov  al, #0x11
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0x7f
+  out  dx, al
+  dec  dx
   pop  ax
   push ax
   shr  ax, #3
@@ -595,6 +600,7 @@ vga_compat_setup:
   out  dx, ax
   mov  dx, # VBE_DISPI_IOPORT_DATA
   in   ax, dx
+  push ax
   dec  ax
   push ax
   mov  dx, # VGAREG_VGA_CRTC_ADDRESS
@@ -607,6 +613,7 @@ vga_compat_setup:
   inc  dx
   in   al, dx
   and  al, #0xbd
+  or   al, #0x10
   test ah, #0x01
   jz   bit8_clear
   or   al, #0x02
@@ -616,16 +623,54 @@ bit8_clear:
   or   al, #0x40
 bit9_clear:
   out  dx, al
+  ;; set CRTC Y blanking start
+  dec  dx
+  pop  ax
+  push ax
+  mov  ah, al
+  mov  al, #0x15
+  out  dx, ax
+  pop  ax
+  mov  al, #0x07
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0xf7
+  test ah, #0x01
+  jz   bit8_clear2
+  or   al, #0x08
+bit8_clear2:
+  out  dx, al
+  dec  dx
+  mov  al, #0x09
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0xdf
+  test ah, #0x02
+  jz   bit9_clear2
+  or   al, #0x20
+bit9_clear2:
+  out  dx, al
   ;; other settings
   mov  dx, # VGAREG_VGA_CRTC_ADDRESS
-  mov  ax, #0x0009
-  out  dx, ax
+  mov  al, #0x09
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0xf0
+  or   al, #0x40
+  out  dx, al
+  dec  dx
   mov  al, #0x17
   out  dx, al
-  mov  dx, # VGAREG_VGA_CRTC_DATA
+  inc  dx
   in   al, dx
   or   al, #0x03
   out  dx, al
+  dec  dx
+  mov  ax, #0xff18
+  out  dx, ax
   mov  dx, # VGAREG_ACTL_RESET
   in   al, dx
   mov  dx, # VGAREG_ACTL_ADDRESS
