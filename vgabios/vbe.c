@@ -57,7 +57,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-02-03"
+.ascii       "ID: vbe.c 2024-02-04"
 .byte        0x00
 
 vbebios_info_string:
@@ -74,7 +74,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-02-03"
+.ascii "VBE Bios ID: vbe.c 2024-02-04"
 .byte  0x0a,0x00
 #endif
 
@@ -1386,16 +1386,14 @@ vbe_biosfn_return_mode_information:
   push cx
   mov  ax, cx
   and  ax, #VBE_MODE_LINEAR_FRAME_BUFFER
-  jz   mode_no_lfb_1
+  jz   mode_no_lfb
   mov  ax, #0x0001
-mode_no_lfb_1:
+mode_no_lfb:
   push ax
   and  cx, #0x01ff
   push cx
   call _mode_info_find_mode
-  inc  sp
-  inc  sp
-  pop  bx
+  add  sp, #4
   or   ax, ax
   jz   mode_not_found
   add  ax, #2
@@ -1408,8 +1406,6 @@ mode_no_lfb_1:
   rep
     stosw
   mov  di, bp
-  or   bx, bx
-  jz   mode_no_lfb_2
   mov  al, #0x01
   seg  es
   mov  [di+26], al
@@ -1424,7 +1420,6 @@ mode_no_lfb_1:
   xor  ax, ax
   seg  es
   mov  [di+40], ax
-mode_no_lfb_2:
   call dispi_support_bank_granularity_32k
   and  ax, #VBE_DISPI_BANK_GRANULARITY_32K
   jz   no_gran_32k
