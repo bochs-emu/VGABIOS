@@ -1258,8 +1258,9 @@ bv00_1:
 bv00_2:
   add  di, #4
 bv00_3:
-  xor  ax, ax ;; caps
+  mov  ax, 0x0001 ;; caps: 8-bit DAC
   stosw
+  xor  ax, ax
   stosw
   lea  ax, 0x22[bp]
   stosw
