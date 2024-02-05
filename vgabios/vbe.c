@@ -57,7 +57,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-02-04"
+.ascii       "ID: vbe.c 2024-02-05"
 .byte        0x00
 
 vbebios_info_string:
@@ -74,7 +74,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-02-04"
+.ascii "VBE Bios ID: vbe.c 2024-02-05"
 .byte  0x0a,0x00
 #endif
 
@@ -1415,11 +1415,13 @@ mode_no_lfb:
   mov ax, #0x1234 // experimental vendor
 #endif
   call pci_get_lfb_addr
+  jz   no_pci_lfb
   seg  es
   mov  [di+42], ax
   xor  ax, ax
   seg  es
   mov  [di+40], ax
+no_pci_lfb:
   call dispi_support_bank_granularity_32k
   and  ax, #VBE_DISPI_BANK_GRANULARITY_32K
   jz   no_gran_32k
