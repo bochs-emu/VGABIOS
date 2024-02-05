@@ -472,7 +472,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios ID: vgabios.c 2024-01-27"
+.ascii "VGABios ID: vgabios.c 2024-02-05"
 .byte  0x0a,0x00
 #endif
 ASM_END
@@ -810,7 +810,6 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
   Bit8u line,mmask,*palette,vpti;
   Bit16u i,twidth,theightm1,cheight;
   Bit8u modeset_ctl,video_ctl,vga_switches;
-  Bit16u crtc_addr;
 
 #ifdef VBE
 ASM_START
@@ -871,48 +870,7 @@ ASM_END
     }
   }
 
-  // Reset Attribute Ctl flip-flop
-  inb(VGAREG_ACTL_RESET);
-
- // Set Attribute Ctl
- for(i=0;i<=0x13;i++)
-  {outb(VGAREG_ACTL_ADDRESS,i);
-   outb(VGAREG_ACTL_WRITE_DATA,video_param_table[vpti].actl_regs[i]);
-  }
- outb(VGAREG_ACTL_ADDRESS,0x14);
- outb(VGAREG_ACTL_WRITE_DATA,0x00);
-
- // Set Sequencer Ctl
- outb(VGAREG_SEQU_ADDRESS,0);
- outb(VGAREG_SEQU_DATA,0x03);
- for(i=1;i<=4;i++)
-  {outb(VGAREG_SEQU_ADDRESS,i);
-   outb(VGAREG_SEQU_DATA,video_param_table[vpti].sequ_regs[i - 1]);
-  }
-
- // Set Grafx Ctl
- for(i=0;i<=8;i++)
-  {outb(VGAREG_GRDC_ADDRESS,i);
-   outb(VGAREG_GRDC_DATA,video_param_table[vpti].grdc_regs[i]);
-  }
-
- // Set CRTC address VGA or MDA
- crtc_addr=vga_modes[line].memmodel==MTEXT?VGAREG_MDA_CRTC_ADDRESS:VGAREG_VGA_CRTC_ADDRESS;
-
- // Disable CRTC write protection
- outw(crtc_addr,0x0011);
- // Set CRTC regs
- for(i=0;i<=0x18;i++)
-  {outb(crtc_addr,i);
-   outb(crtc_addr+1,video_param_table[vpti].crtc_regs[i]);
-  }
-
- // Set the misc register
- outb(VGAREG_WRITE_MISC_OUTPUT,video_param_table[vpti].miscreg);
-
- // Enable video
- outb(VGAREG_ACTL_ADDRESS,0x20);
- inb(VGAREG_ACTL_RESET);
+  set_vga_mode_hw(&video_param_table[vpti]);
 
 #ifdef BANSHEE
 ASM_START
@@ -947,7 +905,11 @@ ASM_END
  write_bda_byte(BIOSMEM_CURRENT_MODE,mode);
  write_bda_word(BIOSMEM_NB_COLS,twidth);
  write_bda_word(BIOSMEM_PAGE_SIZE,*(Bit16u *)&video_param_table[vpti].slength_l);
- write_bda_word(BIOSMEM_CRTC_ADDRESS,crtc_addr);
+ if (video_param_table[vpti].miscreg & 1) {
+   write_bda_word(BIOSMEM_CRTC_ADDRESS, VGAREG_VGA_CRTC_ADDRESS);
+ } else {
+   write_bda_word(BIOSMEM_CRTC_ADDRESS, VGAREG_MDA_CRTC_ADDRESS);
+ }
  write_bda_byte(BIOSMEM_NB_ROWS,theightm1);
  write_bda_word(BIOSMEM_CHAR_HEIGHT,cheight);
  write_bda_byte(BIOSMEM_VIDEO_CTL,(0x60|noclearmem));
@@ -1016,6 +978,108 @@ ASM_END
      break;
    }
 }
+
+ASM_START
+_set_vga_mode_hw:
+  push bp
+  mov  bp, sp
+  push ax
+  push bx
+  push cx
+  push dx
+  push ds
+  mov  ax, #0xc000
+  mov  ds, ax
+  mov  bx, 4[bp]
+  push bx
+  ;; Reset Attribute Ctrl flip-flop
+  mov  dx, #VGAREG_ACTL_RESET
+  in   al, dx
+  ;; Set Attribute Ctrl
+  mov  dx, #VGAREG_ACTL_ADDRESS
+  mov  cx, #0x0014
+  xor  al, al
+  cld
+set_actl_regs:
+  out  dx, al
+  push ax
+  mov  al, 35[bx]
+  out  dx, al
+  pop  ax
+  inc  al
+  inc  bx
+  loop set_actl_regs
+  mov  al, #0x14
+  out  dx, al
+  xor  al, al
+  out  dx, al
+  pop  bx
+  push bx
+  ;; Set Sequencer Ctrl
+  mov  dx, #VGAREG_SEQU_ADDRESS
+  mov  ax, #0x0300
+  out  dx, ax
+  mov  cx, #0x0004
+  mov  al, #0x01
+  cld
+set_sequ_regs:
+  mov  ah, 5[bx]
+  out  dx, ax
+  inc  al
+  inc  bx
+  loop set_sequ_regs
+  pop  bx
+  push bx
+  ;; Set Graphics Ctrl
+  mov  dx, #VGAREG_GRDC_ADDRESS
+  mov  cx, #0x0009
+  xor  al, al
+  cld
+set_grdc_regs:
+  mov  ah, 55[bx]
+  out  dx, ax
+  inc  al
+  inc  bx
+  loop set_grdc_regs
+  pop  bx
+  ;; Set the misc register
+  mov  dx, #VGAREG_WRITE_MISC_OUTPUT
+  mov  al, 9[bx]
+  out  dx, al
+  test al, #0x01
+  jz   crtc_mono
+  mov  dx, #VGAREG_VGA_CRTC_ADDRESS
+  jnz  crtc_color
+crtc_mono:
+  mov  dx, #VGAREG_MDA_CRTC_ADDRESS
+crtc_color:
+  ;; Disable CRTC write protection
+  mov  ax, #0x0011
+  out  dx, ax
+  ;; Set CRTC regs
+  mov  cx, #0x0019
+  xor  al, al
+  cld
+set_crtc_regs:
+  mov  ah, 10[bx]
+  out  dx, ax
+  inc  al
+  inc  bx
+  loop set_crtc_regs
+  ;; Enable video
+  mov  dx, #VGAREG_ACTL_ADDRESS
+  mov  al, #0x20
+  out  dx, al
+  mov  dx, #VGAREG_ACTL_RESET
+  in   al, dx
+  pop  ds
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  pop  bp
+  ret
+ASM_END
 
 // --------------------------------------------------------------------------------------------
 ASM_START
