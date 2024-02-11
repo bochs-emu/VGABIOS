@@ -472,7 +472,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios ID: vgabios.c 2024-02-05"
+.ascii "VGABios ID: vgabios.c 2024-02-11"
 .byte  0x0a,0x00
 #endif
 ASM_END
@@ -4829,12 +4829,14 @@ strcpy_loop:
 ; VBE function 09h
 vbe_biosfn_set_get_palette_data:
   cmp   bl, #0x80
-  je    vbe_set_palette_data
+  je    vbe_set_palette_data_vsync
   cmp   bl, #0x01
   jb    vbe_set_palette_data
   je    vbe_get_palette_data
   mov   ax, #0x024f ; unimplemented
   ret
+vbe_set_palette_data_vsync:
+  call  vbebios_vsync_wait
 vbe_set_palette_data:
   push  cx
   push  dx
@@ -4889,6 +4891,16 @@ vbe_get_dac_loop:
   pop   dx
   pop   cx
   mov   ax, #0x004f
+  ret
+
+vbebios_vsync_wait:
+  push dx
+  mov  dx, #VGAREG_ACTL_RESET
+vbebios_wait_loop:
+  in   al, dx
+  test al, #0x08
+  jz   vbebios_wait_loop
+  pop  dx
   ret
 
 #endif

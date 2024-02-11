@@ -57,7 +57,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-02-05"
+.ascii       "ID: vbe.c 2024-02-11"
 .byte        0x00
 
 vbebios_info_string:
@@ -74,7 +74,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-02-05"
+.ascii "VBE Bios ID: vbe.c 2024-02-11"
 .byte  0x0a,0x00
 #endif
 
@@ -120,10 +120,18 @@ vesa_pm_set_display_start:
   cmp  bl, #0x80
   je   vesa_pm_set_display_start1
   cmp  bl, #0x00
-  je   vesa_pm_set_display_start1
+  je   vesa_pm_set_display_start2
   mov  ax, #0x0100
   ret
 vesa_pm_set_display_start1:
+  push dx
+  mov  dx, #VGAREG_ACTL_RESET
+vesa_pm_wait_loop_1:
+  in   al, dx
+  test al, #0x08
+  jz   vesa_pm_wait_loop_1
+  pop  dx
+vesa_pm_set_display_start2:
 ; convert offset to (X, Y) coordinate
 ; (would be simpler to change Bochs VBE API...)
   push eax
@@ -205,6 +213,16 @@ set_xy_regs:
   ret
 
 vesa_pm_set_palette_data:
+  cmp  bl, #0x80
+  jne  vesa_pm_no_wait
+  push dx
+  mov  dx, #VGAREG_ACTL_RESET
+vesa_pm_wait_loop_2:
+  in   al, dx
+  test al, #0x08
+  jz   vesa_pm_wait_loop_2
+  pop  dx
+vesa_pm_no_wait:
   push  ecx
   push  edx
   push  edi

@@ -1693,13 +1693,15 @@ banshee_vesa_06h_bl3:
 
 banshee_vesa_07h:
   cmp  bl, #0x80
-  je   banshee_vesa_07h_bl0
+  je   banshee_vesa_07h_bl80
   cmp  bl, #0x01
-  je   banshee_vesa_07h_bl1
-  jb   banshee_vesa_07h_bl0
+  je   banshee_vesa_07h_bl01
+  jb   banshee_vesa_07h_bl00
   mov  ax, #0x0100
   ret
-banshee_vesa_07h_bl0:
+banshee_vesa_07h_bl80:
+  call vbebios_vsync_wait
+banshee_vesa_07h_bl00:
   push dx
   call banshee_get_bpp_bytes
   mov  bl, al
@@ -1718,7 +1720,7 @@ banshee_vesa_07h_noinc:
   call banshee_set_start_addr
   mov  ax, #0x004f
   ret
-banshee_vesa_07h_bl1:
+banshee_vesa_07h_bl01:
   call banshee_get_start_addr
   push ax
   call banshee_get_line_offset

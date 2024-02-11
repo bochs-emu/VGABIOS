@@ -610,6 +610,130 @@ cirrus_set_video_mode_bda:
   pop bx
   ret
 
+  .align 2
+cirrus_vesa_pm_start:
+  dw cirrus_vesa_pm_set_window - cirrus_vesa_pm_start
+  dw cirrus_vesa_pm_set_display_start - cirrus_vesa_pm_start
+  dw cirrus_vesa_pm_set_palette_data - cirrus_vesa_pm_start
+  dw 0x0000
+
+  USE32
+cirrus_vesa_pm_set_window:
+  cmp  bx, #0x01
+  jbe  cirrus_vesa_pm_set_display_window1
+cirrus_vesa_pm_set_window_fail:
+  mov  ax, #0x014f
+  ret
+cirrus_vesa_pm_set_display_window1:
+  cmp dx, #0x40 ;; address must be < 0x40
+  jnc cirrus_vesa_pm_set_window_fail
+  push dx
+  mov al, bl ;; bl=bank number
+  add al, #0x09
+  mov ah, dl ;; dx=window address in granularity
+  shl ah, #2
+  mov dx, #0x3ce
+  out dx, ax
+  pop dx
+  mov  ax, #0x004f
+  ret
+
+cirrus_vesa_pm_set_display_start:
+  cmp  bl, #0x80
+  je   cirrus_vesa_pm_set_display_start1
+  cmp  bl, #0x00
+  je   cirrus_vesa_pm_set_display_start2
+  mov  ax, #0x0100
+  ret
+cirrus_vesa_pm_set_display_start1:
+  push dx
+  mov  dx, #VGAREG_ACTL_RESET
+cirrus_vesa_pm_wait_1:
+  in   al, dx
+  test al, #0x08
+  jz   cirrus_vesa_pm_wait_1
+  pop  dx
+cirrus_vesa_pm_set_display_start2:
+  push bx
+  push dx
+  push cx
+  mov  dx, #VGAREG_VGA_CRTC_ADDRESS
+  mov  al, #0x0d
+  out  dx, al
+  inc  dx
+  pop  ax
+  out  dx, al
+  dec  dx
+  mov  al, #0x0c
+  out  dx, ax
+  mov  al, #0x1d
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0x7f
+  pop  bx
+  mov  ah, bl
+  shl  bl, #4
+  and  bl, #0x80
+  or   al, bl
+  out  dx, al
+  dec  dx
+  mov  bl, ah
+  and  ah, #0x01
+  shl  bl, #1
+  and  bl, #0x0c
+  or   ah, bl
+  mov  al, #0x1b
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0xf2
+  or   al, ah
+  out  dx, al
+  pop  bx
+  mov  ax, #0x004f
+  ret
+
+cirrus_vesa_pm_set_palette_data:
+  cmp  bl, #0x80
+  jne  cirrus_vesa_pm_no_wait
+  push dx
+  mov  dx, #VGAREG_ACTL_RESET
+cirrus_vesa_pm_wait_2:
+  in   al, dx
+  test al, #0x08
+  jz   cirrus_vesa_pm_wait_2
+  pop  dx
+cirrus_vesa_pm_no_wait:
+  push  ecx
+  push  edx
+  push  edi
+  mov   al, dl
+  mov   dx, # VGAREG_DAC_WRITE_ADDRESS
+  out   dx, al
+  mov   dx, # VGAREG_DAC_DATA
+  cld
+cirrus_vesa_pm_set_dac_loop:
+  seg   es
+  mov   al, [edi+2]
+  out   dx, al
+  seg   es
+  mov   al, [edi+1]
+  out   dx, al
+  seg   es
+  mov   al, [edi]
+  out   dx, al
+  add   edi, #4
+  loop  cirrus_vesa_pm_set_dac_loop
+  pop   edi
+  pop   edx
+  pop   ecx
+  mov   ax, #0x004f
+  ret
+  USE16
+cirrus_vesa_pm_end:
+
+#ifdef CIRRUS_VESA3_PMINFO
 cirrus_vesa_pmbios_init:
   retf
 cirrus_vesa_pmbios_entry:
@@ -635,6 +759,7 @@ cirrus_vesa_pmbios_return:
   pop bp
   popf
   retf
+#endif
 
 ; in si:mode table
 cirrus_switch_mode:
@@ -1214,7 +1339,7 @@ cirrus_vesa_01h_1:
     stosw ;; clear buffer
   pop di
 
-  mov  ax, #0x003b ;; mode attr
+  mov  ax, #0x001b ;; mode attr
   push bx
   mov  bl, [si+6] ;; bpp
   cmp  bl, #0x08
@@ -1225,7 +1350,7 @@ cirrus_vesa_no_8bpp:
   stosw
   mov ax, #0x0007 ;; win attr
   stosw
-  mov ax, #0x0010 ;; granularity =16K
+  mov ax, #0x0040 ;; granularity =64K
   stosw
   mov ax, #0x0040 ;; size =64K
   stosw
@@ -1429,12 +1554,13 @@ cirrus_vesa_05h:
 cirrus_vesa_05h_1:
   jmp cirrus_vesa_unimplemented
 cirrus_vesa_05h_setmempage:
-  or dh, dh ; address must be < 0x100
-  jnz cirrus_vesa_05h_1
+  cmp dx, #0x40 ;; address must be < 0x40
+  jnc cirrus_vesa_05h_1
   push dx
   mov al, bl ;; bl=bank number
   add al, #0x09
   mov ah, dl ;; dx=window address in granularity
+  shl ah, #2
   mov dx, #0x3ce
   out dx, ax
   pop dx
@@ -1447,6 +1573,7 @@ cirrus_vesa_05h_getmempage:
   out dx, al
   inc dx
   in al, dx
+  shr al, #2
   xor dx, dx
   mov dl, al ;; dx=window address in granularity
   mov ax, #0x004F
@@ -1490,12 +1617,14 @@ cirrus_vesa_06h_3:
 
 cirrus_vesa_07h:
   cmp  bl, #0x80
-  je   cirrus_vesa_07h_1
+  je   cirrus_vesa_07h_4
   cmp  bl, #0x01
   je   cirrus_vesa_07h_2
   jb   cirrus_vesa_07h_1
   mov  ax, #0x0100
   ret
+cirrus_vesa_07h_4:
+  call vbebios_vsync_wait
 cirrus_vesa_07h_1:
   push dx
   call cirrus_get_bpp_bytes
@@ -1545,6 +1674,20 @@ cirrus_vesa_07h_2:
   mov  cx, ax
   pop  dx
   mov  ax, #0x004f
+  ret
+
+cirrus_vesa_0ah:
+  test bl, bl
+  jnz cirrus_vesa_0ah_fail
+  mov di, #0xc000
+  mov es, di
+  mov di, # cirrus_vesa_pm_start
+  mov cx, # cirrus_vesa_pm_end
+  sub cx, di
+  mov ax, #0x004f
+  ret
+cirrus_vesa_0ah_fail:
+  mov ax, #0x014f
   ret
 
 cirrus_vesa_10h:
@@ -2114,7 +2257,7 @@ cirrus_vesa_handlers:
   ;; 08h
   dw cirrus_vesa_unimplemented
   dw vbe_biosfn_set_get_palette_data
-  dw cirrus_vesa_unimplemented
+  dw cirrus_vesa_0ah
   dw cirrus_vesa_unimplemented
   ;; 0Ch
   dw cirrus_vesa_unimplemented
