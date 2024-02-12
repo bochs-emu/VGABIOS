@@ -472,7 +472,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios ID: vgabios.c 2024-02-11"
+.ascii "VGABios ID: vgabios.c 2024-02-12"
 .byte  0x0a,0x00
 #endif
 ASM_END
@@ -835,7 +835,7 @@ ASM_END
   if(line==0xFF)
     return;
 
-  vpti=line_to_vpti[line];
+  vpti=vga_modes[line].vpti;
   twidth=video_param_table[vpti].twidth;
   theightm1=video_param_table[vpti].theightm1;
   cheight=video_param_table[vpti].cheight;
@@ -856,7 +856,7 @@ ASM_END
   if((modeset_ctl&0x08)==0)
   {
     // Set the PEL mask
-    outb(VGAREG_PEL_MASK,vga_modes[line].pelmask);
+    outb(VGAREG_PEL_MASK, 0xff);
 
     load_dac_palette(vga_modes[line].dacmodel);
 
@@ -1295,7 +1295,7 @@ Bit8u page;
   }
  else
   {
-   address = page * (*(Bit16u *)&video_param_table[line_to_vpti[line]].slength_l);
+   address = page * (*(Bit16u *)&video_param_table[vga_modes[line].vpti].slength_l);
   }
 
  // CRTC regs 0x0c and 0x0d
