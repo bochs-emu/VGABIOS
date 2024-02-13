@@ -106,13 +106,13 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
-vgabios-github-current : Feb 12 2024
+vgabios-github-current : Feb 13 2024
   - Volker
     - Implemented AH=12h / BL=36h (video refresh control)
     - Banshee: Added support for VBE function get/set palette format
     - Fixed video mode detection for TTY functions
     - Fixed Cirrus vertical timing parameters for 800x600 modes
-    - Added protected mode interface for the Cirrus version
+    - Added protected mode interface for the Banshee and Cirrus version
   - Vort
     - Cirrus: Added support for 1152x864x8 video mode
 

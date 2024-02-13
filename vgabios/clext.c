@@ -619,8 +619,8 @@ cirrus_vesa_pm_start:
 
   USE32
 cirrus_vesa_pm_set_window:
-  cmp  bx, #0x01
-  jbe  cirrus_vesa_pm_set_display_window1
+  or   bx, bx
+  jz   cirrus_vesa_pm_set_display_window1
 cirrus_vesa_pm_set_window_fail:
   mov  ax, #0x014f
   ret
