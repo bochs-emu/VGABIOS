@@ -570,16 +570,6 @@ banshee_switch_mode:
   out  dx, al
   mov ax, #0x01
   out  dx, al
-  mov  al, [si+1]
-  cmp  al, #0x08
-  jne  no_8bpp_mode
-  mov  al, #0x03
-  xor  ah, ah
-  push ax
-  call _load_dac_palette
-  inc  sp
-  inc  sp
-no_8bpp_mode:
   call banshee_get_io_base_address
   xor  eax, eax
   mov  dl, #0x4c ;; dacMode
@@ -601,6 +591,7 @@ no_pll_setup:
   out  dx, eax
   and  eax, #0x00000fff
   mov  bl, [si+1]
+  inc  bl
   xor  bh, bh
   shr  bx, #3
   cmp  bl, #0x01
@@ -628,6 +619,16 @@ set_mode_8bpp_1:
 set_mode_8bpp_2:
   mov  dl, #0x5c ;; vidProcCfg
   out  dx, eax
+  mov  al, [si+1]
+  cmp  al, #0x08
+  jne  no_8bpp_mode
+  mov  al, #0x03
+  xor  ah, ah
+  push ax
+  call _load_dac_palette
+  inc  sp
+  inc  sp
+no_8bpp_mode:
   pop  ds
   pop  dx
   pop  cx

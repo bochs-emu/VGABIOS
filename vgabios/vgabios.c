@@ -472,7 +472,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios ID: vgabios.c 2024-02-12"
+.ascii "VGABios ID: vgabios.c 2024-02-14"
 .byte  0x0a,0x00
 #endif
 ASM_END
@@ -852,6 +852,14 @@ ASM_END
   // Then we know the number of lines
   // FIXME
 
+  set_vga_mode_hw(&video_param_table[vpti]);
+
+#ifdef BANSHEE
+ASM_START
+  call banshee_set_vga_mode
+ASM_END
+#endif
+
   // if palette loading (bit 3 of modeset ctl = 0)
   if((modeset_ctl&0x08)==0)
   {
@@ -869,14 +877,6 @@ ASM_START
 ASM_END
     }
   }
-
-  set_vga_mode_hw(&video_param_table[vpti]);
-
-#ifdef BANSHEE
-ASM_START
-  call banshee_set_vga_mode
-ASM_END
-#endif
 
  if(noclearmem==0x00)
   {
