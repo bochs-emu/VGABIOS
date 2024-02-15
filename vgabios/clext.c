@@ -1986,6 +1986,10 @@ cirrus_get_bpp_bytes_2:
 ;; in - ax: new line offset
 cirrus_set_line_offset:
   shr  ax, #3
+  cmp  ax, #0x200
+  jb   cirrus_offset_ok
+  mov  ax, #0x1ff
+cirrus_offset_ok:
   push ax
   call get_crtc_address
   mov  al, #0x13

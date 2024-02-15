@@ -2056,14 +2056,17 @@ banshee_get_line_offset:
   ret
 
 banshee_set_line_offset:
+  cmp  bx, #0x8000
+  jb   banshee_offset_ok
+  mov  bx, #0x7fff
+banshee_offset_ok:
   push bx
   push ax
   call banshee_get_io_base_address
   mov  dl, #0xe8 ;; vidDesktopOverlayStride
   in   eax, dx
   pop  bx
-  and  bx, #0x7fff
-  or   ax, bx
+  mov  ax, bx
   out  dx, eax
   pop  bx
   ret
