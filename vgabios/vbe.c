@@ -1220,6 +1220,29 @@ vga_compat_mode:
   mov  ax, #0x004f
   ret
 
+_dispi_set_vga_mode:
+  push bp
+  mov  bp, sp
+  mov  ax, 4[bp]
+  test al, #0x80
+  jnz  invalid_mode_num
+  test ax, #VBE_MODE_PRESERVE_DISPLAY_MEMORY
+  jz   vga_clear_mem
+  or   al, #0x80
+vga_clear_mem:
+  xor  ah, ah
+  push ax
+  call _biosfn_set_video_mode
+  inc  sp
+  inc  sp
+  pop  bp
+  mov  ax, #0x004f
+  ret
+invalid_mode_num:
+  pop  bp
+  mov  ax, #0x014f
+  ret
+
 msg_vbe2_sig_found:
 .ascii       "VBE 00h: VBE2 signature found\n"
 .byte        0x00
@@ -1485,35 +1508,19 @@ ASM_END
 void vbe_biosfn_set_mode(AX, BX)
 Bit16u AX; Bit16u BX;
 {
-    Bit16u            ss = get_SS();
     ModeInfoListItem  *cur_info;
     Boolean           using_lfb;
-    Bit8u             no_clear;
 
     using_lfb = ((BX & VBE_MODE_LINEAR_FRAME_BUFFER) == VBE_MODE_LINEAR_FRAME_BUFFER);
-    no_clear = ((BX & VBE_MODE_PRESERVE_DISPLAY_MEMORY) == VBE_MODE_PRESERVE_DISPLAY_MEMORY)?VBE_DISPI_NOCLEARMEM:0;
 
     // check for non vesa mode
     if ((BX & 0x1ff) < VBE_MODE_VESA_DEFINED) {
-        Bit8u   mode;
 
-ASM_START
-        mov  ax, #VBE_DISPI_DISABLED
-        call dispi_set_enable
-ASM_END
         // call the vgabios in order to set the video mode
         // this allows for going back to textmode with a VBE call (some applications expect that to work)
 
-        mode = BX & 0xff;
-        if ((mode & 0x80) == 0) {
-          if (no_clear != 0) {
-            mode |= 0x80;
-          }
-          biosfn_set_video_mode(mode);
-          AX = 0x4f;
-        } else {
-          AX = 0x014f;
-        }
+        AX = dispi_set_vga_mode(BX);
+
     } else {
 
         cur_info = mode_info_find_mode(BX & 0x1ff, using_lfb, &cur_info);

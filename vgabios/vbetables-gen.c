@@ -155,8 +155,7 @@ int main(int argc, char **argv)
         printf("/*Bit8u  NumberOfPlanes*/ %d,\n", 1);
       }
       printf("/*Bit8u  BitsPerPixel*/ %d,\n", pm->depth);
-      printf("/*Bit8u  NumberOfBanks*/ %d,\n", 
-             (pm->height * pitch + 65535) / 65536);
+      printf("/*Bit8u  NumberOfBanks*/ %d,\n", 1);
 
       if (pm->depth == 4)
         str = "VBE_MEMORYMODEL_PLANAR";
