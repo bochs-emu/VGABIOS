@@ -57,7 +57,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-02-11"
+.ascii       "ID: vbe.c 2024-02-24"
 .byte        0x00
 
 vbebios_info_string:
@@ -74,7 +74,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-02-11"
+.ascii "VBE Bios ID: vbe.c 2024-02-24"
 .byte  0x0a,0x00
 #endif
 
@@ -1026,6 +1026,7 @@ _mode_info_find_mode:
   push bp
   mov  bp, sp
   push bx
+  push si
   mov  ax, 4[bp]
   mov  si, #_mode_info_list
 find_mode_loop:
@@ -1047,6 +1048,7 @@ next_mode_info:
 vbe_mode_not_found:
   xor  ax, ax
 vbe_mode_found:
+  pop  si
   pop  bx
   pop  bp
   ret
@@ -1117,17 +1119,51 @@ no_vbe_flag:
 _dispi_set_mode:
   push bp
   mov  bp, sp
-  push ax
   push bx
   push si
   push ds
   push es
   push cs
   pop  ds
+  mov  si, 6[bp] ;; pointer to mode info
+  or   si, si
+  jnz  mode_found_ok
+#ifdef DEBUG
+  mov  ax, 4[bp]
+  push ax
+  push #msg_vbe_mode_not_found
+  call _printf
+  add  sp, #4
+#endif
+  pop  es
+  pop  ds
+  pop  si
+  pop  bx
+  pop  bp
+  mov  ax, #0x014f
+  ret
+mode_found_ok:
+  add  si, #2 ;; pointer to info block
   ;; first disable current mode (when switching between vesa modi)
   mov  ax, #VBE_DISPI_DISABLED
   call dispi_set_enable
-  mov  si, 6[bp] ;; pointer to info block
+#ifdef DEBUG
+  mov  ax, 4[bp]
+  push ax
+  push #msg_vbe_mode_found1
+  call _printf
+  add  sp, #4
+  mov  al, [si+25] ;; bpp
+  xor  ah,ah
+  push ax
+  mov  ax, [si+20] ;; yres
+  push ax
+  mov  ax, [si+18] ;; xres
+  push ax
+  push #msg_vbe_mode_found2
+  call _printf
+  add  sp, #8
+#endif
   mov  al, [si+25] ;; bpp
   xor  ah, ah
   cmp  al, #4
@@ -1215,7 +1251,6 @@ vga_compat_mode:
   pop  ds
   pop  si
   pop  bx
-  pop  ax
   pop  bp
   mov  ax, #0x004f
   ret
@@ -1243,12 +1278,23 @@ invalid_mode_num:
   mov  ax, #0x014f
   ret
 
+#ifdef DEBUG
 msg_vbe2_sig_found:
 .ascii       "VBE 00h: VBE2 signature found\n"
 .byte        0x00
 msg_vbe_modelist:
 .ascii       "VBE 00h: reporting %d VBE modes supported\n"
 .byte        0x00
+msg_vbe_mode_found1:
+.ascii       "VBE 02h: found mode %x, setting:\n"
+.byte        0x00
+msg_vbe_mode_found2:
+.ascii       "\t%d x %d x %d bpp\n"
+.byte        0x00
+msg_vbe_mode_not_found:
+.ascii       "VBE *NOT* found mode %x\n"
+.byte        0x00
+#endif
 ASM_END
 
 
@@ -1515,31 +1561,12 @@ Bit16u AX; Bit16u BX;
 
     // check for non vesa mode
     if ((BX & 0x1ff) < VBE_MODE_VESA_DEFINED) {
-
         // call the vgabios in order to set the video mode
         // this allows for going back to textmode with a VBE call (some applications expect that to work)
-
         AX = dispi_set_vga_mode(BX);
-
     } else {
-
         cur_info = mode_info_find_mode(BX & 0x1ff, using_lfb, &cur_info);
-
-        if (cur_info != 0) {
-#ifdef DEBUG
-            printf("VBE found mode %x, setting:\n", BX);
-            printf("\t%d x %d x %d bpp\n",
-                   cur_info->info.XResolution,
-                   cur_info->info.YResolution,
-                   cur_info->info.BitsPerPixel);
-#endif
-            AX = dispi_set_mode(BX, &cur_info->info);
-        } else {
-#ifdef DEBUG
-            printf("VBE *NOT* found mode %x\n" , BX);
-#endif
-            AX = 0x014f;
-        }
+        AX = dispi_set_mode(BX, cur_info);
     }
 }
 
