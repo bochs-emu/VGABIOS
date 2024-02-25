@@ -57,7 +57,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-02-24"
+.ascii       "ID: vbe.c 2024-02-25"
 .byte        0x00
 
 vbebios_info_string:
@@ -74,7 +74,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-02-24"
+.ascii "VBE Bios ID: vbe.c 2024-02-25"
 .byte  0x0a,0x00
 #endif
 
@@ -1125,7 +1125,42 @@ _dispi_set_mode:
   push es
   push cs
   pop  ds
-  mov  si, 6[bp] ;; pointer to mode info
+  mov  bx, 4[bp] ;; requested mode
+  mov  ax, bx
+  and  bx, #0x01ff
+  cmp  bx, #VBE_MODE_VESA_DEFINED
+  jnb  set_vesa_mode
+  test al, #0x80
+  jz   set_vga_mode
+set_vbe_mode_fail:
+  pop  es
+  pop  ds
+  pop  si
+  pop  bx
+  pop  bp
+  mov  ax, #0x014f
+  ret
+set_vga_mode:
+  test ax, #VBE_MODE_PRESERVE_DISPLAY_MEMORY
+  jz   vga_clear_mem
+  or   al, #0x80
+vga_clear_mem:
+  xor  ah, ah
+  push ax
+  call _biosfn_set_video_mode
+  inc  sp
+  inc  sp
+  jmp  set_vbe_mode_ok
+set_vesa_mode:
+  and  ax, #VBE_MODE_LINEAR_FRAME_BUFFER
+  jz   set_mode_no_lfb1
+  mov  ax, #0x0001
+set_mode_no_lfb1:
+  push ax
+  push bx
+  call _mode_info_find_mode
+  add  sp, #4
+  mov  si, ax ;; pointer to mode info
   or   si, si
   jnz  mode_found_ok
 #ifdef DEBUG
@@ -1135,13 +1170,7 @@ _dispi_set_mode:
   call _printf
   add  sp, #4
 #endif
-  pop  es
-  pop  ds
-  pop  si
-  pop  bx
-  pop  bp
-  mov  ax, #0x014f
-  ret
+  jnz  set_vbe_mode_fail
 mode_found_ok:
   add  si, #2 ;; pointer to info block
   ;; first disable current mode (when switching between vesa modi)
@@ -1192,9 +1221,9 @@ set_vbe_params:
   call dispi_support_bank_granularity_32k
   or   ax, #VBE_DISPI_ENABLED
   test 4[bp], #VBE_MODE_LINEAR_FRAME_BUFFER
-  jz   set_mode_no_lfb
+  jz   set_mode_no_lfb2
   or   ax, #VBE_DISPI_LFB_ENABLED
-set_mode_no_lfb:
+set_mode_no_lfb2:
   test 4[bp], #VBE_MODE_PRESERVE_DISPLAY_MEMORY
   jz   set_mode_clear_mem
   or   ax, #VBE_DISPI_NOCLEARMEM
@@ -1247,35 +1276,13 @@ set_bda_clear_mem:
   mov [bx], al
 vga_compat_mode:
   SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
+set_vbe_mode_ok:
   pop  es
   pop  ds
   pop  si
   pop  bx
   pop  bp
   mov  ax, #0x004f
-  ret
-
-_dispi_set_vga_mode:
-  push bp
-  mov  bp, sp
-  mov  ax, 4[bp]
-  test al, #0x80
-  jnz  invalid_mode_num
-  test ax, #VBE_MODE_PRESERVE_DISPLAY_MEMORY
-  jz   vga_clear_mem
-  or   al, #0x80
-vga_clear_mem:
-  xor  ah, ah
-  push ax
-  call _biosfn_set_video_mode
-  inc  sp
-  inc  sp
-  pop  bp
-  mov  ax, #0x004f
-  ret
-invalid_mode_num:
-  pop  bp
-  mov  ax, #0x014f
   ret
 
 #ifdef DEBUG
@@ -1554,20 +1561,7 @@ ASM_END
 void vbe_biosfn_set_mode(AX, BX)
 Bit16u AX; Bit16u BX;
 {
-    ModeInfoListItem  *cur_info;
-    Boolean           using_lfb;
-
-    using_lfb = ((BX & VBE_MODE_LINEAR_FRAME_BUFFER) == VBE_MODE_LINEAR_FRAME_BUFFER);
-
-    // check for non vesa mode
-    if ((BX & 0x1ff) < VBE_MODE_VESA_DEFINED) {
-        // call the vgabios in order to set the video mode
-        // this allows for going back to textmode with a VBE call (some applications expect that to work)
-        AX = dispi_set_vga_mode(BX);
-    } else {
-        cur_info = mode_info_find_mode(BX & 0x1ff, using_lfb, &cur_info);
-        AX = dispi_set_mode(BX, cur_info);
-    }
+  AX = dispi_set_mode(BX);
 }
 
 
