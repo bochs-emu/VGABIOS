@@ -1116,42 +1116,14 @@ no_vbe_flag:
 
 ;; set VBE mode helper function
 
-_dispi_set_mode:
+dispi_set_mode:
   push bp
   mov  bp, sp
   push bx
   push si
-  push ds
   push es
-  push cs
-  pop  ds
   mov  bx, 4[bp] ;; requested mode
   mov  ax, bx
-  and  bx, #0x01ff
-  cmp  bx, #VBE_MODE_VESA_DEFINED
-  jnb  set_vesa_mode
-  test al, #0x80
-  jz   set_vga_mode
-set_vbe_mode_fail:
-  pop  es
-  pop  ds
-  pop  si
-  pop  bx
-  pop  bp
-  mov  ax, #0x014f
-  ret
-set_vga_mode:
-  test ax, #VBE_MODE_PRESERVE_DISPLAY_MEMORY
-  jz   vga_clear_mem
-  or   al, #0x80
-vga_clear_mem:
-  xor  ah, ah
-  push ax
-  call _biosfn_set_video_mode
-  inc  sp
-  inc  sp
-  jmp  set_vbe_mode_ok
-set_vesa_mode:
   and  ax, #VBE_MODE_LINEAR_FRAME_BUFFER
   jz   set_mode_no_lfb1
   mov  ax, #0x0001
@@ -1164,21 +1136,24 @@ set_mode_no_lfb1:
   or   si, si
   jnz  mode_found_ok
 #ifdef DEBUG
-  mov  ax, 4[bp]
-  push ax
+  push bx
   push #msg_vbe_mode_not_found
   call _printf
   add  sp, #4
 #endif
-  jnz  set_vbe_mode_fail
+  pop  es
+  pop  si
+  pop  bx
+  pop  bp
+  mov  ax, #0x014f
+  ret
 mode_found_ok:
   add  si, #2 ;; pointer to info block
   ;; first disable current mode (when switching between vesa modi)
   mov  ax, #VBE_DISPI_DISABLED
   call dispi_set_enable
 #ifdef DEBUG
-  mov  ax, 4[bp]
-  push ax
+  push bx
   push #msg_vbe_mode_found1
   call _printf
   add  sp, #4
@@ -1278,31 +1253,13 @@ vga_compat_mode:
   SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
 set_vbe_mode_ok:
   pop  es
-  pop  ds
   pop  si
   pop  bx
   pop  bp
   mov  ax, #0x004f
   ret
-
-#ifdef DEBUG
-msg_vbe2_sig_found:
-.ascii       "VBE 00h: VBE2 signature found\n"
-.byte        0x00
-msg_vbe_modelist:
-.ascii       "VBE 00h: reporting %d VBE modes supported\n"
-.byte        0x00
-msg_vbe_mode_found1:
-.ascii       "VBE 02h: found mode %x, setting:\n"
-.byte        0x00
-msg_vbe_mode_found2:
-.ascii       "\t%d x %d x %d bpp\n"
-.byte        0x00
-msg_vbe_mode_not_found:
-.ascii       "VBE *NOT* found mode %x\n"
-.byte        0x00
-#endif
 ASM_END
+
 
 
 /** Function 00h - Return VBE Controller Information
@@ -1558,11 +1515,44 @@ ASM_END
  *              AX      = VBE Return Status
  *
  */
-void vbe_biosfn_set_mode(AX, BX)
-Bit16u AX; Bit16u BX;
-{
-  AX = dispi_set_mode(BX);
-}
+ASM_START
+vbe_biosfn_set_mode:
+  push ds
+  push cs
+  pop  ds
+  test bx, #0x3e00
+  jnz  set_vbe_mode_fail ;; unknown flags
+  mov  ax, bx
+  and  ax, #0x1ff ;; bit 8-0 mode
+  cmp  ax, #VBE_MODE_VESA_DEFINED ;; legacy VGA mode
+  jnb  set_vesa_mode
+  test al, #0x80
+  jz   set_vga_mode
+set_vbe_mode_fail:
+  pop  ds
+  mov  ax, #0x014f
+  ret
+set_vga_mode:
+  test bx, #VBE_MODE_PRESERVE_DISPLAY_MEMORY
+  jz   vga_clear_mem
+  or   al, #0x80
+vga_clear_mem:
+  xor  ah, ah
+  push ax
+  call _biosfn_set_video_mode
+  inc  sp
+  inc  sp
+  pop  ds
+  mov  ax, #0x004f
+  ret
+set_vesa_mode:
+  push bx
+  call dispi_set_mode ;; TODO: move all of this code here
+  inc  sp
+  inc  sp
+  pop  ds
+  ret
+ASM_END
 
 
 /** Function 03h - Return Current VBE Mode
@@ -2253,19 +2243,6 @@ vbe_return:
   pop  bp
   jmp  int10_end
 
-;; call remaining C function
-vbe_biosfn_set_mode:
-  push ds
-  push bx
-  push ax
-  mov  bx, #0xc000
-  mov  ds, bx
-  call _vbe_biosfn_set_mode
-  pop  ax
-  pop  bx
-  pop  ds
-  ret
-
 vbe_handlers:
   ;; 00h
   dw vbe_biosfn_return_controller_information
@@ -2295,4 +2272,22 @@ vbe_handlers:
   ;; 14h
   dw vbe_unimplemented
   dw vbe_biosfn_display_identification_extensions
+
+#ifdef DEBUG
+msg_vbe2_sig_found:
+.ascii       "VBE 00h: VBE2 signature found\n"
+.byte        0x00
+msg_vbe_modelist:
+.ascii       "VBE 00h: reporting %d VBE modes supported\n"
+.byte        0x00
+msg_vbe_mode_found1:
+.ascii       "VBE 02h: found mode %x, setting:\n"
+.byte        0x00
+msg_vbe_mode_found2:
+.ascii       "\t%d x %d x %d bpp\n"
+.byte        0x00
+msg_vbe_mode_not_found:
+.ascii       "VBE 02h: *NOT* found mode %x\n"
+.byte        0x00
+#endif
 ASM_END
