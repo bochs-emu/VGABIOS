@@ -57,7 +57,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-02-25"
+.ascii       "ID: vbe.c 2024-02-27"
 .byte        0x00
 
 vbebios_info_string:
@@ -74,7 +74,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-02-25"
+.ascii "VBE Bios ID: vbe.c 2024-02-27"
 .byte  0x0a,0x00
 #endif
 
@@ -1020,14 +1020,15 @@ vbe_fill_check_row:
   pop  ax
   ret
 
-;; ModeInfo helper function
-
-_mode_info_find_mode:
-  push bp
-  mov  bp, sp
+  ; ModeInfo helper function
+  ; in  - bx: VBE mode number
+  ; out - ax: Pointer into table or 0 if not found
+mode_info_find_mode:
   push bx
-  push si
-  mov  ax, 4[bp]
+  push cx
+  mov  cx, bx
+  mov  ax, bx
+  and  ax, #0x01ff
   mov  si, #_mode_info_list
 find_mode_loop:
   mov  bx, [si]
@@ -1036,8 +1037,7 @@ find_mode_loop:
   cmp  ax, bx
   jnz  next_mode_info
   mov  ax, si
-  mov  bx, 6[bp] ;; LFB requested ?
-  or   bx, bx
+  test cx, #VBE_MODE_LINEAR_FRAME_BUFFER ;; LFB requested ?
   jz   vbe_mode_found
   mov  bx, [si+2]
   test bx, #VBE_MODE_ATTRIBUTE_LINEAR_FRAME_BUFFER_MODE
@@ -1048,9 +1048,8 @@ next_mode_info:
 vbe_mode_not_found:
   xor  ax, ax
 vbe_mode_found:
-  pop  si
+  pop  cx
   pop  bx
-  pop  bp
   ret
 
 ;; Has VBE display - Returns true if VBE display detected
@@ -1120,54 +1119,11 @@ dispi_set_mode:
   push bp
   mov  bp, sp
   push bx
-  push si
   push es
   mov  bx, 4[bp] ;; requested mode
-  mov  ax, bx
-  and  ax, #VBE_MODE_LINEAR_FRAME_BUFFER
-  jz   set_mode_no_lfb1
-  mov  ax, #0x0001
-set_mode_no_lfb1:
-  push ax
-  push bx
-  call _mode_info_find_mode
-  add  sp, #4
-  mov  si, ax ;; pointer to mode info
-  or   si, si
-  jnz  mode_found_ok
-#ifdef DEBUG
-  push bx
-  push #msg_vbe_mode_not_found
-  call _printf
-  add  sp, #4
-#endif
-  pop  es
-  pop  si
-  pop  bx
-  pop  bp
-  mov  ax, #0x014f
-  ret
-mode_found_ok:
-  add  si, #2 ;; pointer to info block
   ;; first disable current mode (when switching between vesa modi)
   mov  ax, #VBE_DISPI_DISABLED
   call dispi_set_enable
-#ifdef DEBUG
-  push bx
-  push #msg_vbe_mode_found1
-  call _printf
-  add  sp, #4
-  mov  al, [si+25] ;; bpp
-  xor  ah,ah
-  push ax
-  mov  ax, [si+20] ;; yres
-  push ax
-  mov  ax, [si+18] ;; xres
-  push ax
-  push #msg_vbe_mode_found2
-  call _printf
-  add  sp, #8
-#endif
   mov  al, [si+25] ;; bpp
   xor  ah, ah
   cmp  al, #4
@@ -1196,9 +1152,9 @@ set_vbe_params:
   call dispi_support_bank_granularity_32k
   or   ax, #VBE_DISPI_ENABLED
   test 4[bp], #VBE_MODE_LINEAR_FRAME_BUFFER
-  jz   set_mode_no_lfb2
+  jz   set_mode_no_lfb
   or   ax, #VBE_DISPI_LFB_ENABLED
-set_mode_no_lfb2:
+set_mode_no_lfb:
   test 4[bp], #VBE_MODE_PRESERVE_DISPLAY_MEMORY
   jz   set_mode_clear_mem
   or   ax, #VBE_DISPI_NOCLEARMEM
@@ -1253,13 +1209,11 @@ vga_compat_mode:
   SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
 set_vbe_mode_ok:
   pop  es
-  pop  si
   pop  bx
   pop  bp
   mov  ax, #0x004f
   ret
 ASM_END
-
 
 
 /** Function 00h - Return VBE Controller Information
@@ -1435,16 +1389,8 @@ vbe_biosfn_return_mode_information:
   push cs
   pop  ds
   push cx
-  mov  ax, cx
-  and  ax, #VBE_MODE_LINEAR_FRAME_BUFFER
-  jz   mode_no_lfb
-  mov  ax, #0x0001
-mode_no_lfb:
-  push ax
-  and  cx, #0x01ff
-  push cx
-  call _mode_info_find_mode
-  add  sp, #4
+  mov  bx, cx
+  call mode_info_find_mode
   or   ax, ax
   jz   mode_not_found
   add  ax, #2
@@ -1518,6 +1464,7 @@ ASM_END
 ASM_START
 vbe_biosfn_set_mode:
   push ds
+  push si
   push cs
   pop  ds
   test bx, #0x3e00
@@ -1529,6 +1476,7 @@ vbe_biosfn_set_mode:
   test al, #0x80
   jz   set_vga_mode
 set_vbe_mode_fail:
+  pop  si
   pop  ds
   mov  ax, #0x014f
   ret
@@ -1537,19 +1485,61 @@ set_vga_mode:
   jz   vga_clear_mem
   or   al, #0x80
 vga_clear_mem:
+  push bx
+  push cx
   xor  ah, ah
   push ax
   call _biosfn_set_video_mode
   inc  sp
   inc  sp
+  pop  cx
+  pop  bx
+  pop  si
   pop  ds
   mov  ax, #0x004f
   ret
 set_vesa_mode:
+  call mode_info_find_mode
+  mov  si, ax ;; pointer to mode info
+  or   si, si
+  jnz  mode_found_ok
+#ifdef DEBUG
   push bx
-  call dispi_set_mode ;; TODO: move all of this code here
+  push #msg_vbe_mode_not_found
+  call _printf
   inc  sp
   inc  sp
+  pop  bx
+#endif
+  pop  si
+  pop  ds
+  mov  ax, #0x014f
+  ret
+mode_found_ok:
+  add  si, #2 ;; pointer to info block
+#ifdef DEBUG
+  push bx
+  push #msg_vbe_mode_found1
+  call _printf
+  inc  sp
+  inc  sp
+  mov  al, [si+25] ;; bpp
+  xor  ah,ah
+  push ax
+  mov  ax, [si+20] ;; yres
+  push ax
+  mov  ax, [si+18] ;; xres
+  push ax
+  push #msg_vbe_mode_found2
+  call _printf
+  add  sp, #8
+  pop  bx
+#endif
+  push bx
+  call dispi_set_mode
+  inc  sp
+  inc  sp
+  pop  si
   pop  ds
   ret
 ASM_END
