@@ -30,12 +30,6 @@
 // ============================================================================================
 
 
-// defines available
-
-// disable VESA/VBE2 check in vbe info
-//#define VBE2_NO_VESA_CHECK
-
-
 #include "vbe.h"
 #include "vbetables.h"
 
@@ -43,41 +37,6 @@
 #define VBE_OEM_SOFTWARE_REV 0x0002;
 
 ASM_START
-// FIXME: 'merge' these (c) etc strings with the vgabios.c strings?
-vbebios_copyright:
-.ascii       "Bochs VBE (C) 2002-2024 http://savannah.nongnu.org/projects/vgabios/"
-.byte        0x00
-
-vbebios_vendor_name:
-.ascii       "LGPL VGABIOS Developers"
-.byte        0x00
-
-vbebios_product_name:
-.ascii       "Bochs VBE Adapter"
-.byte        0x00
-
-vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-02-27"
-.byte        0x00
-
-vbebios_info_string:
-.ascii      "Bochs VBE Display Adapter enabled"
-.byte	0x0a,0x0d
-.byte	0x0a,0x0d
-.byte	0x00
-
-no_vbebios_info_string:
-.ascii      "NO Bochs VBE Support available!"
-.byte	0x0a,0x0d
-.byte	0x0a,0x0d
-.byte 0x00
-
-#if defined(USE_BX_INFO) || defined(DEBUG)
-msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-02-27"
-.byte  0x0a,0x00
-#endif
-
   .align 2
 vesa_pm_start:
   dw vesa_pm_set_window - vesa_pm_start
@@ -2262,6 +2221,41 @@ vbe_handlers:
   ;; 14h
   dw vbe_unimplemented
   dw vbe_biosfn_display_identification_extensions
+
+;; FIXME: 'merge' these (c) etc strings with the vgabios.c strings?
+vbebios_copyright:
+.ascii       "Bochs VBE (C) 2002-2024 https://github.com/bochs-emu/VGABIOS"
+.byte        0x00
+
+vbebios_vendor_name:
+.ascii       "LGPL VGABIOS Developers"
+.byte        0x00
+
+vbebios_product_name:
+.ascii       "Bochs VBE Adapter"
+.byte        0x00
+
+vbebios_product_revision:
+.ascii       "ID: vbe.c 2024-02-28"
+.byte        0x00
+
+vbebios_info_string:
+.ascii      "Bochs VBE Display Adapter enabled"
+.byte	0x0a,0x0d
+.byte	0x0a,0x0d
+.byte	0x00
+
+no_vbebios_info_string:
+.ascii      "NO Bochs VBE Support available!"
+.byte	0x0a,0x0d
+.byte	0x0a,0x0d
+.byte 0x00
+
+#if defined(USE_BX_INFO) || defined(DEBUG)
+msg_vbe_init:
+.ascii "VBE Bios ID: vbe.c 2024-02-28"
+.byte  0x0a,0x00
+#endif
 
 #ifdef DEBUG
 msg_vbe2_sig_found:
