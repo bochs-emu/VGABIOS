@@ -329,6 +329,32 @@ vgabios_int10_handler:
 #endif
 int10_no_vbefn:
   push  #int10_end
+  or    ah, ah
+  jnz   int10_test_01
+  push  ds
+  push  bx
+  push  cx
+  mov   bx, #0xc000
+  mov   ds, bx
+  push  ax
+  call  _biosfn_set_video_mode
+  pop   ax
+  pop   cx
+  pop   bx
+  pop   ds
+  cmp   al, #0x06
+  jne   no_mode06
+  mov   al, #0x3f
+  ret
+no_mode06:
+  cmp   al, #0x07
+  ja    no_cga_modes
+  mov al, #0x30
+  ret
+no_cga_modes:
+  mov al, #0x20
+  ret
+int10_test_01:
   cmp   ah, #0x01
   jne   int10_test_02
   jmp   biosfn_set_cursor_shape
@@ -472,7 +498,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios ID: vgabios.c 2024-02-14"
+.ascii "VGABios ID: vgabios.c 2024-03-01"
 .byte  0x0a,0x00
 #endif
 ASM_END
@@ -635,25 +661,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
  // BIOS functions
  switch(GET_AH())
   {
-   case 0x00:
-     biosfn_set_video_mode(GET_AL());
-     switch(GET_AL()&0x7F)
-      {case 6:
-        SET_AL(0x3F);
-        break;
-       case 0:
-       case 1:
-       case 2:
-       case 3:
-       case 4:
-       case 5:
-       case 7:
-        SET_AL(0x30);
-        break;
-      default:
-        SET_AL(0x20);
-      }
-     break;
    case 0x05:
      biosfn_set_active_page(GET_AL());
      break;
