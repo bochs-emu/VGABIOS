@@ -707,6 +707,7 @@ bit9_clear2:
 vga_compat_end:
   pop  dx
   pop  ax
+  ret
 
 ;; code for 'write character' support in 8bpp graphics modes
 
@@ -1073,13 +1074,10 @@ no_vbe_flag:
   jmp  _display_string
 
 ;; set VBE mode helper function
-
+  ; in  - bx: requested VBE mode, si: pointer to mode info block
 dispi_set_mode:
-  push bp
-  mov  bp, sp
-  push bx
   push es
-  mov  bx, 4[bp] ;; requested mode
+  push cx
   ;; first disable current mode (when switching between vesa modi)
   mov  ax, #VBE_DISPI_DISABLED
   call dispi_set_enable
@@ -1088,10 +1086,12 @@ dispi_set_mode:
   cmp  al, #4
   jnz  no_vga_4bpp
   push ax
+  push bx
   push #0x6a
   call _biosfn_set_video_mode
   inc  sp
   inc  sp
+  pop  bx
   pop  ax
 no_vga_4bpp:
   cmp  al, #8
@@ -1110,66 +1110,65 @@ set_vbe_params:
   call dispi_set_bank
   call dispi_support_bank_granularity_32k
   or   ax, #VBE_DISPI_ENABLED
-  test 4[bp], #VBE_MODE_LINEAR_FRAME_BUFFER
+  test bx, #VBE_MODE_LINEAR_FRAME_BUFFER
   jz   set_mode_no_lfb
   or   ax, #VBE_DISPI_LFB_ENABLED
 set_mode_no_lfb:
-  test 4[bp], #VBE_MODE_PRESERVE_DISPLAY_MEMORY
+  test bx, #VBE_MODE_PRESERVE_DISPLAY_MEMORY
   jz   set_mode_clear_mem
   or   ax, #VBE_DISPI_NOCLEARMEM
 set_mode_clear_mem:
   call dispi_set_enable
   call vga_compat_setup
+  mov  cx, bx
   mov  ax, #BIOSMEM_SEG
   mov  es, ax
   mov  bx, #BIOSMEM_NB_COLS
   mov  ax, [si+18]
   shr  ax, #3
   seg  es
-  mov [bx], ax
+  mov  [bx], ax
   mov  bx, #BIOSMEM_NB_ROWS
   mov  ax, [si+20]
   shr  ax, #4
   dec  ax
   seg  es
-  mov [bx], ax
+  mov  [bx], ax
   mov  bx, #BIOSMEM_CHAR_HEIGHT
   mov  ax, #16
   seg  es
-  mov [bx], ax
+  mov  [bx], ax
   mov  bx, #BIOSMEM_CURRENT_PAGE
   xor  ax, ax
   seg  es
-  mov [bx], ax
+  mov  [bx], ax
   mov  bx, #BIOSMEM_CURSOR_POS
   seg  es
-  mov [bx], ax
+  mov  [bx], ax
   mov  bx, #BIOSMEM_VBE_MODE
-  mov  ax, 4[bp]
+  mov  ax, cx
   and  ax, #0x1ff
   seg  es
-  mov [bx], ax
+  mov  [bx], ax
+  mov  ax, cx
+  mov  al, ah
+  and  al, #0x80
+  or   al, #0x60
   mov  bx, #BIOSMEM_VIDEO_CTL
-  mov  al, #0x60
-  test 4[bp], #VBE_MODE_PRESERVE_DISPLAY_MEMORY
-  jz   set_bda_clear_mem
-  or   al, #0x80
-set_bda_clear_mem:
   seg  es
-  mov [bx], al
+  mov  [bx], al
   mov  al, [si+25] ;; bpp
   cmp  al, #4
   jz   vga_compat_mode
   mov  bx, #BIOSMEM_CURRENT_MODE
   mov  ax, #0x5f ;; FIXME
   seg  es
-  mov [bx], al
+  mov  [bx], al
 vga_compat_mode:
+  mov  bx, cx
   SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
-set_vbe_mode_ok:
+  pop  cx
   pop  es
-  pop  bx
-  pop  bp
   mov  ax, #0x004f
   ret
 ASM_END
@@ -1494,10 +1493,7 @@ mode_found_ok:
   add  sp, #8
   pop  bx
 #endif
-  push bx
   call dispi_set_mode
-  inc  sp
-  inc  sp
   pop  si
   pop  ds
   ret
