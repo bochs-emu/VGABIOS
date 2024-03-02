@@ -69,10 +69,10 @@ References
                   http://www.vesa.org/vbe3.pdf
 
   [BOCHS]         Bochs Open Source IA-32 Emulator at
-                  http://bochs.sourceforge.net
+                  https://bochs.sourceforge.io
 
   [VBEBIOS]       VBE Bios for Bochs at
-                  http://savannah.gnu.org/projects/vgabios/
+                  https://github.com/bochs-emu/VGABIOS
 
   [Screenshots]   Screenshots of programs using the VBE Bios at
                   http://japj.org/projects/bochs_plex86/screenshots.html

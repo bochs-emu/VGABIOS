@@ -2232,7 +2232,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-02-28"
+.ascii       "ID: vbe.c 2024-03-02"
 .byte        0x00
 
 vbebios_info_string:
@@ -2249,7 +2249,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-02-28"
+.ascii "VBE Bios ID: vbe.c 2024-03-02"
 .byte  0x0a,0x00
 #endif
 

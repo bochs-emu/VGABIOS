@@ -209,9 +209,9 @@ vgabios_license:
 vgabios_website:
 .ascii	"Please visit :"
 .byte	0x0a,0x0d
-.ascii	" . http://bochs.sourceforge.net"
+.ascii	" . https://bochs.sourceforge.io"
 .byte	0x0a,0x0d
-.ascii	" . http://www.nongnu.org/vgabios"
+.ascii	" . https://www.nongnu.org/vgabios"
 .byte	0x0a,0x0d
 .byte	0x0a,0x0d
 .byte	0x00
@@ -326,8 +326,8 @@ vgabios_int10_handler:
   cmp   ah, #0x4f
   jne   int10_no_vbefn
   jmp   vbe_main_handler
-#endif
 int10_no_vbefn:
+#endif
   push  #int10_end
   or    ah, ah
   jnz   int10_test_01
@@ -498,7 +498,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios ID: vgabios.c 2024-03-01"
+.ascii "VGABios ID: vgabios.c 2024-03-02"
 .byte  0x0a,0x00
 #endif
 ASM_END
