@@ -497,7 +497,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios ID: vgabios.c 2024-03-02"
+.ascii "VGABios ID: vgabios.c 2024-03-03"
 .byte  0x0a,0x00
 #endif
 ASM_END
