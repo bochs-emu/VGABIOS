@@ -6,12 +6,10 @@ General
   - Add new functionalities and modify static functionality table
   - Performance : 16 bits IO
 
-v0.9
+v1.0
   - Implement the remaining functions (don't know if all are needed):
     - select alternate print screen routine ah=12 bl=20
     - display switch interface ah=12 bl=35
-
-v1.0
   - Bugfixes
 
 

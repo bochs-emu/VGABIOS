@@ -76,7 +76,7 @@ release:
 	VGABIOS_VERS=\"-DVGABIOS_VERS=\\\"$(RELVERS)\\\"\" make bios cirrus-bios banshee-bios
 	make clean
 	tar czvf ../$(RELEASE)-bin.tgz $(RELEASE_BIN_LIST)
-	tar czvf ../$(RELEASE).tgz --exclude .svn -C .. $(RELEASE)/
+	tar czvf ../$(RELEASE).tgz --exclude .git -C .. $(RELEASE)/
 
 biossums: biossums.c
 	$(CC) -o biossums biossums.c

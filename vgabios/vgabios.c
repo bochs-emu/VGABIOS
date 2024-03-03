@@ -93,7 +93,6 @@ static void           unimplemented();
 static void           unknown();
 
 static Bit8u find_vga_entry();
-static void load_dac_palette();
 static void set_cursor_pos();
 
 static void memsetb();
@@ -748,18 +747,17 @@ dac_palette_table:
 .word _palette2
 .word _palette3
 
-_load_dac_palette:
-  push  bp
-  mov   bp, sp
+;; Load DAC palette
+  ; in - al: palette number
+load_dac_palette:
   push  ax
   push  bx
   push  cx
   push  dx
   push  si
   push  ds
-  mov   ax, #0xc000
-  mov   ds, ax
-  mov   al, 4[bp] ; palette num
+  mov   bx, #0xc000
+  mov   ds, bx
   xor   ah, ah
   push  ax
   shl   ax, #1
@@ -799,7 +797,6 @@ no_fill_dac:
   pop   cx
   pop   bx
   pop   ax
-  pop   bp
   ret
 ASM_END
 
@@ -868,22 +865,7 @@ ASM_END
 #endif
 
   // if palette loading (bit 3 of modeset ctl = 0)
-  if((modeset_ctl&0x08)==0)
-  {
-    // Set the PEL mask
-    outb(VGAREG_PEL_MASK, 0xff);
-
-    load_dac_palette(vga_modes[line].dacmodel);
-
-    if((modeset_ctl&0x02)==0x02)
-    {
-ASM_START
-      xor  bx, bx
-      mov  cx, #0x0100
-      call biosfn_perform_gray_scale_summing
-ASM_END
-    }
-  }
+  set_vga_mode_palette(modeset_ctl, vga_modes[line].dacmodel);
 
  if(noclearmem==0x00)
   {
@@ -1079,6 +1061,39 @@ set_crtc_regs:
   out  dx, al
   mov  dx, #VGAREG_ACTL_RESET
   in   al, dx
+  pop  ds
+  pop  dx
+  pop  cx
+  pop  bx
+  pop  ax
+  pop  bp
+  ret
+
+_set_vga_mode_palette:
+  push bp
+  mov  bp, sp
+  push ax
+  push bx
+  push cx
+  push dx
+  push ds
+  mov  ax, #0xc000
+  mov  ds, ax
+  mov  bl, 4[bp] ;; modeset_ctl
+  test bl, #0x08
+  jnz  no_palette_loading
+  ;; Set the PEL mask
+  mov  dx, #VGAREG_PEL_MASK
+  mov  al, #0xff
+  out  dx, al
+  mov  al, 6[bp] ;; dacmodel
+  call load_dac_palette
+  test bl, #0x02
+  jz   no_palette_loading
+  xor  bx, bx
+  mov  cx, #0x0100
+  call biosfn_perform_gray_scale_summing
+no_palette_loading:
   pop  ds
   pop  dx
   pop  cx

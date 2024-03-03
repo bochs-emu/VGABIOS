@@ -622,12 +622,10 @@ set_mode_8bpp_2:
   mov  al, [si+1]
   cmp  al, #0x08
   jne  no_8bpp_mode
-  mov  al, #0x03
-  xor  ah, ah
   push ax
-  call _load_dac_palette
-  inc  sp
-  inc  sp
+  mov  al, #0x03
+  call load_dac_palette
+  pop  ax
 no_8bpp_mode:
   pop  ds
   pop  dx
