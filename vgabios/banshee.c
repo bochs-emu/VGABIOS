@@ -1185,6 +1185,7 @@ banshee_vesa_pm_set_display_window1:
   mov  dl, #0x2c ;; vgaInit1
   in   eax, dx
   pop  ecx
+  shl  cx, #1
   and  cx, #0x03ff
   and  eax, #0xfffffc00
   or   ax, cx
@@ -1198,6 +1199,7 @@ banshee_vesa_pm_set_display_window1:
   pop  edx
   pop  ecx
   pop  ebx
+  shr  ax, #1
   cmp  ax, dx
   jne  banshee_vesa_pm_set_window_fail
   mov  ax, #0x004f
@@ -1449,7 +1451,7 @@ banshee_vesa_no_8bpp:
   stosw
   mov  ax, #0x0007 ;; win attr
   stosw
-  mov  ax, #0x0020 ;; granularity =32K
+  mov  ax, #0x0040 ;; granularity =64K
   stosw
   mov  ax, #0x0040 ;; size =64K
   stosw
@@ -1743,16 +1745,19 @@ banshee_vesa_05h:
   ret
 banshee_vesa_05h_set:
   mov  ax, dx
+  shl  ax, #1
   push bx
   mov  bl, #0x03
   call banshee_set_bank
   pop  bx
+  shr  ax, #1
   cmp  ax, dx
   jne  banshee_vesa_05h_failed
   mov  ax, #0x004f
   ret
 banshee_vesa_05h_get:
   call banshee_get_bank
+  shr  ax, #1
   mov  dx, ax
   mov  ax, #0x004f
   ret
