@@ -515,6 +515,10 @@ set_width_svga:
   ret
 
 dispi_set_virt_width:
+  cmp  ax, #0x8000
+  jb   virt_width_ok
+  mov  ax, #0x7fff
+virt_width_ok:
   call vga_set_virt_width
   push dx
   push ax

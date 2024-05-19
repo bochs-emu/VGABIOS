@@ -1226,6 +1226,7 @@ banshee_vesa_pm_set_display_start2:
   mov  ax, dx
   shl  eax, #16
   mov  ax, cx
+  shl  eax, #2
   call banshee_vesa_pm_get_io_base_address
   mov  dl, #0xe4 ;; vidDesktopStartAddr
   out  dx, eax

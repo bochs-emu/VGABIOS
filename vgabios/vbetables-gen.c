@@ -96,7 +96,7 @@ int main(int argc, char **argv)
       pitch = (pm->width + 7) / 8;
     else
       pitch = pm->width * ((pm->depth + 7) / 8);
-    pages = vram_size / (pm->height * pitch);
+    pages = vram_size / ((pm->height * pitch + 0xffff) & ~0xffff);
     if (pages > 0) {
       modelist[n_modes++] = pm->mode;
       printf("{ 0x%04x, /* %dx%dx%d */\n", 
