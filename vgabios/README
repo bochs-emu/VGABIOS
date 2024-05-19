@@ -107,6 +107,10 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
+vgabios-github-current : May 19 2024
+  - Volker
+    - Fixed VBE bank switching for the Bochs VBE and Banshee version
+
 vgabios-0.9a : Mar 03 2024
   - Volker
     - Implemented AH=12h / BL=36h (video refresh control)

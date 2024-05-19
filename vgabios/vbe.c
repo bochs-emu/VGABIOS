@@ -63,9 +63,12 @@ vesa_pm_set_display_window1:
   mov  ax, # VBE_DISPI_INDEX_BANK
   out  dx, ax
   pop  ax
+  shl  ax, #1
+  or   ax, #VBE_DISPI_BANK_RW
   mov  dx, # VBE_DISPI_IOPORT_DATA
   out  dx, ax
   in   ax, dx
+  shr  ax, #1
   pop  dx
   cmp  dx, ax
   jne  illegal_window
@@ -1381,6 +1384,7 @@ no_pci_lfb:
   and  ax, #VBE_DISPI_BANK_GRANULARITY_32K
   jz   no_gran_32k
   mov  ax, #VBE_DISPI_BANK_GRANULARITY_KB
+  shl  ax, #1
   seg  es
   mov  [di+4], ax
 no_gran_32k:
@@ -1709,15 +1713,18 @@ vbe_biosfn_display_window_control:
   ret
 set_display_window:
   mov  ax, dx
+  shl  ax, #1
   or   ax, #VBE_DISPI_BANK_RW
   call dispi_set_bank
   call dispi_get_bank
+  shr  ax, #1
   cmp  ax, dx
   jne  vbe_05_failed
   mov  ax, #0x004f
   ret
 get_display_window:
   call dispi_get_bank
+  shr  ax, #1
   mov  dx, ax
   mov  ax, #0x004f
   ret
