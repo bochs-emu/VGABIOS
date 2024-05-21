@@ -107,9 +107,10 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
-vgabios-github-current : May 20 2024
+vgabios-github-current : May 21 2024
   - Volker
     - Fixed VBE bank switching and page flipping (Bochs VBE / Banshee)
+    - Bochs VBE function 07h now also supports wait for VSYNC
 
 vgabios-0.9a : Mar 03 2024
   - Volker

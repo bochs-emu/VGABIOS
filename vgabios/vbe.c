@@ -1841,12 +1841,14 @@ ASM_END
 ASM_START
 vbe_biosfn_set_get_display_start:
   cmp  bl, #0x80
-  je   set_display_start
+  je   set_display_start_vsync
   cmp  bl, #0x01
   je   get_display_start
   jb   set_display_start
   mov  ax, #0x0100
   ret
+set_display_start_vsync:
+  call vbebios_vsync_wait
 set_display_start:
   mov  ax, cx
   call dispi_set_x_offset

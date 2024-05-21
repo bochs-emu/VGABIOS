@@ -1622,6 +1622,7 @@ cirrus_vesa_07h:
 cirrus_vesa_07h_4:
   call vbebios_vsync_wait
 cirrus_vesa_07h_1:
+  push bx
   push dx
   call cirrus_get_bpp_bytes
   mov  bl, al
@@ -1629,6 +1630,7 @@ cirrus_vesa_07h_1:
   mov  ax, cx
   mul  bx
   pop  bx
+  push bx
   push ax
   call cirrus_get_line_offset
   mul  bx
@@ -1644,6 +1646,8 @@ cirrus_vesa_07h_3:
   pop  dx
   shr  dx, #2
   call cirrus_set_start_addr
+  pop  dx
+  pop  bx
   mov  ax, #0x004f
   ret
 cirrus_vesa_07h_2:
