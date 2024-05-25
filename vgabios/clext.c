@@ -620,22 +620,26 @@ cirrus_vesa_pm_start:
   USE32
 cirrus_vesa_pm_set_window:
   or   bx, bx
-  jz   cirrus_vesa_pm_set_display_window1
-cirrus_vesa_pm_set_window_fail:
-  mov  ax, #0x014f
-  ret
+  jnz  cirrus_vesa_pm_get_window
 cirrus_vesa_pm_set_display_window1:
-  cmp dx, #0x40 ;; address must be < 0x40
-  jnc cirrus_vesa_pm_set_window_fail
-  push dx
+  cmp dl, #0x40 ;; address must be < 0x40
+  jnc cirrus_vesa_pm_get_window
   mov al, bl ;; bl=bank number
   add al, #0x09
   mov ah, dl ;; dx=window address in granularity
   shl ah, #2
   mov dx, #0x3ce
   out dx, ax
-  pop dx
-  mov  ax, #0x004f
+cirrus_vesa_pm_get_window:
+  mov al, bl ;; bl=bank number
+  add al, #0x09
+  mov dx, #0x3ce
+  out dx, al
+  inc dx
+  in  al, dx
+  shr al, #2
+  xor ah, ah
+  mov dx, ax
   ret
 
 cirrus_vesa_pm_set_display_start:
