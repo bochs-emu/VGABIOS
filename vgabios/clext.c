@@ -568,7 +568,7 @@ cirrus_set_video_mode_extended:
   test al, #0x80
   jnz cirrus_set_video_mode_extended_1
   push ax
-  mov ax, #0xffff ; set to 0xff to keep win 2K happy
+  xor ax, ax
   call cirrus_clear_vram
   pop ax
 cirrus_set_video_mode_extended_1:
