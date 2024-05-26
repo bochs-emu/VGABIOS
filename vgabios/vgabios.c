@@ -497,7 +497,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios ID: vgabios.c 2024-03-03"
+.ascii "VGABios ID: vgabios.c 2024-05-26"
 .byte  0x0a,0x00
 #endif
 ASM_END
@@ -4219,8 +4219,8 @@ ASM_START
     push di
 
     mov  cx, 10[bp] ; count
-    cmp  cx, #0x00
-    je   memsetb_end
+    test cx, cx
+    jz   memsetb_end
     mov  ax, 4[bp] ; segment
     mov  es, ax
     mov  ax, 6[bp] ; offset
@@ -4257,8 +4257,8 @@ ASM_START
     push di
 
     mov  cx, 10[bp] ; count
-    cmp  cx, #0x00
-    je   memsetw_end
+    test cx, cx
+    jz   memsetw_end
     mov  ax, 4[bp] ; segment
     mov  es, ax
     mov  ax, 6[bp] ; offset
@@ -4298,8 +4298,8 @@ ASM_START
     push si
 
     mov  cx, 12[bp] ; count
-    cmp  cx, #0x0000
-    je   memcpyb_end
+    test cx, cx
+    jz   memcpyb_end
     mov  ax, 4[bp] ; dsegment
     mov  es, ax
     mov  ax, 6[bp] ; doffset
@@ -4344,8 +4344,8 @@ ASM_START
     push si
 
     mov  cx, 12[bp] ; count
-    cmp  cx, #0x0000
-    je   memcpyw_end
+    test cx, cx
+    jz   memcpyw_end
     mov  ax, 4[bp] ; dsegment
     mov  es, ax
     mov  ax, 6[bp] ; doffset
@@ -4588,23 +4588,6 @@ ASM_START
     push dx
     mov  dx, 4[bp]
     in   al, dx
-    pop  dx
-
-  pop  bp
-ASM_END
-}
-
-  Bit16u
-inw(port)
-  Bit16u port;
-{
-ASM_START
-  push bp
-  mov  bp, sp
-
-    push dx
-    mov  dx, 4[bp]
-    in   ax, dx
     pop  dx
 
   pop  bp

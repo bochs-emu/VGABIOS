@@ -567,10 +567,7 @@ cirrus_set_video_mode_extended:
   pop ax ;; mode
   test al, #0x80
   jnz cirrus_set_video_mode_extended_1
-  push ax
-  xor ax, ax
   call cirrus_clear_vram
-  pop ax
 cirrus_set_video_mode_extended_1:
   and al, #0x7f
   call cirrus_set_video_mode_bda
@@ -1497,7 +1494,6 @@ cirrus_vesa_02h_1:
 cirrus_vesa_02h_3:
   test bx, #0x8000 ;; no clear
   jnz cirrus_vesa_02h_4
-  xor ax, ax
   call cirrus_clear_vram
 cirrus_vesa_02h_4:
   pop ax
@@ -2156,7 +2152,6 @@ cirrus_get_start_addr:
 cirrus_clear_vram:
   pusha
   push es
-  mov si, ax
 
   call cirrus_enable_16k_granularity
   call cirrus_extbios_85h
@@ -2171,7 +2166,7 @@ cirrus_clear_vram_1:
   mov cx, #0xa000
   mov es, cx
   xor di, di
-  mov ax, si
+  xor ax, ax
   mov cx, #8192
   cld
   rep 
