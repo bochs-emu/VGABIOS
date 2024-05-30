@@ -49,6 +49,8 @@
 #ifdef VBE
 #include "vbe.h"
 #define VGAEXT
+#define VGAEXT_init            vbe_init
+#define VGAEXT_display_info    vbe_display_info
 #define VGAEXT_is_8bpp_mode    vbe_is_8bpp_mode
 #define VGAEXT_8bpp_write_char vbe_8bpp_write_char
 #define VGAEXT_8bpp_copy       vbe_8bpp_copy
@@ -56,6 +58,8 @@
 #endif
 #ifdef CIRRUS
 #define VGAEXT
+#define VGAEXT_init            cirrus_init
+#define VGAEXT_display_info    cirrus_display_info
 #define VGAEXT_is_8bpp_mode    cirrus_is_8bpp_mode
 #define VGAEXT_8bpp_write_char cirrus_bitblt_write_char
 #define VGAEXT_8bpp_copy       cirrus_bitblt_copy
@@ -63,6 +67,8 @@
 #endif
 #ifdef BANSHEE
 #define VGAEXT
+#define VGAEXT_init            banshee_init
+#define VGAEXT_display_info    banshee_display_info
 #define VGAEXT_is_8bpp_mode    banshee_is_8bpp_mode
 #define VGAEXT_8bpp_write_char banshee_8bpp_write_char
 #define VGAEXT_8bpp_copy       banshee_8bpp_copy
@@ -260,45 +266,24 @@ vgabios_init_func:
 ;; init basic bios vars
   call init_bios_area
 
-#ifdef VBE
-;; init vbe functions
-  call vbe_init
-#endif
-
 ;; set int10 vect
   SET_INT_VECTOR(0x10, #0xC000, #vgabios_int10_handler)
 
-#ifdef CIRRUS
-  call cirrus_init
+#ifdef VGAEXT
+;; init vga extension functions
+  call VGAEXT_init
 #endif
-
-#ifdef BANSHEE
-  call banshee_init
-#endif
-
-;; display splash screen
-  call _display_splash_screen
 
 ;; init video mode and clear the screen
   mov ax,#0x0003
   int #0x10
 
 ;; show info
-  call _display_info
+  call display_info
 
-#ifdef VBE
-;; show vbe info
-  call vbe_display_info
-#endif
-
-#ifdef CIRRUS
-;; show cirrus info
-  call cirrus_display_info
-#endif
-
-#ifdef BANSHEE
-;; show 3dfx Banshee info
-  call banshee_display_info
+#ifdef VGAEXT
+;; show vga extension info
+  call VGAEXT_display_info
 #endif
 
   retf
@@ -320,12 +305,6 @@ vgabios_int10_handler:
   popa
   pop ds
   pop es
-#endif
-#ifdef VBE
-  cmp   ah, #0x4f
-  jne   int10_no_vbefn
-  jmp   vbe_main_handler
-int10_no_vbefn:
 #endif
   push  #int10_end
   or    ah, ah
@@ -497,7 +476,7 @@ init_vga_card:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vga_init:
-.ascii "VGABios ID: vgabios.c 2024-05-26"
+.ascii "VGABios ID: vgabios.c 2024-05-30"
 .byte  0x0a,0x00
 #endif
 ASM_END
@@ -576,20 +555,11 @@ ASM_END
 
 // --------------------------------------------------------------------------------------------
 /*
- *  Boot time Splash screen
- */
-static void display_splash_screen()
-{
-}
-
-// --------------------------------------------------------------------------------------------
-/*
  *  Tell who we are
  */
 
-static void display_info()
-{
 ASM_START
+display_info:
  mov ax,#0xc000
  mov ds,ax
  mov si,#vgabios_name
@@ -597,17 +567,12 @@ ASM_START
  mov si,#vgabios_version
  call _display_string
 
- ;;mov si,#vgabios_copyright
- ;;call _display_string
- ;;mov si,#crlf
- ;;call _display_string
-
  mov si,#vgabios_license
  call _display_string
  mov si,#vgabios_website
  call _display_string
+ ret
 ASM_END
-}
 
 static void display_string()
 {
@@ -814,17 +779,6 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
   Bit8u line,mmask,*palette,vpti;
   Bit16u i,twidth,theightm1,cheight;
   Bit8u modeset_ctl,video_ctl,vga_switches;
-
-#ifdef VBE
-ASM_START
-  call vbe_has_vbe_display
-  or   ax, ax
-  jz   no_vbe_display
-  mov  ax, #VBE_DISPI_DISABLED
-  call dispi_set_enable
-no_vbe_display:
-ASM_END
-#endif // def VBE
 
   // The real mode
   mode=mode&0x7f;

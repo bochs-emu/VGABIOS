@@ -722,8 +722,7 @@ vga_compat_end:
 _vbe_is_8bpp_mode:
 vbe_is_8bpp_mode:
   call vbe_has_vbe_display
-  test ax, #0x01
-  jz   no_vbe_8bpp_mode
+  jnc  no_vbe_8bpp_mode
   call dispi_get_enable
   and  ax, # VBE_DISPI_ENABLED
   jz   no_vbe_8bpp_mode
@@ -1019,18 +1018,19 @@ vbe_mode_found:
   pop  bx
   ret
 
-;; Has VBE display - Returns true if VBE display detected
+;; Has VBE display - Sets CF set if VBE display detected
 
 vbe_has_vbe_display:
   push ds
+  push ax
   push bx
   mov  ax, # BIOSMEM_SEG
   mov  ds, ax
   mov  bx, # BIOSMEM_VBE_FLAG
   mov  al, [bx]
-  and  al, #0x01
-  xor  ah, ah
+  shr  al, #1
   pop  bx
+  pop  ax
   pop  ds
   ret
 
@@ -1043,6 +1043,7 @@ vbe_init:
   call dispi_get_id
   cmp  ax, # VBE_DISPI_ID0
   jne  no_vbe_interface
+  SET_INT_VECTOR(0x10, #0xC000, #vbe_int10_handler)
   push ds
   push bx
   mov  ax, # BIOSMEM_SEG
@@ -1068,8 +1069,7 @@ no_vbe_interface:
 
 vbe_display_info:
   call vbe_has_vbe_display
-  or   ax, ax
-  jz   no_vbe_flag
+  jnc  no_vbe_flag
   mov  ax, #0xc000
   mov  ds, ax
   mov  si, #vbebios_info_string
@@ -1451,15 +1451,7 @@ set_vga_mode:
   jz   vga_clear_mem
   or   al, #0x80
 vga_clear_mem:
-  push bx
-  push cx
-  xor  ah, ah
-  push ax
-  call _biosfn_set_video_mode
-  inc  sp
-  inc  sp
-  pop  cx
-  pop  bx
+  int  #0x10
   pop  si
   pop  ds
   mov  ax, #0x004f
@@ -2177,12 +2169,22 @@ vbe_unimplemented:
   ret
 
 ; Handle INT 10h AH 4Fh
-vbe_main_handler:
-  push ax
+vbe_int10_handler:
+  pushf
   call vbe_has_vbe_display
-  shr  al, #1
+  jnc  int10_no_vbefn
+  or   ah, ah
+  jnz  test_vbefn
+  push ax
+  mov  ax, #VBE_DISPI_DISABLED
+  call dispi_set_enable
   pop  ax
-  jnc  vbe_unimplemented
+int10_no_vbefn:
+  popf
+  jmp  vgabios_int10_handler
+test_vbefn:
+  cmp  ah, #0x4f
+  jne  int10_no_vbefn
   cmp  al, #0x15
   ja   vbe_unimplemented
   push bp
@@ -2245,7 +2247,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-03-03"
+.ascii       "ID: vbe.c 2024-05-30"
 .byte        0x00
 
 vbebios_info_string:
@@ -2262,7 +2264,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-03-03"
+.ascii "VBE Bios ID: vbe.c 2024-05-30"
 .byte  0x0a,0x00
 #endif
 
