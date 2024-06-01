@@ -107,12 +107,13 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
-vgabios-github-current : May 25 2024
+vgabios-github-current : Jun 01 2024
   - Volker
     - Fixed VBE protected mode bank switching (all extensions)
     - Fixed VBE protected mode page flipping (Bochs VBE / Banshee)
     - Get rid of the Win2k clear VRAM hack after fixing emulation
     - Bochs VBE function 07h now also supports wait for VSYNC
+    - Added 'Banshee debug' binary that fits in 32k
 
 vgabios-0.9a : Mar 03 2024
   - Volker

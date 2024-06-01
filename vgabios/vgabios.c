@@ -779,6 +779,7 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
   Bit8u line,mmask,*palette,vpti;
   Bit16u i,twidth,theightm1,cheight;
   Bit8u modeset_ctl,video_ctl,vga_switches;
+  Boolean textmode;
 
   // The real mode
   mode=mode&0x7f;
@@ -797,6 +798,7 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
   twidth=video_param_table[vpti].twidth;
   theightm1=video_param_table[vpti].theightm1;
   cheight=video_param_table[vpti].cheight;
+  textmode = (vga_modes[line].class == TEXT);
 
   // Read the bios vga control
   video_ctl=read_bda_byte(BIOSMEM_VIDEO_CTL);
@@ -821,105 +823,122 @@ ASM_END
   // if palette loading (bit 3 of modeset ctl = 0)
   set_vga_mode_palette(modeset_ctl, vga_modes[line].dacmodel);
 
- if(noclearmem==0x00)
+  if (noclearmem==0x00)
   {
-   if(vga_modes[line].class==TEXT)
+    if (textmode)
     {
-     memsetw(vga_modes[line].sstart,0,0x0720,0x4000); // 32k
+      memsetw(vga_modes[line].sstart,0,0x0720,0x4000); // 32k
     }
-   else
+    else if (mode < 0x0d)
     {
-     if(mode<0x0d)
-      {
-       memsetw(vga_modes[line].sstart,0,0x0000,0x4000); // 32k
-      }
-     else
-      {
-       outb( VGAREG_SEQU_ADDRESS, 0x02 );
-       mmask = inb( VGAREG_SEQU_DATA );
-       outb( VGAREG_SEQU_DATA, 0x0f ); // all planes
-       memsetw(vga_modes[line].sstart,0,0x0000,0x8000); // 64k
-       outb( VGAREG_SEQU_DATA, mmask );
-      }
+      memsetw(vga_modes[line].sstart,0,0x0000,0x4000); // 32k
+    }
+    else
+    {
+      outb( VGAREG_SEQU_ADDRESS, 0x02 );
+      mmask = inb( VGAREG_SEQU_DATA );
+      outb( VGAREG_SEQU_DATA, 0x0f ); // all planes
+      memsetw(vga_modes[line].sstart,0,0x0000,0x8000); // 64k
+      outb( VGAREG_SEQU_DATA, mmask );
     }
   }
 
- // Set the BIOS mem
- write_bda_byte(BIOSMEM_CURRENT_MODE,mode);
- write_bda_word(BIOSMEM_NB_COLS,twidth);
- write_bda_word(BIOSMEM_PAGE_SIZE,*(Bit16u *)&video_param_table[vpti].slength_l);
- if (video_param_table[vpti].miscreg & 1) {
-   write_bda_word(BIOSMEM_CRTC_ADDRESS, VGAREG_VGA_CRTC_ADDRESS);
- } else {
-   write_bda_word(BIOSMEM_CRTC_ADDRESS, VGAREG_MDA_CRTC_ADDRESS);
- }
- write_bda_byte(BIOSMEM_NB_ROWS,theightm1);
- write_bda_word(BIOSMEM_CHAR_HEIGHT,cheight);
- write_bda_byte(BIOSMEM_VIDEO_CTL,(0x60|noclearmem));
- write_bda_byte(BIOSMEM_SWITCHES,0xF9);
- write_bda_byte(BIOSMEM_MODESET_CTL,read_bda_byte(BIOSMEM_MODESET_CTL)&0x7f);
+  // Set the BIOS mem
+  write_bda_byte(BIOSMEM_CURRENT_MODE,mode);
+  write_bda_word(BIOSMEM_NB_COLS,twidth);
+  write_bda_word(BIOSMEM_PAGE_SIZE,*(Bit16u *)&video_param_table[vpti].slength_l);
+  if (video_param_table[vpti].miscreg & 1) {
+    write_bda_word(BIOSMEM_CRTC_ADDRESS, VGAREG_VGA_CRTC_ADDRESS);
+  } else {
+    write_bda_word(BIOSMEM_CRTC_ADDRESS, VGAREG_MDA_CRTC_ADDRESS);
+  }
+  write_bda_byte(BIOSMEM_NB_ROWS,theightm1);
+  write_bda_word(BIOSMEM_CHAR_HEIGHT,cheight);
+  write_bda_byte(BIOSMEM_VIDEO_CTL,(0x60|noclearmem));
+  write_bda_byte(BIOSMEM_SWITCHES,0xF9);
+  write_bda_byte(BIOSMEM_MODESET_CTL,read_bda_byte(BIOSMEM_MODESET_CTL)&0x7f);
 
- // FIXME We nearly have the good tables. to be reworked
- write_bda_byte(BIOSMEM_DCC_INDEX,0x08);    // 8 is VGA should be ok for now
- write_bda_word(BIOSMEM_VS_POINTER, video_save_pointer_table);
- write_bda_word(BIOSMEM_VS_POINTER+2, 0xc000);
+  // FIXME We nearly have the good tables. to be reworked
+  write_bda_byte(BIOSMEM_DCC_INDEX,0x08);    // 8 is VGA should be ok for now
+  write_bda_word(BIOSMEM_VS_POINTER, video_save_pointer_table);
+  write_bda_word(BIOSMEM_VS_POINTER+2, 0xc000);
 
- // FIXME
- write_bda_byte(BIOSMEM_CURRENT_MSR,0x00); // Unavailable on vanilla vga, but...
- write_bda_byte(BIOSMEM_CURRENT_PAL,0x00); // Unavailable on vanilla vga, but...
+  // FIXME
+  write_bda_byte(BIOSMEM_CURRENT_MSR,0x00); // Unavailable on vanilla vga, but...
+  write_bda_byte(BIOSMEM_CURRENT_PAL,0x00); // Unavailable on vanilla vga, but...
 
- // Set cursor shape
- if(vga_modes[line].class==TEXT)
+  // Set cursor shape
+  if (textmode)
   {
 ASM_START
-  mov  cx, #0x0607
-  call biosfn_set_cursor_shape
+    mov  cx, #0x0607
+    call biosfn_set_cursor_shape
 ASM_END
   }
 
- // Set cursor pos for page 0..7
- for(i=0;i<8;i++)
-  set_cursor_pos(i,0x0000);
+  // Set cursor pos for page 0..7
+ASM_START
+  xor  dx, dx
+  xor  bh, bh
+set_next_cp:
+  call biosfn_set_cursor_pos
+  inc  bh
+  cmp  bh, #0x08
+  jb   set_next_cp
+ASM_END
 
- // Set active page 0
- biosfn_set_active_page(0x00);
+  // Set active page 0
+  biosfn_set_active_page(0x00);
 
- // Write the fonts in memory
- if(vga_modes[line].class==TEXT)
+  // Write the fonts in memory
+  if (textmode)
   {
 ASM_START
-  ;; copy and activate 8x16 font
-  mov ax, #0x1104
-  mov bl, #0x00
-  int #0x10
-  mov ax, #0x1103
-  mov bl, #0x00
-  int #0x10
+    ;; copy and activate 8x16 font
+    mov  ax, #0x1104
+    mov  bl, #0x00
+    int  #0x10
+    mov  bl, #0x00
+    call biosfn_set_text_block_specifier
 ASM_END
   }
 
- // Set the ints 0x1F and 0x43
+  // Set the ints 0x1F and 0x43
 ASM_START
- SET_INT_VECTOR(0x1f, #0xC000, #_vgafont8+128*8)
+  push bp
+  mov  bp, sp
+  push bx
+  push dx
+  mov  dl, _biosfn_set_video_mode.cheight + 2[bp]
+  cmp  dl, #0x08
+  jne  no_cheight8
+  mov  bx, #_vgafont8
+  je   set_fontptr
+no_cheight8:
+  cmp  dl, #0x0e
+  jne  no_cheight14
+  mov  bx, #_vgafont14
+  je   set_fontptr
+no_cheight14:
+  cmp  dl, #0x10
+  jne  no_cheight
+  mov  bx, #_vgafont16
+set_fontptr:
+  push ds
+  xor  ax, ax
+  mov  ds, ax
+  mov  ax, #0xc000
+  mov  0x010c, bx ;; INT 0x43
+  mov  0x010e, ax
+  mov  bx, #_vgafont8+128*8
+  mov  0x007c, bx ;; INT 0x1F
+  mov  0x007e, ax
+  pop  ds
+no_cheight:
+  pop  dx
+  pop  bx
+  pop  bp
 ASM_END
-
-  switch(cheight)
-   {case 8:
-ASM_START
-     SET_INT_VECTOR(0x43, #0xC000, #_vgafont8)
-ASM_END
-     break;
-    case 14:
-ASM_START
-     SET_INT_VECTOR(0x43, #0xC000, #_vgafont14)
-ASM_END
-     break;
-    case 16:
-ASM_START
-     SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
-ASM_END
-     break;
-   }
 }
 
 ASM_START
@@ -1531,7 +1550,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
 
  Bit8u line,cheight,bpp,cols;
  Bit16u nbcols,nbrows,i;
- Bit16u address,pgsize;
+ Bit16u address,pgsize,chattr;
 
  if(rul>rlr)return;
  if(cul>clr)return;
@@ -1559,13 +1578,14 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
    pgsize=read_bda_word(BIOSMEM_PAGE_SIZE);
    // Compute the address
    address=pgsize*page;
+   chattr = ((Bit16u)attr << 8) + ' ';
 #ifdef DEBUG
    printf("Scroll, address %04x (%04x %04x %02x)\n",address,nbrows,nbcols,page);
 #endif
 
    if(nblines==0&&rul==0&&cul==0&&rlr==nbrows-1&&clr==nbcols-1)
     {
-     memsetw(vga_modes[line].sstart,address,(Bit16u)attr*0x100+' ',nbrows*nbcols);
+     memsetw(vga_modes[line].sstart,address,chattr,nbrows*nbcols);
     }
    else
     {// if Scroll up
@@ -1573,7 +1593,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
       {for(i=rul;i<=rlr;i++)
         {
          if((i+nblines>rlr)||(nblines==0))
-          memsetw(vga_modes[line].sstart,address+(i*nbcols+cul)*2,(Bit16u)attr*0x100+' ',cols);
+          memsetw(vga_modes[line].sstart,address+(i*nbcols+cul)*2,chattr,cols);
          else
           memcpyw(vga_modes[line].sstart,address+(i*nbcols+cul)*2,vga_modes[line].sstart,((i+nblines)*nbcols+cul)*2,cols);
         }
@@ -1582,7 +1602,7 @@ Bit8u nblines;Bit8u attr;Bit8u rul;Bit8u cul;Bit8u rlr;Bit8u clr;Bit8u page;Bit8
       {for(i=rlr;i>=rul;i--)
         {
          if((i<rul+nblines)||(nblines==0))
-          memsetw(vga_modes[line].sstart,address+(i*nbcols+cul)*2,(Bit16u)attr*0x100+' ',cols);
+          memsetw(vga_modes[line].sstart,address+(i*nbcols+cul)*2,chattr,cols);
          else
           memcpyw(vga_modes[line].sstart,address+(i*nbcols+cul)*2,vga_modes[line].sstart,((i-nblines)*nbcols+cul)*2,cols);
          if (i>rlr) break;
@@ -2312,7 +2332,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
 
  // Get the cursor pos for the page
  cursor=get_cursor_pos(page);
- xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
+ xcurs = cursor & 0x00ff; ycurs = (Bit8u)(cursor >> 8);
 
  // Get the dimensions
  nbrows=read_bda_byte(BIOSMEM_NB_ROWS)+1;
@@ -2337,12 +2357,11 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
     break;
 
    case '\t':
-    do
-     {
+    do {
       biosfn_write_teletype(' ',page,attr,flag);
-      cursor=get_cursor_pos(page);
-      xcurs=cursor&0x00ff;ycurs=(cursor&0xff00)>>8;
-     }while(xcurs%8==0);
+      cursor = get_cursor_pos(page);
+      xcurs = cursor & 0x00ff; ycurs = (Bit8u)(cursor >> 8);
+     } while ((xcurs % 8) == 0);
     break;
 
    default:
@@ -2409,7 +2428,7 @@ Bit8u car;Bit8u page;Bit8u attr;Bit8u flag;
   }
 
  // Set the cursor for the page
- cursor=ycurs; cursor<<=8; cursor+=xcurs;
+ cursor = ((Bit16u)ycurs << 8) | xcurs;
  set_cursor_pos(page,cursor);
 }
 
