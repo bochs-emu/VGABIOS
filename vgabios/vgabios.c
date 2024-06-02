@@ -301,7 +301,7 @@ vgabios_int10_handler:
   pusha
   mov   bx, #0xc000
   mov   ds, bx
-  call _int10_debugmsg
+  call _int10_call_debugmsg
   popa
   pop ds
   pop es
@@ -440,6 +440,17 @@ int10_normal:
   ret
 
 int10_end:
+#ifdef DEBUG
+  push es
+  push ds
+  pusha
+  mov   bx, #0xc000
+  mov   ds, bx
+  call _int10_ret_debugmsg
+  popa
+  pop ds
+  pop es
+#endif
   popf
   iret
 ASM_END
@@ -604,13 +615,21 @@ ASM_END
 }
 
 // --------------------------------------------------------------------------------------------
-#ifdef DEBUG
-static void int10_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
+#if defined(DEBUG) || defined(CIRRUS_DEBUG) || defined(BANSHEE_DEBUG)
+static void int10_call_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
   Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
 {
- // 0E is write char...
- if(GET_AH()!=0x0E)
-  printf("vgabios call ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
+  // 0E is write char...
+  if (GET_AH() != 0x0E)
+    printf("vgabios call ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
+}
+
+static void int10_ret_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
+  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
+{
+  // 0E is write char...
+  if (GET_AH() != 0x0E)
+    printf("vgabios ret  ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
 }
 #endif
 

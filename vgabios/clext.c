@@ -544,7 +544,7 @@ cirrus_call_debug_dump:
   pusha
   push cs
   pop ds
-  call _cirrus_call_debugmsg
+  call _int10_call_debugmsg
   popa
   pop ds
   pop es
@@ -555,7 +555,7 @@ cirrus_ret_debug_dump:
   pusha
   push cs
   pop ds
-  call _cirrus_ret_debugmsg
+  call _int10_ret_debugmsg
   popa
   pop ds
   pop es
@@ -618,7 +618,6 @@ cirrus_vesa_pm_start:
 cirrus_vesa_pm_set_window:
   or   bx, bx
   jnz  cirrus_vesa_pm_get_window
-cirrus_vesa_pm_set_display_window1:
   cmp dl, #0x40 ;; address must be < 0x40
   jnc cirrus_vesa_pm_get_window
   mov al, bl ;; bl=bank number
@@ -2306,18 +2305,3 @@ cirrus_vesa_is_protected_mode:
      + (cirrus_vesa_pmbios_init >> 8) + (cirrus_vesa_pmbios_init)) & 0xff) << 8) + 0x01
 ASM_END
 #endif // CIRRUS_VESA3_PMINFO
-
-
-#ifdef CIRRUS_DEBUG
-static void cirrus_call_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
-  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
-{
-  printf("vgabios cirrus call ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
-}
-
-static void cirrus_ret_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
-  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
-{
-  printf("vgabios cirrus ret  ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
-}
-#endif

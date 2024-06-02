@@ -51,14 +51,9 @@ vesa_pm_io_ports_table:
 
   USE32
 vesa_pm_set_window:
-  cmp  bx, #0x00
-  je  vesa_pm_set_display_window1
-  mov  ax, #0x0100
-  ret
-vesa_pm_set_display_window1:
-  mov  ax, dx
+  or   bx, bx
+  jnz  vesa_pm_get_window
   push dx
-  push ax
   mov  dx, # VBE_DISPI_IOPORT_INDEX
   mov  ax, # VBE_DISPI_INDEX_BANK
   out  dx, ax
@@ -67,15 +62,14 @@ vesa_pm_set_display_window1:
   or   ax, #VBE_DISPI_BANK_RW
   mov  dx, # VBE_DISPI_IOPORT_DATA
   out  dx, ax
+vesa_pm_get_window:
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_BANK
+  out  dx, ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
   in   ax, dx
   shr  ax, #1
-  pop  dx
-  cmp  dx, ax
-  jne  illegal_window
-  mov  ax, #0x004f
-  ret
-illegal_window:
-  mov  ax, #0x014f
+  mov  dx, ax
   ret
 
 vesa_pm_set_display_start:
@@ -283,7 +277,7 @@ dispi_get_bpp:
   in   ax, dx
   mov  ah, al
   shr  ah, 3
-  test al, #0x07
+  test al, #0x03
   jz   get_bpp_noinc
   inc  ah
 get_bpp_noinc:
@@ -515,6 +509,17 @@ set_width_svga:
   ret
 
 dispi_set_virt_width:
+  push ax
+  call dispi_get_bpp
+  cmp  al, #0x04
+  ja   check_width_svga
+  pop  ax
+  cmp  ax, #0x0ff0
+  jbe  virt_width_ok
+  mov  ax, #0x0ff0
+  ja   virt_width_ok
+check_width_svga:
+  pop  ax
   cmp  ax, #0x8000
   jb   virt_width_ok
   mov  ax, #0x7fff
@@ -1764,13 +1769,13 @@ set_logical_scan_line_bytes:
   call dispi_get_bpp
   xor  bh, bh
   mov  bl, ah
+  pop  ax
   or   bl, bl
   jnz  no_4bpp_1
   shl  ax, #3
   mov  bl, #1
 no_4bpp_1:
   xor  dx, dx
-  pop  ax
   div  bx
 set_logical_scan_line_pixels:
   call dispi_set_virt_width
@@ -2185,6 +2190,17 @@ int10_no_vbefn:
 test_vbefn:
   cmp  ah, #0x4f
   jne  int10_no_vbefn
+#ifdef DEBUG
+  push es
+  push ds
+  pusha
+  mov   bx, #0xc000
+  mov   ds, bx
+  call _int10_call_debugmsg
+  popa
+  pop ds
+  pop es
+#endif
   cmp  al, #0x15
   ja   vbe_unimplemented
   push bp

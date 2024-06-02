@@ -511,7 +511,7 @@ banshee_call_debug_dump:
   pusha
   push cs
   pop ds
-  call _banshee_call_debugmsg
+  call _int10_call_debugmsg
   popa
   pop ds
   pop es
@@ -523,7 +523,7 @@ banshee_ret_debug_dump:
   pusha
   push cs
   pop ds
-  call _banshee_ret_debugmsg
+  call _int10_ret_debugmsg
   popa
   pop ds
   pop es
@@ -2272,17 +2272,3 @@ banshee_vesa_handlers:
   dw banshee_vesa_unimplemented
   dw banshee_vesa_15h
 ASM_END
-
-#ifdef BANSHEE_DEBUG
-static void banshee_call_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
-  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
-{
-  printf("vgabios banshee call ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
-}
-
-static void banshee_ret_debugmsg(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
-  Bit16u DI, SI, BP, SP, BX, DX, CX, AX, ES, DS, FLAGS;
-{
-  printf("vgabios banshee ret  ah%02x al%02x bx%04x cx%04x dx%04x\n",GET_AH(),GET_AL(),BX,CX,DX);
-}
-#endif
