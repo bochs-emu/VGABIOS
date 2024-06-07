@@ -68,20 +68,7 @@ typedef struct ModeInfoBlockCompact
    Bit32u PhysBasePtr;
    Bit32u OffScreenMemOffset;
    Bit16u OffScreenMemSize;
-// Mandatory information for VBE 3.0 and above
-   Bit16u LinBytesPerScanLine;
-   Bit8u  BnkNumberOfPages;
-   Bit8u  LinNumberOfPages;
-   Bit8u  LinRedMaskSize;
-   Bit8u  LinRedFieldPosition;
-   Bit8u  LinGreenMaskSize;
-   Bit8u  LinGreenFieldPosition;
-   Bit8u  LinBlueMaskSize;
-   Bit8u  LinBlueFieldPosition;
-   Bit8u  LinRsvdMaskSize;
-   Bit8u  LinRsvdFieldPosition;
-   Bit32u MaxPixelClock;
-//   Bit8u  Reserved[189]; // DO NOT PUT THIS IN HERE because of Compact Mode Info storage in bios 
+//   Bit8u  Reserved[206]; // DO NOT PUT THIS IN HERE because of Compact Mode Info storage in bios 
 } ModeInfoBlockCompact;
 
 typedef struct ModeInfoBlock

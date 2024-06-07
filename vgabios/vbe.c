@@ -1014,7 +1014,7 @@ find_mode_loop:
   test bx, #VBE_MODE_ATTRIBUTE_LINEAR_FRAME_BUFFER_MODE
   jnz  vbe_mode_found
 next_mode_info:
-  add  si, #0x44
+  add  si, #0x34
   jnz  find_mode_loop
 vbe_mode_not_found:
   xor  ax, ax
@@ -1320,7 +1320,7 @@ vbe00_5:
   stosw
   inc  cx
 vbe00_6:
-  add  si, #0x44
+  add  si, #0x34
   cmp  bx, #0xffff
   jnz  vbe00_4
 #ifdef DEBUG
@@ -1365,11 +1365,11 @@ vbe_biosfn_return_mode_information:
   jz   mode_not_found
   add  ax, #2
   mov  si, ax
-  mov  cx, #0x0021
+  mov  cx, #0x0019
   rep
     movsw
   xor  ax, ax
-  mov  cx, #0x005f
+  mov  cx, #0x0067
   rep
     stosw
   mov  di, bp

@@ -247,19 +247,6 @@ int main(int argc, char **argv)
         printf("/*Bit32u PhysBasePtr*/ %s,\n", "0");
       printf("/*Bit32u OffScreenMemOffset*/ %d,\n", 0);
       printf("/*Bit16u OffScreenMemSize*/ %d,\n", 0);
-      // Mandatory information for VBE 3.0 and above
-      printf("/*Bit16u LinBytesPerScanLine*/ %d,\n", pitch);
-      printf("/*Bit8u  BnkNumberOfPages*/ %d,\n", 0);
-      printf("/*Bit8u  LinNumberOfPages*/ %d,\n", 0);
-      printf("/*Bit8u  LinRedMaskSize*/ %d,\n", r_size);
-      printf("/*Bit8u  LinRedFieldPosition*/ %d,\n", r_pos);
-      printf("/*Bit8u  LinGreenMaskSize*/ %d,\n", g_size);
-      printf("/*Bit8u  LinGreenFieldPosition*/ %d,\n", g_pos);
-      printf("/*Bit8u  LinBlueMaskSize*/ %d,\n", b_size);
-      printf("/*Bit8u  LinBlueFieldPosition*/ %d,\n", b_pos);
-      printf("/*Bit8u  LinRsvdMaskSize*/ %d,\n", a_size);
-      printf("/*Bit8u  LinRsvdFieldPosition*/ %d,\n", a_pos);
-      printf("/*Bit32u MaxPixelClock*/ %d,\n", 0);
       printf("} },\n");
     }
   }
