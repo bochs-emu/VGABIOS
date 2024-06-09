@@ -368,7 +368,6 @@ dispi_support_bank_granularity_32k:
   pop  dx
   ret
 
-_dispi_set_enable:
 dispi_set_enable:
   push dx
   push ax
@@ -1023,6 +1022,25 @@ vbe_mode_found:
   pop  bx
   ret
 
+ ;; ModeInfo helper function: check if mode is supported by hw
+ ;; in  - si: Pointer to mode info
+ ;; out - CF set if supported
+mode_info_check_mode:
+  call dispi_get_max_xres
+  cmp  [si+20], ax
+  ja   vbe_mode_unsup
+  call dispi_get_max_yres
+  cmp  [si+22], ax
+  ja   vbe_mode_unsup
+  call dispi_get_max_bpp
+  cmp  [si+27], al
+  ja   vbe_mode_unsup
+  stc
+  ret
+vbe_mode_unsup:
+  clc
+  ret
+
 ;; Has VBE display - Sets CF set if VBE display detected
 
 vbe_has_vbe_display:
@@ -1306,15 +1324,8 @@ vbe00_4:
   mov  bx, [si]
   cmp  bx, #0xffff
   jz   vbe00_5
-  call dispi_get_max_xres
-  cmp  [si+20], ax
-  ja   vbe00_6
-  call dispi_get_max_yres
-  cmp  [si+22], ax
-  ja   vbe00_6
-  call dispi_get_max_bpp
-  cmp  [si+27], al
-  ja   vbe00_6
+  call mode_info_check_mode
+  jnc   vbe00_6
 vbe00_5:
   mov  ax, bx
   stosw
@@ -1363,8 +1374,10 @@ vbe_biosfn_return_mode_information:
   call mode_info_find_mode
   or   ax, ax
   jz   mode_not_found
-  add  ax, #2
   mov  si, ax
+  call mode_info_check_mode
+  jnc  mode_not_found
+  add  si, #2
   mov  cx, #0x0019
   rep
     movsw
