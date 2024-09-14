@@ -107,6 +107,10 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
+vgabios-github-current : Sep 14 2024
+  - Volker
+    - Fixed line offset for Cirrus mode 800x600x24
+
 vgabios-0.9b : Jun 09 2024
   - Volker
     - Fixed VBE protected mode bank switching (all extensions)

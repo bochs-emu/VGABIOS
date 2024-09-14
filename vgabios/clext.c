@@ -137,7 +137,7 @@ unsigned short cseq_800x600x24[] = {
 unsigned short ccrtc_800x600x24[] = {
 0x2311,0x7f00,0x6301,0x6402,0x8203,0x6b04,0x1b05,0x7206,0xf007,
 0x6009,0x000c,0x000d,
-0x5910,0x5712,0x2c13,0x4014,0x5815,0x7316,0xc317,0xff18,
+0x5910,0x5712,0x8013,0x4014,0x5815,0x7316,0xc317,0xff18,
 0x001a,0x321b,0x001d,
 0xffff
 };
@@ -572,7 +572,7 @@ cirrus_set_video_mode_extended_1:
   and al, #0x7f
   call cirrus_set_video_mode_bda
   SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
-  mov al, #0x20
+  mov ax, #0x20
   pop si
   jmp cirrus_return
 
@@ -1312,9 +1312,17 @@ cv00_4:
 cirrus_vesa_01h:
   mov ax, cx
   and ax, #0x3fff
+  cmp ax, #0x0080
+  jb  cirrus_no_vesamode
   call cirrus_vesamode_to_mode
   cmp ax, #0xffff
   jnz cirrus_vesa_01h_1
+  jmp cirrus_vesa_unimplemented
+cirrus_no_vesamode:
+  push si
+  call cirrus_get_modeentry_nomask
+  pop  si
+  jnc cirrus_vesa_01h_1
   jmp cirrus_vesa_unimplemented
 cirrus_vesa_01h_1:
   push ds
