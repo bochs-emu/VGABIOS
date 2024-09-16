@@ -852,6 +852,20 @@ cirrus_enable_16k_granularity:
   pop ax
   ret
 
+cirrus_disable_16k_granularity:
+  push ax
+  push dx
+  mov dx, #0x3ce
+  mov al, #0x0b
+  out dx, al
+  inc dx
+  in  al, dx
+  and al, #0xdf ;; disable 16k
+  out dx, al
+  pop dx
+  pop ax
+  ret
+
 cirrus_switch_mode_setregs:
 csms_1:
   mov ax, [bx]
@@ -1495,13 +1509,13 @@ cirrus_vesa_02h_1:
   push ax
   call cirrus_get_modeentry_nomask
   call cirrus_switch_mode
-  test bx, #0x4000 ;; LFB
-  jnz cirrus_vesa_02h_3
-  call cirrus_enable_16k_granularity
-cirrus_vesa_02h_3:
   test bx, #0x8000 ;; no clear
-  jnz cirrus_vesa_02h_4
+  jnz cirrus_vesa_02h_3
   call cirrus_clear_vram
+cirrus_vesa_02h_3:
+  test bx, #0x4000 ;; LFB
+  jnz cirrus_vesa_02h_4
+  call cirrus_enable_16k_granularity
 cirrus_vesa_02h_4:
   pop ax
   call cirrus_set_video_mode_bda
@@ -2176,7 +2190,7 @@ cirrus_clear_vram_1:
   xor ax, ax
   mov cx, #8192
   cld
-  rep 
+  rep
       stosw
   pop ax
   inc ah
@@ -2186,6 +2200,7 @@ cirrus_clear_vram_1:
   xor ah,ah
   mov dx, #0x3ce
   out dx, ax
+  call cirrus_disable_16k_granularity
 
   pop es
   popa
