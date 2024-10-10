@@ -480,23 +480,42 @@ cirrus_set_video_mode:
   push ds
 #ifdef CIRRUS_VESA3_PMINFO
  db 0x2e ;; cs:
-  mov si, [cirrus_vesa_sel0000_data]
+  mov  si, [cirrus_vesa_sel0000_data]
 #else
-  xor si, si
+  xor  si, si
 #endif
-  mov ds, si
-  xor bx, bx
-  mov [PM_BIOSMEM_VBE_MODE], bx
-  pop ds
-  pop bx
+  mov  ds, si
+  xor  bx, bx
+  mov  [PM_BIOSMEM_VBE_MODE], bx
+  pop  ds
+  pop  bx
   call cirrus_get_modeentry
-  jnc cirrus_set_video_mode_extended
-  mov al, #0xfe
+  jnc  cirrus_set_video_mode_extended
+  mov  al, #0xfe
   call cirrus_get_modeentry_nomask
   call cirrus_switch_mode
-  pop ax
-  pop si
-  jmp cirrus_unhandled
+  pop  ax
+  pop  si
+  ;; Cirrus 4 bpp test code
+  cmp  al, #0x58
+  jne  std_vga_mode
+  mov  al, #0x6a
+  int  #0x10
+  push si
+  push ds
+  mov  al, #0x58
+#ifdef CIRRUS_VESA3_PMINFO
+ db 0x2e ;; cs:
+  mov  si, [cirrus_vesa_sel0000_data]
+#else
+  xor  si, si
+#endif
+  mov  ds, si
+  mov  [PM_BIOSMEM_CURRENT_MODE], al
+  pop  ds
+  jmp  cirrus_set_video_mode_extended_2
+std_vga_mode:
+  jmp  cirrus_unhandled
 
 cirrus_extbios:
   cmp bl, #0x80
@@ -572,6 +591,7 @@ cirrus_set_video_mode_extended_1:
   and al, #0x7f
   call cirrus_set_video_mode_bda
   SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
+cirrus_set_video_mode_extended_2:
   mov ax, #0x20
   pop si
   jmp cirrus_return
@@ -1361,9 +1381,9 @@ cirrus_vesa_01h_1:
   push bx
   mov  bl, [si+6] ;; bpp
   cmp  bl, #0x08
-  jne  cirrus_vesa_no_8bpp
+  ja   cirrus_vesa_gt_8bpp
   or   al, #0x04 ;; TTY support
-cirrus_vesa_no_8bpp:
+cirrus_vesa_gt_8bpp:
   pop  bx
   stosw
   mov ax, #0x0007 ;; win attr

@@ -4165,6 +4165,35 @@ ASM_END
 // ============================================================================================
 
 // --------------------------------------------------------------------------------------------
+#ifdef CIRRUS
+ASM_START
+_stdvga_is_4bpp_mode:
+  push dx
+  mov  dx, #0x03ce
+  mov  al, #0x05 ;; GR5: shift reg
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0x60
+  jnz  no_4bpp_mode
+  dec  dx
+  mov  al, #0x06 ;; GR6: graphics mode and memory mapping
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0x0d
+  cmp  al, #0x05
+  jnz  no_4bpp_mode
+  pop  dx
+  mov  al, #0x01
+  ret
+no_4bpp_mode:
+  pop  dx
+  xor  ax, ax
+  ret
+ASM_END
+#endif
+
 static Bit8u find_vga_entry(mode)
 Bit8u mode;
 {
@@ -4183,6 +4212,12 @@ Bit8u mode;
   if ((current == 1) && (line==0xff)) {
     if (VGAEXT_is_8bpp_mode())
       line = 14;
+  }
+#endif
+#ifdef CIRRUS
+  if ((current == 1) && (line==0xff)) {
+    if (stdvga_is_4bpp_mode())
+      line = 15;
   }
 #endif
   return line;
