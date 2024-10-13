@@ -52,6 +52,11 @@ unsigned short cgraph_vga[] = {0x0009,0x000a,0x000b,0xffff};
 unsigned short ccrtc_vga[] = {0x001a,0x001b,0x001d,0xffff};
 
 /* extensions */
+unsigned short cgraph_vgacolor[] = {
+0x0000,0x0001,0x0002,0x0003,0x0004,0x0005,0x0506,0x0f07,0xff08,
+0x0009,0x000a,0x000b,
+0xffff
+};
 unsigned short cgraph_svgacolor[] = {
 0x0000,0x0001,0x0002,0x0003,0x0004,0x4005,0x0506,0x0f07,0xff08,
 0x0009,0x000a,0x000b,
@@ -97,6 +102,20 @@ unsigned short ccrtc_640x480x24[] = {
 0x4009,0x000c,0x000d,
 0xea10,0xdf12,0x0013,0x4014,0xdf15,0x0b16,0xc317,0xff18,
 0x001a,0x321b,0x001d,
+0xffff
+};
+/* 800x600x4 */
+unsigned short cseq_800x600x4[] = {
+0x0300,0x0101,0x0f02,0x0003,0x0604,
+0x0412,0x0013,0x2017,0x510e,0x3a1e,
+0x0007,
+0xffff
+};
+unsigned short ccrtc_800x600x4[] = {
+0x2311,0x7f00,0x6301,0x6402,0x8203,0x6b04,0x1b05,0x7206,0xf007,
+0x6009,0x000c,0x000d,
+0x5910,0x5712,0x3213,0x0014,0x5815,0x7316,0xe317,0xff18,
+0x001a,0x221b,0x001d,
 0xffff
 };
 /* 800x600x8 */
@@ -265,6 +284,9 @@ cirrus_mode_t cirrus_modes[] =
    cseq_640x480x24,cgraph_svgacolor,ccrtc_640x480x24,24,
    6,cirrus_color_params_24bpp},
 
+ {0x58,800,600,4,0x00,
+   cseq_800x600x4,cgraph_vgacolor,ccrtc_800x600x4,4,
+   3,cirrus_color_params_8bpp},
  {0x5c,800,600,8,0x00,
    cseq_800x600x8,cgraph_svgacolor,ccrtc_800x600x8,8,
    4,cirrus_color_params_8bpp},
@@ -496,25 +518,6 @@ cirrus_set_video_mode:
   call cirrus_switch_mode
   pop  ax
   pop  si
-  ;; Cirrus 4 bpp test code
-  cmp  al, #0x58
-  jne  std_vga_mode
-  mov  al, #0x6a
-  int  #0x10
-  push si
-  push ds
-  mov  al, #0x58
-#ifdef CIRRUS_VESA3_PMINFO
- db 0x2e ;; cs:
-  mov  si, [cirrus_vesa_sel0000_data]
-#else
-  xor  si, si
-#endif
-  mov  ds, si
-  mov  [PM_BIOSMEM_CURRENT_MODE], al
-  pop  ds
-  jmp  cirrus_set_video_mode_extended_2
-std_vga_mode:
   jmp  cirrus_unhandled
 
 cirrus_extbios:
@@ -583,18 +586,23 @@ cirrus_ret_debug_dump:
 
 cirrus_set_video_mode_extended:
   call cirrus_switch_mode
-  pop ax ;; mode
+  pop  ax ;; mode
   test al, #0x80
-  jnz cirrus_set_video_mode_extended_1
+  jnz  cirrus_set_video_mode_extended_1
+ db 0x2e ;; cs:
+  cmp  [si+6], #0x04 ;; bpp
+  ja   clear_vram_linear
+  call _vga_clear_vram_pl4
+  jmp  cirrus_set_video_mode_extended_1
+clear_vram_linear:
   call cirrus_clear_vram
 cirrus_set_video_mode_extended_1:
-  and al, #0x7f
+  and  al, #0x7f
   call cirrus_set_video_mode_bda
   SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
-cirrus_set_video_mode_extended_2:
-  mov ax, #0x20
-  pop si
-  jmp cirrus_return
+  mov  ax, #0x20
+  pop  si
+  jmp  cirrus_return
 
 cirrus_set_video_mode_bda:
   push bx
@@ -831,25 +839,35 @@ no_vclk_setup:
   mov al, #0xff
   out dx, al
 
-  mov al, #0x00
-  mov bl, [si+17]  ;; memory model
-  or  bl, bl
-  jz is_text_mode
-  mov al, #0x01
-  cmp bl, #0x03
-  jnz is_text_mode
-  or al, #0x40
+  mov  al, #0x00
+  mov  ah, #0xbe
+  mov  bl, [si+17]  ;; memory model
+  or   bl, bl
+  jz   is_text_mode
+  mov  al, #0x01
+  mov  ah, #0xb2
+  cmp  bl, #0x03
+  jnz  is_text_mode
+  or   al, #0x40
 is_text_mode:
-  mov bl, #0x10
+  mov  bl, #0x10
   call biosfn_get_single_palette_reg
-  and bh, #0xfe
-  or bh, al
+  and  bh, ah
+  or   bh, al
+  call biosfn_set_single_palette_reg
+  and  bh, #0x01
+  xor  bh, #0x01
+  shl  bh, #3
+  mov  bl, #0x13
   call biosfn_set_single_palette_reg
 
-  mov al, [si+6]  ;; bpp
-  cmp al, #0x08
-  jnz no_8bpp_mode
-  mov al, #0x03
+  cmp  [si+6], #0x08  ;; bpp
+  ja   no_8bpp_mode
+  mov  al, #0x03
+  cmp  [si+6], #0x04
+  ja   palette_ok
+  dec  al
+palette_ok:
   call load_dac_palette
 no_8bpp_mode:
 

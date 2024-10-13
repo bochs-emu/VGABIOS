@@ -782,6 +782,31 @@ no_fill_dac:
   pop   bx
   pop   ax
   ret
+
+_vga_clear_vram_pl4:
+  pusha
+  push es
+  mov  dx, #VGAREG_SEQU_ADDRESS
+  mov  al, #0x02
+  out  dx, al
+  inc  dx
+  in   al, dx
+  push ax
+  mov  al, #0x0f
+  out  dx, al
+  mov  cx, #0xa000
+  mov  es, cx
+  xor  di, di
+  xor  ax, ax
+  mov  cx, #0x8000
+  cld
+  rep
+       stosw
+  pop  ax
+  out  dx, al
+  pop  es
+  popa
+  ret
 ASM_END
 
 // ============================================================================================
@@ -854,11 +879,7 @@ ASM_END
     }
     else
     {
-      outb( VGAREG_SEQU_ADDRESS, 0x02 );
-      mmask = inb( VGAREG_SEQU_DATA );
-      outb( VGAREG_SEQU_DATA, 0x0f ); // all planes
-      memsetw(vga_modes[line].sstart,0,0x0000,0x8000); // 64k
-      outb( VGAREG_SEQU_DATA, mmask );
+      vga_clear_vram_pl4();
     }
   }
 

@@ -109,6 +109,7 @@ History
 -------
 vgabios-github-current : Sep 14 2024
   - Volker
+    - Added support for Cirrus mode 0x58 (800x600x4)
     - Fixed line offset for Cirrus mode 800x600x24
     - Disable 16k granularity after clearing Cirrus VRAM
 
