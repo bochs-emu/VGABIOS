@@ -107,14 +107,14 @@ unsigned short ccrtc_640x480x24[] = {
 /* 800x600x4 */
 unsigned short cseq_800x600x4[] = {
 0x0300,0x0101,0x0f02,0x0003,0x0604,
-0x0412,0x0013,0x2017,0x510e,0x3a1e,
+0x0012,0x0013,0x0616,0x2117,0x530e,0x301e,
 0x0007,
 0xffff
 };
 unsigned short ccrtc_800x600x4[] = {
-0x2311,0x7f00,0x6301,0x6402,0x8203,0x6b04,0x1b05,0x7206,0xf007,
+0x0b11,0x7f00,0x6301,0x6402,0x8203,0x6804,0x1205,0x6f06,0xf007,
 0x6009,0x000c,0x000d,
-0x5910,0x5712,0x3213,0x0014,0x5815,0x7316,0xe317,0xff18,
+0x5810,0x5712,0x3213,0x0014,0x5715,0x6f16,0xe317,0xff18,
 0x001a,0x221b,0x001d,
 0xffff
 };
@@ -415,7 +415,11 @@ cirrus_init:
   out dx, al
   inc dx
   in  al, dx
-  and al, #0x18
+  and  al, #0x98
+  test al, #0x80
+  jz   no_bankswitch
+  mov  al, #0x47
+no_bankswitch:
   mov ah, al
   mov al, #0x0a
   dec dx
@@ -592,7 +596,20 @@ cirrus_set_video_mode_extended:
  db 0x2e ;; cs:
   cmp  [si+6], #0x04 ;; bpp
   ja   clear_vram_linear
+  push ax
+  push dx
+  mov  dx, #0x03ce
+  mov  ax, #0x0009
+vga_clear_loop:
+  out  dx, ax
   call _vga_clear_vram_pl4
+  add  ah, #0x10
+  cmp  ah, #0x40
+  jb   vga_clear_loop
+  xor  ah, ah
+  out  dx, ax
+  pop  dx
+  pop  ax
   jmp  cirrus_set_video_mode_extended_1
 clear_vram_linear:
   call cirrus_clear_vram
@@ -812,6 +829,12 @@ cirrus_switch_mode:
   mov bx, [si+14] ;; crtc
   call get_crtc_address
   call cirrus_switch_mode_setregs
+  mov  al, #0x11
+  out  dx, al
+  inc  dx
+  in   al, dx
+  or   al, #0x80
+  out  dx, al ;; lock CRTC regs 0 - 7
 
   mov  bx, [si+2]
   or   bx, bx
@@ -821,6 +844,7 @@ cirrus_switch_mode:
   and  al, #0xf3
   cmp  bx, #0x280
   jbe  set_vclk_sel
+  and  al, #0x33
   or   al, #0x0c
 set_vclk_sel:
   mov  dx, #VGAREG_WRITE_MISC_OUTPUT
@@ -847,10 +871,10 @@ no_vclk_setup:
   mov  al, #0x01
   mov  ah, #0xb2
   cmp  bl, #0x03
-  jnz  is_text_mode
+  jz   is_text_mode
   or   al, #0x40
 is_text_mode:
-  mov  bl, #0x10
+  mov  bl, #0x10 ;; mode control
   call biosfn_get_single_palette_reg
   and  bh, ah
   or   bh, al
@@ -858,7 +882,7 @@ is_text_mode:
   and  bh, #0x01
   xor  bh, #0x01
   shl  bh, #3
-  mov  bl, #0x13
+  mov  bl, #0x13 ;; horiz. pel panning
   call biosfn_set_single_palette_reg
 
   cmp  [si+6], #0x08  ;; bpp
