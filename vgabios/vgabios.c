@@ -4188,7 +4188,8 @@ ASM_END
 // --------------------------------------------------------------------------------------------
 #ifdef CIRRUS
 ASM_START
-_stdvga_is_4bpp_mode:
+stdvga_is_4bpp_mode:
+  push ax
   push dx
   mov  dx, #0x03ce
   mov  al, #0x05 ;; GR5: shift reg
@@ -4206,11 +4207,19 @@ _stdvga_is_4bpp_mode:
   cmp  al, #0x05
   jnz  no_4bpp_mode
   pop  dx
-  mov  al, #0x01
+  pop  ax
+  stc
   ret
 no_4bpp_mode:
   pop  dx
-  xor  ax, ax
+  pop  ax
+  clc
+  ret
+
+_stdvga_is_4bpp_mode:
+  xor  al, al
+  call stdvga_is_4bpp_mode
+  rcl  al, #1
   ret
 ASM_END
 #endif
