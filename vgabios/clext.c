@@ -1992,22 +1992,25 @@ cirrus_vesa_get_capabilities:
   ret
 
 cirrus_vesa_read_EDID:
+  mov  dx, #0x03c4
+  in   al, dx
+  push ax
   call cirrus_ddc_init
-  jnz  cirrus_vesa_unimplemented
+  jnz  cirrus_vesa_no_ddc
   call cirrus_ddc_start
   call cirrus_ddc_delay
   mov  al, #0xa0
   call cirrus_ddc_send_byte
-  jc   cirrus_vesa_unimplemented
+  jc   cirrus_vesa_no_ddc
   mov  al, #0x00
   call cirrus_ddc_send_byte
-  jc   cirrus_vesa_unimplemented
+  jc   cirrus_vesa_no_ddc
   call cirrus_ddc_stop
   call cirrus_ddc_start
   call cirrus_ddc_delay
   mov  al, #0xa1
   call cirrus_ddc_send_byte
-  jc   cirrus_vesa_unimplemented
+  jc   cirrus_vesa_no_ddc
   push cx
   push di
   mov  cx, #0x0080
@@ -2020,9 +2023,16 @@ cirrus_vesa_15h_01:
   call cirrus_ddc_stop
   pop  di
   pop  cx
+  mov  dx, #0x03c4
+  pop  ax
+  out  dx, al
   mov  ax, #0x004f
   ret
 
+cirrus_vesa_no_ddc:
+  mov  dx, #0x03c4
+  pop  ax
+  out  dx, al
 cirrus_vesa_unimplemented:
   mov  ax, #0x014F ;; not implemented
   ret

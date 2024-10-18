@@ -98,7 +98,6 @@ static void           printf();
 static void           unimplemented();
 static void           unknown();
 
-static Bit8u find_vga_entry();
 static void set_cursor_pos();
 
 static void memsetb();
@@ -4215,43 +4214,65 @@ no_4bpp_mode:
   pop  ax
   clc
   ret
-
-_stdvga_is_4bpp_mode:
-  xor  al, al
-  call stdvga_is_4bpp_mode
-  rcl  al, #1
-  ret
 ASM_END
 #endif
 
-static Bit8u find_vga_entry(mode)
-Bit8u mode;
-{
-  Bit8u i, line = 0xff, current=0;
-  if (mode == 0xff) {
-    mode=read_bda_byte(BIOSMEM_CURRENT_MODE);
-    current = 1;
-  }
-  for (i = 0; i <= MODE_MAX; i++) {
-    if (vga_modes[i].svgamode == mode) {
-      line = i;
-      break;
-    }
-  }
+ASM_START
+_find_vga_entry:
+  push bp
+  mov  bp, sp
+  push cx
+  push si
+  mov  al, 4[bp]
+  cmp  al, #0xff
+  jne  fve_1
+  push  ds
+  mov   ax, # BIOSMEM_SEG
+  mov   ds, ax
+  push  bx
+  mov   bx, # BIOSMEM_CURRENT_MODE
+  mov   al, [bx]
+  pop   bx
+  pop   ds
+fve_1:
+  xor  cl, cl
+  mov  si, #_vga_modes
+fve_2:
+ db 0x2e ;; cs:
+  mov  ah, [si]
+  cmp  al, ah
+  jz   fve_5
+  add  si, # VGA_MODE_SIZE
+  inc  cl
+  cmp  cl, # MODE_MAX
+  jbe  fve_2
 #ifdef VGAEXT
-  if ((current == 1) && (line==0xff)) {
-    if (VGAEXT_is_8bpp_mode())
-      line = 14;
-  }
+  cmp  4[bp], #0xff
+  jne  fve_3
+  call VGAEXT_is_8bpp_mode
+  or   al, al
+  jz   fve_3
+  mov  cl, #14
+  jnz  fve_5
+fve_3:
 #endif
 #ifdef CIRRUS
-  if ((current == 1) && (line==0xff)) {
-    if (stdvga_is_4bpp_mode())
-      line = 15;
-  }
+  cmp  4[bp], #0xff
+  jne  fve_4
+  call stdvga_is_4bpp_mode
+  jnc  fve_4
+  mov  cl, #15
+  jc   fve_5
+fve_4:
 #endif
-  return line;
-}
+  mov  cl, #0xff
+fve_5:
+  mov  al, cl
+  pop  si
+  pop  cx
+  pop  bp
+  ret
+ASM_END
 
 /* =========================================================== */
 /*

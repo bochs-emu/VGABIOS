@@ -112,6 +112,8 @@ typedef struct
  Bit8u  vpti;
 } VGAMODES;
 
+#define VGA_MODE_SIZE 8
+
 static VGAMODES vga_modes[MODE_MAX+1]=
 {//mode  class  model bits sstart  dac   vpti
  {0x00, TEXT,  CTEXT,   4, 0xB800, 0x02, 0x17},
