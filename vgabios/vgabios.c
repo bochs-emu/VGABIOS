@@ -3037,104 +3037,126 @@ dac_no_clip:
 ASM_END
 
 // --------------------------------------------------------------------------------------------
-static void get_font_access()
-{
 ASM_START
- mov dx, # VGAREG_SEQU_ADDRESS
- mov ax, #0x0100
- out dx, ax
- mov ax, #0x0402
- out dx, ax
- mov ax, #0x0704
- out dx, ax
- mov ax, #0x0300
- out dx, ax
- mov dx, # VGAREG_GRDC_ADDRESS
- mov ax, #0x0204
- out dx, ax
- mov ax, #0x0005
- out dx, ax
- mov ax, #0x0406
- out dx, ax
-ASM_END
-}
-
-static void release_font_access()
-{
-ASM_START
- mov dx, # VGAREG_SEQU_ADDRESS
- mov ax, #0x0100
- out dx, ax
- mov ax, #0x0302
- out dx, ax
- mov ax, #0x0304
- out dx, ax
- mov ax, #0x0300
- out dx, ax
- mov dx, # VGAREG_READ_MISC_OUTPUT
- in  al, dx
- and al, #0x01
- shl al, 2
- or  al, #0x0a
- mov ah, al
- mov al, #0x06
- mov dx, # VGAREG_GRDC_ADDRESS
- out dx, ax
- mov ax, #0x0004
- out dx, ax
- mov ax, #0x1005
- out dx, ax
-ASM_END
-}
-
-ASM_START
-idiv_u:
-  xor dx,dx
-  div bx
+_get_font_access:
+  mov dx, # VGAREG_SEQU_ADDRESS
+  mov ax, #0x0100
+  out dx, ax
+  mov ax, #0x0402
+  out dx, ax
+  mov ax, #0x0704
+  out dx, ax
+  mov ax, #0x0300
+  out dx, ax
+  mov dx, # VGAREG_GRDC_ADDRESS
+  mov ax, #0x0204
+  out dx, ax
+  mov ax, #0x0005
+  out dx, ax
+  mov ax, #0x0406
+  out dx, ax
   ret
-ASM_END
 
-static void set_scan_lines(lines) Bit8u lines;
-{
- Bit16u crtc_addr,cols,page,vde;
- Bit8u crtc_r9,ovl,rows;
+_release_font_access:
+  mov dx, # VGAREG_SEQU_ADDRESS
+  mov ax, #0x0100
+  out dx, ax
+  mov ax, #0x0302
+  out dx, ax
+  mov ax, #0x0304
+  out dx, ax
+  mov ax, #0x0300
+  out dx, ax
+  mov dx, # VGAREG_READ_MISC_OUTPUT
+  in  al, dx
+  and al, #0x01
+  shl al, 2
+  or  al, #0x0a
+  mov ah, al
+  mov al, #0x06
+  mov dx, # VGAREG_GRDC_ADDRESS
+  out dx, ax
+  mov ax, #0x0004
+  out dx, ax
+  mov ax, #0x1005
+  out dx, ax
+  ret
 
- crtc_addr = read_bda_word(BIOSMEM_CRTC_ADDRESS);
- outb(crtc_addr, 0x09);
- crtc_r9 = inb(crtc_addr+1);
- crtc_r9 = (crtc_r9 & 0xe0) | (lines - 1);
- outb(crtc_addr+1, crtc_r9);
- if(lines==8)
-  {
-ASM_START
-  mov  cx, #0x0607
-  call biosfn_set_cursor_shape
-ASM_END
-  }
- else
-  {
-ASM_START
+_set_scan_lines:
   push bp
   mov  bp, sp
-  mov  ch, _set_scan_lines.lines + 2[bp]
+  push ds
+  mov  ax, # BIOSMEM_SEG
+  mov  ds, ax
+  mov  bx, # BIOSMEM_CRTC_ADDRESS
+  mov  dx, [bx]
+  mov  al, #0x09
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0xe0
+  mov  ah, 4[bp] ;; lines
+  dec  ah
+  or   al, ah
+  out  dx, al
+  inc  ah
+  cmp  ah, #0x08
+  jne  scanlines_gt_8
+  mov  cx, #0x0607
+  call biosfn_set_cursor_shape
+  jmp  set_char_height
+scanlines_gt_8:
+  mov  ch, ah
   sub  ch, #0x04 ; CH = lines-4
   mov  cl, ch
   inc  cl        ; CL = lines-3
   call biosfn_set_cursor_shape
+set_char_height:
+  mov  bx, # BIOSMEM_CHAR_HEIGHT
+  mov  [bx], ah
+  push ax
+  dec  dx
+  mov  al, #0x12
+  out  dx, al
+  inc  dx
+  in   al, dx
+  mov  cl, al
+  dec  dx
+  mov  al, #0x07
+  out  dx, al
+  inc  dx
+  in   al, dx
+  mov  ch, al
+  mov  al, cl
+  xor  ah, ah
+  test ch, #0x02
+  jz   no_vde_bit8
+  or   ah, #0x01
+no_vde_bit8:
+  test ch, #0x40
+  jz   no_vde_bit9
+  or   ah, #0x02
+no_vde_bit9:
+  inc  ax
+  pop  bx
+  div  bh
+  mov  ah, al
+  dec  al
+  mov  bx, # BIOSMEM_NB_ROWS
+  mov  [bx], al
+  mov  bx, # BIOSMEM_NB_COLS
+  mov  al, [bx]
+  mov  bl, ah
+  mul  bl
+  shl  ax, #1
+  or   al, #0xff
+  inc  ax
+  mov  bx, # BIOSMEM_PAGE_SIZE
+  mov  [bx], ax
+  pop  ds
   pop  bp
+  ret
 ASM_END
-  }
- write_bda_word(BIOSMEM_CHAR_HEIGHT, lines);
- outb(crtc_addr, 0x12);
- vde = inb(crtc_addr+1);
- outb(crtc_addr, 0x07);
- ovl = inb(crtc_addr+1);
- vde += (((ovl & 0x02) << 7) + ((ovl & 0x40) << 3) + 1);
- rows = vde / lines;
- write_bda_byte(BIOSMEM_NB_ROWS, rows-1);
- cols = read_bda_word(BIOSMEM_NB_COLS);
- write_bda_word(BIOSMEM_PAGE_SIZE, SCREEN_SIZE(rows, cols));
-}
 
 static void biosfn_load_text_user_pat (AL,ES,BP,CX,DX,BL,BH) Bit8u AL;Bit16u ES;Bit16u BP;Bit16u CX;Bit16u DX;Bit8u BL;Bit8u BH;
 {
@@ -4736,6 +4758,11 @@ void unknown()
 #endif
 
 ASM_START
+idiv_u:
+  xor dx,dx
+  div bx
+  ret
+
 imodu:
   push dx
   xor  dx, dx
