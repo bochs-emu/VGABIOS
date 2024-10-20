@@ -230,6 +230,20 @@ unsigned short ccrtc_1152x864x8[] = {
 0x001a,0x221b,0x001d,
 0xffff
 };
+/* 1280x1024x4 */
+unsigned short cseq_1280x1024x4[] = {
+0x0300,0x0101,0x0f02,0x0003,0x0604,
+0x0012,0x0013,0x0616,0x2117,0x6e0e,0x2a1e,
+0x0007,
+0xffff
+};
+unsigned short ccrtc_1280x1024x4[] = {
+0x0311,0xcf00,0x9f01,0xa002,0x8003,0xa904,0x1305,0x1406,0xb207,
+0x6009,0x000c,0x000d,
+0x0010,0xff12,0x5013,0x0014,0x0015,0x2a16,0xe317,0xff18,
+0x011a,0x221b,0x001d,
+0xffff
+};
 /* 1280x1024x8 */
 unsigned short cseq_1280x1024x8[] = {
 0x0300,0x2101,0x0f02,0x0003,0x0e04,
@@ -331,6 +345,9 @@ cirrus_mode_t cirrus_modes[] =
    cseq_1024x768x24,cgraph_svgacolor,ccrtc_1024x768x24,24,
    6,cirrus_color_params_24bpp},
 
+ {0x6c,1280,1024,4,0x00,
+   cseq_1280x1024x4,cgraph_vgacolor,ccrtc_1280x1024x4,4,
+   3,cirrus_color_params_8bpp},
  {0x6d,1280,1024,8,0x00,
    cseq_1280x1024x8,cgraph_svgacolor,ccrtc_1280x1024x8,8,
    4,cirrus_color_params_8bpp},
@@ -393,6 +410,8 @@ unsigned short cirrus_vesa_modelist[] = {
   0x117, 0x74,
 // 1024x768x24
   0x118, 0x79,
+// 1280x1024x4
+  0x106, 0x6c,
 // 1280x1024x8
   0x107, 0x6d,
 // 1280x1024x15
@@ -1689,7 +1708,7 @@ cirrus_vesa_06h_bl0:
   mul  bx
   jmp  cirrus_vesa_06h_bl2
 cirrus_vesa_06h_bl0_4bpp:
-  call stdvga_get_scanlines
+  call cirrus_get_scanlines
   mov  bx, ax
   mov  dx, #0x04
   xor  ax, ax
@@ -2371,6 +2390,23 @@ cirrus_clear_vram_1:
 
   pop es
   popa
+  ret
+
+cirrus_get_scanlines:
+  call stdvga_get_scanlines
+  push ax
+  push dx
+  call get_crtc_address
+  mov  al, #0x1a
+  out  dx, al
+  inc  dx
+  in   al, dx
+  test al, #0x01
+  pop  dx
+  pop  ax
+  jz   no_interlace
+  shl  ax, #1
+no_interlace:
   ret
 
 cirrus_extbios_handlers:

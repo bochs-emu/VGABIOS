@@ -109,7 +109,7 @@ History
 -------
 vgabios-github-current : Oct 20 2024
   - Volker
-    - Added support for Cirrus 4 bpp modes 0x58 and 0x5d
+    - Added support for Cirrus 4 bpp modes 0x58, 0x5d and 0x6c
     - Added 4 bpp support for Cirrus VBE functions
     - Fixed line offset for Cirrus mode 800x600x24
     - Disable 16k granularity after clearing Cirrus VRAM
