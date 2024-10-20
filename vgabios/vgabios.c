@@ -86,8 +86,6 @@ static void           write_byte();
 static void           write_bda_byte();
 static void           write_word();
 static void           write_bda_word();
-static Bit8u          inb();
-static Bit16u         inw();
 static void           outb();
 static void           outw();
 
@@ -3115,29 +3113,7 @@ set_char_height:
   mov  bx, # BIOSMEM_CHAR_HEIGHT
   mov  [bx], ah
   push ax
-  dec  dx
-  mov  al, #0x12
-  out  dx, al
-  inc  dx
-  in   al, dx
-  mov  cl, al
-  dec  dx
-  mov  al, #0x07
-  out  dx, al
-  inc  dx
-  in   al, dx
-  mov  ch, al
-  mov  al, cl
-  xor  ah, ah
-  test ch, #0x02
-  jz   no_vde_bit8
-  or   ah, #0x01
-no_vde_bit8:
-  test ch, #0x40
-  jz   no_vde_bit9
-  or   ah, #0x02
-no_vde_bit9:
-  inc  ax
+  call stdvga_get_scanlines
   pop  bx
   div  bh
   mov  ah, al
@@ -4677,24 +4653,6 @@ ASM_END
 }
 
 // --------------------------------------------------------------------------------------------
- Bit8u
-inb(port)
-  Bit16u port;
-{
-ASM_START
-  push bp
-  mov  bp, sp
-
-    push dx
-    mov  dx, 4[bp]
-    in   al, dx
-    pop  dx
-
-  pop  bp
-ASM_END
-}
-
-// --------------------------------------------------------------------------------------------
   void
 outb(port, val)
   Bit16u port;
@@ -4911,6 +4869,36 @@ get_crtc_address:
   mov  dx, #VGAREG_MDA_CRTC_ADDRESS
   add  dl, al
   pop  ax
+  ret
+
+;; out - ax:number of scanlines
+stdvga_get_scanlines:
+  push bx
+  push dx
+  call get_crtc_address
+  mov  al, #0x12
+  out  dx, al
+  inc  dx
+  in   al, dx
+  mov  bl, al
+  dec  dx
+  mov  al, #0x07
+  out  dx, al
+  inc  dx
+  in   al, dx
+  xor  ah, ah
+  test al, #0x02
+  jz   test_bit9
+  or   ah, #0x01
+test_bit9:
+  test al, #0x40
+  jz   inc_vde
+  or   ah, #0x02
+inc_vde:
+  mov  al, bl
+  inc  ax
+  pop  dx
+  pop  bx
   ret
 
 ; shared code for the VBE support of all extensions
