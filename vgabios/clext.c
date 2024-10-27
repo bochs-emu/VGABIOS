@@ -1802,12 +1802,14 @@ cirrus_vesa_07h_bl0_set:
   mov  ax, #0x004f
   ret
 cirrus_vesa_07h_bl1:
-  ;; TODO: 4 bpp
   call cirrus_get_start_addr
+  call stdvga_is_4bpp_mode
+  jc   cirrus_vesa_07h_bl1_4bpp_1
   shl  ax, #1
   rcl  dx, #1
   shl  ax, #1
   rcl  dx, #1
+cirrus_vesa_07h_bl1_4bpp_1:
   push ax
   call cirrus_get_line_offset
   mov  bx, ax
@@ -1816,12 +1818,23 @@ cirrus_vesa_07h_bl1:
   push ax
   push dx
   call cirrus_get_bpp_bytes
+  jnc  cirrus_vesa_07h_bl1_4bpp_2
   mov  bl, al
   xor  bh, bh
   pop  ax
   xor  dx, dx
   div  bx
   mov  cx, ax
+  pop  dx
+  mov  ax, #0x004f
+  ret
+cirrus_vesa_07h_bl1_4bpp_2:
+  pop  cx
+  shl  cx, #3
+  mov  bl, #0x13 ;; horiz. pel panning
+  call biosfn_get_single_palette_reg
+  and  bh, #0x07
+  or   cl, bh
   pop  dx
   mov  ax, #0x004f
   ret
