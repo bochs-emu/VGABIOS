@@ -425,10 +425,13 @@ dispi_set_bank_farcall:
   je   dispi_set_bank_farcall_get
   or   bx, bx
   jnz  dispi_set_bank_farcall_error
+  push dx
   mov  ax, dx
+  shl  ax, #1
   or   ax, #VBE_DISPI_BANK_RW
   call dispi_set_bank
   in   ax, dx
+  shr  ax, #1
   pop  dx
   cmp  dx, ax
   jne  dispi_set_bank_farcall_error
@@ -436,6 +439,7 @@ dispi_set_bank_farcall:
   retf
 dispi_set_bank_farcall_get:
   call dispi_get_bank
+  shr  ax, #1
   mov  dx, ax
   mov  ax, #0x004f
   retf
