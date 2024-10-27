@@ -245,8 +245,6 @@ int main(int argc, char **argv)
                "VBE_DISPI_LFB_PHYSICAL_ADDRESS");
       else
         printf("/*Bit32u PhysBasePtr*/ %s,\n", "0");
-      printf("/*Bit32u OffScreenMemOffset*/ %d,\n", 0);
-      printf("/*Bit16u OffScreenMemSize*/ %d,\n", 0);
       printf("} },\n");
     }
   }

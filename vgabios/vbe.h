@@ -66,8 +66,8 @@ typedef struct ModeInfoBlockCompact
    Bit8u  DirectColorModeInfo;
 // Mandatory information for VBE 2.0 and above
    Bit32u PhysBasePtr;
-   Bit32u OffScreenMemOffset;
-   Bit16u OffScreenMemSize;
+//   Bit32u OffScreenMemOffset;
+//   Bit16u OffScreenMemSize;
 //   Bit8u  Reserved[206]; // DO NOT PUT THIS IN HERE because of Compact Mode Info storage in bios 
 } ModeInfoBlockCompact;
 
