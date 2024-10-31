@@ -47,7 +47,7 @@ typedef struct
 #define CIRRUS_PM16INFO_SIZE 20
 
 /* VGA */
-unsigned short cseq_vga[] = {0x0007,0xffff};
+unsigned short cseq_vga[] = {0x0007,0x0012,0xffff};
 unsigned short cgraph_vga[] = {0x0009,0x000a,0x000b,0xffff};
 unsigned short ccrtc_vga[] = {0x001a,0x001b,0x001d,0xffff};
 
