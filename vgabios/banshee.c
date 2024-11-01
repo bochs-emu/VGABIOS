@@ -786,7 +786,7 @@ no_256col:
   call get_crtc_xres
   mov  bx, ax
   xor  eax, eax
-  call get_crtc_yres
+  call stdvga_get_scanlines
   shr  ax, #4 ;; FIXME: use char height
   shl  eax, #12
   or   ax, bx
@@ -807,7 +807,7 @@ vga_gfx_mode:
   shr  bx, #1
 vga_16col_1:
   xor  eax, eax
-  call get_crtc_yres
+  call stdvga_get_scanlines
   test cl, #0x02
   jz   vga_16col_2
   shr  ax, #1
@@ -841,7 +841,7 @@ no_banshee2:
   pop  ds
   ret
 
-;; VGA compatibility helper functions
+;; VGA compatibility helper function
 
 get_crtc_xres:
   push dx
@@ -852,35 +852,6 @@ get_crtc_xres:
   in   al, dx
   inc  al
   pop  dx
-  ret
-
-get_crtc_yres:
-  push bx
-  push dx
-  call get_crtc_address
-  mov  al, #0x12
-  out  dx, al
-  inc  dx
-  in   al, dx
-  mov  bl, al
-  xor  bh, bh
-  dec  dx
-  mov  al, #0x07
-  out  dx, al
-  inc  dx
-  in   al, dx
-  test al, #0x02
-  jz   no_bit8
-  or   bh, #0x01
-no_bit8:
-  test al, #0x40
-  jz   no_bit9
-  or   bh, #0x02
-no_bit9:
-  mov  ax, bx
-  inc  ax
-  pop  dx
-  pop  bx
   ret
 
 ;; code for 'write character' support in 8bpp graphics modes
