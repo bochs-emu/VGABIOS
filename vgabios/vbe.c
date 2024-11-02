@@ -559,6 +559,16 @@ dispi_get_virt_height:
   pop  dx
   ret
 
+dispi_get_memory_64k:
+  push dx
+  mov  dx, #VBE_DISPI_IOPORT_INDEX
+  mov  ax, #VBE_DISPI_INDEX_VIDEO_MEMORY_64K
+  out  dx, ax
+  mov  dx, #VBE_DISPI_IOPORT_DATA
+  in   ax, dx
+  pop  dx
+  ret
+
 vga_compat_setup:
   push ax
   push dx
@@ -1026,6 +1036,33 @@ vbe_mode_found:
   pop  bx
   ret
 
+ ;; ModeInfo helper function: return number of image pages
+ ;; in  - si: Pointer to mode info
+ ;; out - al: Number of images pages
+mode_info_number_of_image_pages:
+  call dispi_get_memory_64k
+  cmp  byte ptr [si+27], #0x04
+  jne  no_4bpp_mode
+  shr  ax, #2
+no_4bpp_mode:
+  push bx
+  push dx
+  push ax
+  mov  ax, [si+18] ;; Bytes per scanline
+  mov  bx, [si+22] ;; Y Resolution
+  mul  bx
+  or   ax, ax
+  jz   no_inc_dx
+  inc  dx
+no_inc_dx:
+  mov  bx, dx
+  pop  ax
+  xor  dx, dx
+  div  bx
+  pop  dx
+  pop  bx
+  ret
+
  ;; ModeInfo helper function: check if mode is supported by hw
  ;; in  - si: Pointer to mode info
  ;; out - CF set if supported
@@ -1039,6 +1076,9 @@ mode_info_check_mode:
   call dispi_get_max_bpp
   cmp  [si+27], al
   ja   vbe_mode_unsup
+  call mode_info_number_of_image_pages
+  or   al, al
+  jz   vbe_mode_unsup
   stc
   ret
 vbe_mode_unsup:
@@ -1311,13 +1351,7 @@ vbe00_3:
   stosw
   mov  ax, es
   stosw
-  push dx
-  mov  dx, #VBE_DISPI_IOPORT_INDEX
-  mov  ax, #VBE_DISPI_INDEX_VIDEO_MEMORY_64K
-  out  dx, ax
-  mov  dx, #VBE_DISPI_IOPORT_DATA
-  in   ax, dx
-  pop  dx
+  call dispi_get_memory_64k
   stosw
   push cs ;; build dynamic mode list
   pop  ds
@@ -1381,6 +1415,7 @@ vbe_biosfn_return_mode_information:
   mov  si, ax
   call mode_info_check_mode
   jnc  mode_not_found
+  push si
   add  si, #2
   mov  cx, #0x0016
   rep
@@ -1389,10 +1424,15 @@ vbe_biosfn_return_mode_information:
   mov  cx, #0x006a
   rep
     stosw
+  pop  si
   mov  di, bp
   mov  al, #0x01
   seg  es
   mov  [di+26], al
+  call mode_info_number_of_image_pages
+  dec  al
+  seg  es
+  mov  [di+29], al
 #ifdef PCI_VID
   mov ax, #PCI_VID
 #else
@@ -2280,7 +2320,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-06-09"
+.ascii       "ID: vbe.c 2024-11-02"
 .byte        0x00
 
 vbebios_info_string:
@@ -2297,7 +2337,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-06-09"
+.ascii "VBE Bios ID: vbe.c 2024-11-02"
 .byte  0x0a,0x00
 #endif
 
