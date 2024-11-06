@@ -31,12 +31,477 @@
 
 
 #include "vbe.h"
-#include "vbetables.h"
+
+#define VBE_MODE_SIZE 12
 
 // The current OEM Software Revision of this VBE Bios
 #define VBE_OEM_SOFTWARE_REV 0x0002;
 
 ASM_START
+vbe_mode_list:
+;; 640 x 400 x 8
+.word 0x0100 ;; mode
+.word 640    ;; xres
+.word 400    ;; yres
+.byte 8      ;; depth
+.byte 0x04   ;; VBE memory model
+.word 640    ;; pitch
+.word vbe_color_params_8bpp ;; color params
+;; 640 x 480 x 8
+.word 0x0101
+.word 640
+.word 480
+.byte 8
+.byte 0x04
+.word 640
+.word vbe_color_params_8bpp
+;; 800 x 600 x 4
+.word 0x0102
+.word 800
+.word 600
+.byte 4
+.byte 0x03
+.word 100
+.word vbe_color_params_8bpp
+;; 800 x 600 x 8
+.word 0x0103
+.word 800
+.word 600
+.byte 8
+.byte 0x04
+.word 800
+.word vbe_color_params_8bpp
+;; 1024 x 768 x 4
+.word 0x0104
+.word 1024
+.word 768
+.byte 4
+.byte 0x03
+.word 128
+.word vbe_color_params_8bpp
+;; 1024 x 768 x 8
+.word 0x0105
+.word 1024
+.word 768
+.byte 8
+.byte 0x04
+.word 1024
+.word vbe_color_params_8bpp
+;; 1280 x 1024 x 4
+.word 0x0106
+.word 1280
+.word 1024
+.byte 4
+.byte 0x03
+.word 160
+.word vbe_color_params_8bpp
+;; 1280 x 1024 x 8
+.word 0x0107
+.word 1280
+.word 1024
+.byte 8
+.byte 0x04
+.word 1280
+.word vbe_color_params_8bpp
+;; 640 x 480 x 15
+.word 0x0110
+.word 640
+.word 480
+.byte 15
+.byte 0x06
+.word 1280
+.word vbe_color_params_15bpp
+;; 640 x 480 x 16
+.word 0x0111
+.word 640
+.word 480
+.byte 16
+.byte 0x06
+.word 1280
+.word vbe_color_params_16bpp
+;; 640 x 480 x 24
+.word 0x0112 ;; mode
+.word 640    ;; xres
+.word 480    ;; yres
+.byte 24     ;; depth
+.byte 0x06   ;; VBE memory model
+.word 1920   ;; pitch
+.word vbe_color_params_24bpp ;; color params
+;; 800 x 600 x 15
+.word 0x0113
+.word 800
+.word 600
+.byte 15
+.byte 0x06
+.word 1600
+.word vbe_color_params_15bpp
+;; 800 x 600 x 16
+.word 0x0114
+.word 800
+.word 600
+.byte 16
+.byte 0x06
+.word 1600
+.word vbe_color_params_16bpp
+;; 800 x 600 x 24
+.word 0x0115
+.word 800
+.word 600
+.byte 24
+.byte 0x06
+.word 2400
+.word vbe_color_params_24bpp
+;; 1024 x 768 x 15
+.word 0x0116
+.word 1024
+.word 768
+.byte 15
+.byte 0x06
+.word 2048
+.word vbe_color_params_15bpp
+;; 1024 x 768 x 16
+.word 0x0117
+.word 1024
+.word 768
+.byte 16
+.byte 0x06
+.word 2048
+.word vbe_color_params_16bpp
+;; 1024 x 768 x 24
+.word 0x0118
+.word 1024
+.word 768
+.byte 24
+.byte 0x06
+.word 3072
+.word vbe_color_params_24bpp
+;; 1280 x 1024 x 15
+.word 0x0119
+.word 1280
+.word 1024
+.byte 15
+.byte 0x06
+.word 2560
+.word vbe_color_params_15bpp
+;; 1280 x 1024 x 16
+.word 0x011a
+.word 1280
+.word 1024
+.byte 16
+.byte 0x06
+.word 2560
+.word vbe_color_params_16bpp
+;; 1280 x 1024 x 24
+.word 0x011b
+.word 1280
+.word 1024
+.byte 24
+.byte 0x06
+.word 3840
+.word vbe_color_params_24bpp
+;; BOCHS 'own' mode numbers
+;; 640 x 400 x 32
+.word 0x0141 ;; mode
+.word 640    ;; xres
+.word 400    ;; yres
+.byte 32     ;; depth
+.byte 0x06   ;; VBE memory model
+.word 2560   ;; pitch
+.word vbe_color_params_32bpp ;; color params
+;; 640 x 480 x 32
+.word 0x0142
+.word 640
+.word 480
+.byte 32
+.byte 0x06
+.word 2560
+.word vbe_color_params_32bpp
+;; 800 x 600 x 32
+.word 0x0143
+.word 800
+.word 600
+.byte 32
+.byte 0x06
+.word 3200
+.word vbe_color_params_32bpp
+;; 1024 x 768 x 32
+.word 0x0144
+.word 1024
+.word 768
+.byte 32
+.byte 0x06
+.word 4096
+.word vbe_color_params_32bpp
+;; 1280 x 1024 x 32
+.word 0x0145
+.word 1280
+.word 1024
+.byte 32
+.byte 0x06
+.word 5120
+.word vbe_color_params_32bpp
+;; 1600 x 1200 x 32
+.word 0x0147
+.word 1600
+.word 1200
+.byte 32
+.byte 0x06
+.word 6400
+.word vbe_color_params_32bpp
+;; 1280 x 768 x 16
+.word 0x0175
+.word 1280
+.word 768
+.byte 16
+.byte 0x06
+.word 2560
+.word vbe_color_params_16bpp
+;; 1280 x 768 x 24
+.word 0x0176
+.word 1280
+.word 768
+.byte 24
+.byte 0x06
+.word 3840
+.word vbe_color_params_24bpp
+;; 1280 x 768 x 32
+.word 0x0177
+.word 1280
+.word 768
+.byte 32
+.byte 0x06
+.word 5120
+.word vbe_color_params_32bpp
+;; 1280 x 800 x 16
+.word 0x0178
+.word 1280
+.word 800
+.byte 16
+.byte 0x06
+.word 2560
+.word vbe_color_params_16bpp
+;; 1280 x 800 x 24
+.word 0x0179
+.word 1280
+.word 800
+.byte 24
+.byte 0x06
+.word 3840
+.word vbe_color_params_24bpp
+;; 1280 x 800 x 32
+.word 0x017a
+.word 1280
+.word 800
+.byte 32
+.byte 0x06
+.word 5120
+.word vbe_color_params_32bpp
+;; 1280 x 960 x 16
+.word 0x017b
+.word 1280
+.word 960
+.byte 16
+.byte 0x06
+.word 2560
+.word vbe_color_params_16bpp
+;; 1280 x 960 x 24
+.word 0x017c
+.word 1280
+.word 960
+.byte 24
+.byte 0x06
+.word 3840
+.word vbe_color_params_24bpp
+;; 1280 x 960 x 32
+.word 0x017d
+.word 1280
+.word 960
+.byte 32
+.byte 0x06
+.word 5120
+.word vbe_color_params_32bpp
+;; 1440 x 900 x 16
+.word 0x017e
+.word 1440
+.word 900
+.byte 16
+.byte 0x06
+.word 2880
+.word vbe_color_params_16bpp
+;; 1440 x 900 x 24
+.word 0x017f
+.word 1440
+.word 900
+.byte 24
+.byte 0x06
+.word 4320
+.word vbe_color_params_24bpp
+;; 1440 x 900 x 32
+.word 0x0180
+.word 1440
+.word 900
+.byte 32
+.byte 0x06
+.word 5760
+.word vbe_color_params_32bpp
+;; 1400 x 1050 x 16
+.word 0x0181
+.word 1400
+.word 1050
+.byte 16
+.byte 0x06
+.word 2800
+.word vbe_color_params_16bpp
+;; 1400 x 1050 x 24
+.word 0x0182
+.word 1400
+.word 1050
+.byte 24
+.byte 0x06
+.word 4200
+.word vbe_color_params_24bpp
+;; 1400 x 1050 x 32
+.word 0x0183
+.word 1400
+.word 1050
+.byte 32
+.byte 0x06
+.word 5600
+.word vbe_color_params_32bpp
+;; 1680 x 1050 x 16
+.word 0x0184
+.word 1680
+.word 1050
+.byte 16
+.byte 0x06
+.word 3360
+.word vbe_color_params_16bpp
+;; 1680 x 1050 x 24
+.word 0x0185
+.word 1680
+.word 1050
+.byte 24
+.byte 0x06
+.word 5040
+.word vbe_color_params_24bpp
+;; 1680 x 1050 x 32
+.word 0x0186
+.word 1680
+.word 1050
+.byte 32
+.byte 0x06
+.word 6720
+.word vbe_color_params_32bpp
+;; 1920 x 1200 x 16
+.word 0x0187
+.word 1920
+.word 1200
+.byte 16
+.byte 0x06
+.word 3840
+.word vbe_color_params_16bpp
+;; 1920 x 1200 x 24
+.word 0x0188
+.word 1920
+.word 1200
+.byte 24
+.byte 0x06
+.word 5760
+.word vbe_color_params_24bpp
+;; 1920 x 1200 x 32
+.word 0x0189
+.word 1920
+.word 1200
+.byte 32
+.byte 0x06
+.word 7680
+.word vbe_color_params_32bpp
+;; 2560 x 1600 x 16
+.word 0x018a
+.word 2560
+.word 1600
+.byte 16
+.byte 0x06
+.word 5120
+.word vbe_color_params_16bpp
+;; 2560 x 1600 x 24
+.word 0x018b
+.word 2560
+.word 1600
+.byte 24
+.byte 0x06
+.word 7680
+.word vbe_color_params_24bpp
+;; 2560 x 1600 x 32
+.word 0x018c
+.word 2560
+.word 1600
+.byte 32
+.byte 0x06
+.word 10240
+.word vbe_color_params_32bpp
+;; 1280 x 720 x 16
+.word 0x018d
+.word 1280
+.word 720
+.byte 16
+.byte 0x06
+.word 2560
+.word vbe_color_params_16bpp
+;; 1280 x 720 x 24
+.word 0x018e
+.word 1280
+.word 720
+.byte 24
+.byte 0x06
+.word 3840
+.word vbe_color_params_24bpp
+;; 1280 x 720 x 32
+.word 0x018f
+.word 1280
+.word 720
+.byte 32
+.byte 0x06
+.word 5120
+.word vbe_color_params_32bpp
+;; 1920 x 1080 x 16
+.word 0x0190
+.word 1920
+.word 1080
+.byte 16
+.byte 0x06
+.word 3840
+.word vbe_color_params_16bpp
+;; 1920 x 1080 x 24
+.word 0x0191
+.word 1920
+.word 1080
+.byte 24
+.byte 0x06
+.word 5760
+.word vbe_color_params_24bpp
+;; 1920 x 1080 x 32
+.word 0x0192
+.word 1920
+.word 1080
+.byte 32
+.byte 0x06
+.word 7680
+.word vbe_color_params_32bpp
+vbe_mode_list_end:
+.word 0xffff
+
+vbe_color_params_8bpp:
+.byte 0, 0, 0, 0, 0, 0, 0, 0
+vbe_color_params_15bpp:
+.byte 5, 10, 5, 5, 5, 0, 0, 0
+vbe_color_params_16bpp:
+.byte 5, 11, 6, 5, 5, 0, 0, 0
+vbe_color_params_24bpp:
+.byte 8, 16, 8, 8, 8, 0, 0, 0
+vbe_color_params_32bpp:
+.byte 8, 16, 8, 8, 8, 0, 8, 24
+
   .align 2
 vesa_pm_start:
   dw vesa_pm_set_window - vesa_pm_start
@@ -1013,7 +1478,7 @@ mode_info_find_mode:
   mov  cx, bx
   mov  ax, bx
   and  ax, #0x01ff
-  mov  si, #_mode_info_list
+  mov  si, #vbe_mode_list
 find_mode_loop:
   mov  bx, [si]
   cmp  bx, #0xffff
@@ -1023,11 +1488,11 @@ find_mode_loop:
   mov  ax, si
   test cx, #VBE_MODE_LINEAR_FRAME_BUFFER ;; LFB requested ?
   jz   vbe_mode_found
-  mov  bx, [si+2]
-  test bx, #VBE_MODE_ATTRIBUTE_LINEAR_FRAME_BUFFER_MODE
-  jnz  vbe_mode_found
+  mov  bl, [si+6] ;; bpp
+  cmp  bl, #0x04
+  ja   vbe_mode_found
 next_mode_info:
-  add  si, #0x2e ;; VBE_MODE_SIZE
+  add  si, #VBE_MODE_SIZE
   jnz  find_mode_loop
 vbe_mode_not_found:
   xor  ax, ax
@@ -1037,19 +1502,19 @@ vbe_mode_found:
   ret
 
  ;; ModeInfo helper function: return number of image pages
- ;; in  - si: Pointer to mode info
+ ;; in  - si: Pointer to mode list
  ;; out - al: Number of images pages
 mode_info_number_of_image_pages:
   call dispi_get_memory_64k
-  cmp  byte ptr [si+27], #0x04
+  cmp  byte ptr [si+6], #0x04
   jne  no_4bpp_mode
   shr  ax, #2
 no_4bpp_mode:
   push bx
   push dx
   push ax
-  mov  ax, [si+18] ;; Bytes per scanline
-  mov  bx, [si+22] ;; Y Resolution
+  mov  ax, [si+8] ;; Bytes per scanline
+  mov  bx, [si+4] ;; Y Resolution
   mul  bx
   or   ax, ax
   jz   no_inc_dx
@@ -1064,17 +1529,17 @@ no_inc_dx:
   ret
 
  ;; ModeInfo helper function: check if mode is supported by hw
- ;; in  - si: Pointer to mode info
+ ;; in  - si: Pointer to mode list
  ;; out - CF set if supported
 mode_info_check_mode:
   call dispi_get_max_xres
-  cmp  [si+20], ax
+  cmp  [si+2], ax
   ja   vbe_mode_unsup
   call dispi_get_max_yres
-  cmp  [si+22], ax
+  cmp  [si+4], ax
   ja   vbe_mode_unsup
   call dispi_get_max_bpp
-  cmp  [si+27], al
+  cmp  [si+6], al
   ja   vbe_mode_unsup
   call mode_info_number_of_image_pages
   or   al, al
@@ -1148,14 +1613,14 @@ no_vbe_flag:
   jmp  _display_string
 
 ;; set VBE mode helper function
-  ; in  - bx: requested VBE mode, si: pointer to mode info block
+  ; in  - bx: requested VBE mode, si: pointer to mode list
 dispi_set_mode:
   push es
   push cx
   ;; first disable current mode (when switching between vesa modi)
   mov  ax, #VBE_DISPI_DISABLED
   call dispi_set_enable
-  mov  al, [si+25] ;; bpp
+  mov  al, [si+6] ;; bpp
   xor  ah, ah
   cmp  al, #4
   jnz  no_vga_4bpp
@@ -1176,9 +1641,9 @@ no_vga_4bpp:
   pop  ax
 set_vbe_params:
   call dispi_set_bpp
-  mov  ax, [si+18] ;; xres
+  mov  ax, [si+2] ;; xres
   call dispi_set_xres
-  mov  ax, [si+20] ;; yres
+  mov  ax, [si+4] ;; yres
   call dispi_set_yres
   mov  ax, #VBE_DISPI_BANK_RW
   call dispi_set_bank
@@ -1198,12 +1663,12 @@ set_mode_clear_mem:
   mov  ax, #BIOSMEM_SEG
   mov  es, ax
   mov  bx, #BIOSMEM_NB_COLS
-  mov  ax, [si+18]
+  mov  ax, [si+2]
   shr  ax, #3
   seg  es
   mov  [bx], ax
   mov  bx, #BIOSMEM_NB_ROWS
-  mov  ax, [si+20]
+  mov  ax, [si+4]
   shr  ax, #4
   dec  ax
   seg  es
@@ -1231,7 +1696,7 @@ set_mode_clear_mem:
   mov  bx, #BIOSMEM_VIDEO_CTL
   seg  es
   mov  [bx], al
-  mov  al, [si+25] ;; bpp
+  mov  al, [si+6] ;; bpp
   cmp  al, #4
   jz   vga_compat_mode
   mov  bx, #BIOSMEM_CURRENT_MODE
@@ -1357,7 +1822,7 @@ vbe00_3:
   pop  ds
   xor  cx, cx
   lea  di, 0x22[bp]
-  mov  si, #_mode_info_list
+  mov  si, #vbe_mode_list
 vbe00_4:
   mov  bx, [si]
   cmp  bx, #0xffff
@@ -1369,7 +1834,7 @@ vbe00_5:
   stosw
   inc  cx
 vbe00_6:
-  add  si, #0x2e ;; VBE_MODE_SIZE
+  add  si, #VBE_MODE_SIZE
   cmp  bx, #0xffff
   jnz  vbe00_4
 #ifdef DEBUG
@@ -1407,7 +1872,6 @@ vbe_biosfn_return_mode_information:
   mov  bp, di
   push cs
   pop  ds
-  push cx
   mov  bx, cx
   call mode_info_find_mode
   or   ax, ax
@@ -1415,67 +1879,124 @@ vbe_biosfn_return_mode_information:
   mov  si, ax
   call mode_info_check_mode
   jnc  mode_not_found
-  push si
-  add  si, #2
-  mov  cx, #0x0016
-  rep
-    movsw
+
+  push cx
   xor  ax, ax
-  mov  cx, #0x006a
+  mov  cx, #0x80
   rep
-    stosw
-  pop  si
+    stosw ;; clear buffer
+  pop cx
   mov  di, bp
-  mov  al, #0x01
-  seg  es
-  mov  [di+26], al
+
+  mov  ax, #0x001b ;; mode attr
+  cmp  byte ptr [si+6], #0x08 ;; bpp
+  ja   vbe_no_tty
+  or   al, #0x04 ;; TTY support
+vbe_no_tty:
+  stosw
+  mov  ax, #0x0007 ;; win attr
+  stosw
+  mov  ax, #0x0040 ;; granularity =64K
+  stosw
+  mov  ax, #0x0040 ;; size =64K
+  stosw
+  mov  ax, #0xA000 ;; segment A
+  stosw
+  xor  ax, ax ;; no segment B
+  stosw
+  mov  ax, #dispi_set_bank_farcall
+  stosw
+  mov  ax, cs
+  stosw
+  mov  ax, [si+8] ;; bytes per scan line
+  stosw 
+  mov  ax, [si+2] ;; width
+  stosw
+  mov  ax, [si+4] ;; height
+  stosw
+  mov  ax, #0x08
+  stosb
+  mov  ax, #0x10
+  stosb
+  mov  al, #1 ;; count of planes
+  stosb
+  mov  al, [si+6] ;; bpp
+  stosb
+  mov  al, #0x1 ;; XXX number of banks
+  stosb
+  mov  al, [si+7] ;; memory model
+  stosb
+  mov  al, #0x0   ;; XXX size of bank in K
+  stosb
   call mode_info_number_of_image_pages
   dec  al
-  seg  es
-  mov  [di+29], al
+  stosb
+  mov  al, #0x00
+  stosb
+
+  ;; v1.2+ stuffs
+  mov  ax, [si+10]
+  push si
+  mov  si, ax
+  movsw
+  movsw
+  movsw
+  movsw
+  pop  si
+
+  mov  ah, [si+6]
+  mov  al, #0x0
+  sub  ah, #9
+  rcl  al, #1 ;; bit 0=palette flag
+  stosb ;; direct screen mode info
+
+  ;; v2.0+ stuffs
+  ;; 32-bit LFB address
+  xor ax, ax
+  stosw
+  cmp byte ptr [si+7], #0x03
+  je  vbe_set_lfb_addr
 #ifdef PCI_VID
   mov ax, #PCI_VID
 #else
   mov ax, #0x1234 // experimental vendor
 #endif
   call pci_get_lfb_addr
-  jz   no_pci_lfb
-  seg  es
-  mov  [di+42], ax
-  xor  ax, ax
-  seg  es
-  mov  [di+40], ax
-no_pci_lfb:
-  call dispi_support_bank_granularity_32k
-  and  ax, #VBE_DISPI_BANK_GRANULARITY_32K
-  jz   no_gran_32k
-  mov  ax, #VBE_DISPI_BANK_GRANULARITY_KB
-  shl  ax, #1
-  seg  es
-  mov  [di+4], ax
-no_gran_32k:
-  seg  es
-  mov  al, [di+2]
-  and  al, #VBE_WINDOW_ATTRIBUTE_RELOCATABLE
-  jz   no_win_reloc
-  mov  ax, #dispi_set_bank_farcall
-  seg  es
-  mov  [di+12], ax
-  mov  ax, #0xc000
-  seg  es
-  mov  [di+14], ax
-no_win_reloc:
-  mov  ah, #0x00
-  db   0xa9 ; skip next opcode
+  or   ax, ax
+  jnz  vbe_set_lfb_addr
+  mov  ax, #(VBE_DISPI_LFB_PHYSICAL_ADDRESS >> 16)
+vbe_set_lfb_addr:
+  stosw
+  or   ax, ax
+  jz   vbe_no_lfb_support
+  push di
+  mov di, bp
+ db 0x26 ;; es:
+  mov ax, [di]
+  or ax, #0x0080 ;; mode bit 7:LFB
+  stosw
+  pop di
+vbe_no_lfb_support:
+
+  xor ax, ax
+  stosw ; reserved
+  stosw ; reserved
+  stosw ; reserved
+
+  mov ax, #0x004F
+  mov di, bp
+
+  test cx, #0x4000 ;; LFB flag
+  jz   mode_found
+ db 0x26 ;; es:
+  test [di], #0x0080 ;; is LFB supported?
+  jnz  mode_found
 mode_not_found:
-  mov  ah, #0x01
-  mov  al, #0x4f
-mode_ok:
-  pop  cx
-  mov  di, bp
-  pop  bx
-  pop  si
-  pop  ds
+  mov  ax, #0x014F
+mode_found:
+  pop bx
+  pop si
+  pop ds
   ret
 ASM_END
 
@@ -1536,19 +2057,18 @@ set_vesa_mode:
   mov  ax, #0x014f
   ret
 mode_found_ok:
-  add  si, #2 ;; pointer to info block
 #ifdef DEBUG
   push bx
   push #msg_vbe_mode_found1
   call _printf
   inc  sp
   inc  sp
-  mov  al, [si+25] ;; bpp
+  mov  al, [si+6] ;; bpp
   xor  ah,ah
   push ax
-  mov  ax, [si+20] ;; yres
+  mov  ax, [si+4] ;; yres
   push ax
-  mov  ax, [si+18] ;; xres
+  mov  ax, [si+2] ;; xres
   push ax
   push #msg_vbe_mode_found2
   call _printf
@@ -2320,7 +2840,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-11-02"
+.ascii       "ID: vbe.c 2024-11-06"
 .byte        0x00
 
 vbebios_info_string:
@@ -2337,7 +2857,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-11-02"
+.ascii "VBE Bios ID: vbe.c 2024-11-06"
 .byte  0x0a,0x00
 #endif
 

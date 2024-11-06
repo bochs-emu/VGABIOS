@@ -30,14 +30,14 @@ cirrus-bios: vgabios-cirrus.bin vgabios-cirrus.debug.bin
 banshee-bios: vgabios-banshee.bin vgabios-banshee.debug.bin
 
 clean:
-	/bin/rm -f  biossums vbetables-gen vbetables.h *.o *.s *.ld86 \
+	/bin/rm -f  biossums *.o *.s *.ld86 \
           temp.awk.* vgabios*.orig _vgabios_* _vgabios-debug_* core vgabios*.bin vgabios*.txt $(RELEASE).bin *.bak
 
 dist-clean: clean
 
 # source files
 VGA_FILES := vgabios.c vgabios.h vgafonts.h vgatables.h
-VBE_FILES := vbe.h vbe.c vbetables.h
+VBE_FILES := vbe.h vbe.c
 BANSHEE_FILES := banshee.c
 
 # build flags
@@ -83,9 +83,3 @@ release:
 
 biossums: biossums.c
 	$(CC) -o biossums biossums.c
-
-vbetables-gen: vbetables-gen.c
-	$(CC) -o vbetables-gen vbetables-gen.c
-
-vbetables.h: vbetables-gen
-	./vbetables-gen > $@
