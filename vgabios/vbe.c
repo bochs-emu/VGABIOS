@@ -1,7 +1,7 @@
 // ============================================================================================
 //
 //  Copyright (C) 2002      Jeroen Janssen
-//  Copyright (C) 2003-2024 Volker Ruppert
+//  Copyright (C) 2003-2025 Volker Ruppert
 //
 //  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
@@ -2828,7 +2828,7 @@ vbe_handlers:
 
 ;; FIXME: 'merge' these (c) etc strings with the vgabios.c strings?
 vbebios_copyright:
-.ascii       "Bochs VBE (C) 2002-2024 https://github.com/bochs-emu/VGABIOS"
+.ascii       "Bochs VBE (C) 2002-2025 https://github.com/bochs-emu/VGABIOS"
 .byte        0x00
 
 vbebios_vendor_name:
@@ -2840,7 +2840,7 @@ vbebios_product_name:
 .byte        0x00
 
 vbebios_product_revision:
-.ascii       "ID: vbe.c 2024-11-06"
+.ascii       "ID: vbe.c 2025-01-08"
 .byte        0x00
 
 vbebios_info_string:
@@ -2857,7 +2857,7 @@ no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii "VBE Bios ID: vbe.c 2024-11-06"
+.ascii "VBE Bios ID: vbe.c 2025-01-08"
 .byte  0x0a,0x00
 #endif
 
