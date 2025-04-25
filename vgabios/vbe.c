@@ -103,6 +103,30 @@ vbe_mode_list:
 .byte 0x04
 .word 1280
 .word vbe_color_params_8bpp
+;; 320 x 200 x 15
+.word 0x010d
+.word 320
+.word 200
+.byte 15
+.byte 0x06
+.word 640
+.word vbe_color_params_15bpp
+;; 320 x 200 x 16
+.word 0x010e
+.word 320
+.word 200
+.byte 16
+.byte 0x06
+.word 640
+.word vbe_color_params_16bpp
+;; 320 x 200 x 24
+.word 0x010f ;; mode
+.word 320    ;; xres
+.word 200    ;; yres
+.byte 24     ;; depth
+.byte 0x06   ;; VBE memory model
+.word 960    ;; pitch
+.word vbe_color_params_24bpp ;; color params
 ;; 640 x 480 x 15
 .word 0x0110
 .word 640
