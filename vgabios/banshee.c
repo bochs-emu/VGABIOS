@@ -100,6 +100,12 @@ banshee_1280x1024x8_crtc:
 .byte 0x01,0x04,0xff,0xa0,0x40,0x01,0x28,0xc3
 .byte 0xff,0x00,0x00,0x51
 
+banshee_320x200x8_crtc:
+.byte 0x2d,0x27,0x28,0x90,0x29,0x8f,0xbf,0x1f
+.byte 0x00,0xc0,0x00,0x00,0x00,0x00,0x00,0x00
+.byte 0x9c,0x8e,0x8f,0x28,0x1f,0x96,0xb9,0xe3
+.byte 0xff,0x00,0x00,0x00
+
 banshee_modes:
 ;; 640 x 400 x 8
 .byte 0x5b ;; mode
@@ -251,6 +257,26 @@ banshee_modes:
 .byte 0xef
 .byte 0x06
 .word banshee_color_params_24bpp
+;; 320 x 200 x 16
+.byte 0x79
+.byte 16
+.word 320
+.word 200
+.word banshee_320x200x8_crtc
+.word 0xd1ea,0
+.byte 0x6f
+.byte 0x06
+.word banshee_color_params_16bpp
+;; 320 x 200 x 24
+.byte 0x7a
+.byte 24
+.word 320
+.word 200
+.word banshee_320x200x8_crtc
+.word 0xd1ea,0
+.byte 0x6f
+.byte 0x06
+.word banshee_color_params_24bpp
 banshee_mode_list_end:
 .byte 0xff
 
@@ -285,6 +311,10 @@ banshee_vesa_modelist:
 .word 0x011a, 0x0074
 ;; 1280x1024x24
 .word 0x011b, 0x0075
+;; 320x200x16
+.word 0x010e, 0x0079
+;; 320x200x24
+.word 0x010f, 0x007a
 ;; invalid
 .word 0xffff, 0xffff
 
@@ -583,7 +613,13 @@ banshee_switch_mode:
   out  dx, eax
 no_pll_setup:
   mov  ax, [si+4]
+  cmp  ax, #400
+  jae  no_half_mode1
+  shl  eax, #13
+  jnz  set_yres
+no_half_mode1:
   shl  eax, #12
+set_yres:
   or   ax, [si+2]
   mov  dl, #0x98 ;; vidScreenSize
   out  dx, eax
@@ -615,6 +651,10 @@ set_mode_8bpp_1:
   or   eax, ebx
   or   ax, #0x0c00
 set_mode_8bpp_2:
+  cmp  [si+4], #400
+  jae  no_half_mode2
+  or   al, #0x10
+no_half_mode2:
   mov  dl, #0x5c ;; vidProcCfg
   out  dx, eax
   mov  al, [si+1]

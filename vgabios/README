@@ -107,9 +107,9 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
-vgabios-github-current : Apr 25 2025
+vgabios-github-current : Apr 26 2025
   - Volker
-    - Cirrus: Added 320x200x16 and 320x200x24 modes
+    - Cirrus / Banshee: Added 320x200x16 and 320x200x24 modes
     - Bochs VBE: Added 320x200x15, 320x200x16 and 320x200x24 modes
 
 vgabios-0.9c : Jan 08 2025
