@@ -39,6 +39,14 @@
 
 ASM_START
 vbe_mode_list:
+;; 320 x 200 x 8
+.word 0x0150
+.word 320
+.word 200
+.byte 8
+.byte 0x04
+.word 320
+.word vbe_color_params_8bpp
 ;; 640 x 400 x 8
 .word 0x0100 ;; mode
 .word 640    ;; xres
@@ -224,6 +232,14 @@ vbe_mode_list:
 .word 3840
 .word vbe_color_params_24bpp
 ;; BOCHS 'own' mode numbers
+;; 320 x 200 x 32
+.word 0x0140
+.word 320
+.word 200
+.byte 32
+.byte 0x06
+.word 1280
+.word vbe_color_params_32bpp
 ;; 640 x 400 x 32
 .word 0x0141 ;; mode
 .word 640    ;; xres
