@@ -109,9 +109,9 @@ History
 -------
 vgabios-github-current : Apr 26 2025
   - Volker
+    - Bochs VBE: Added 8 low resolution modes
     - Banshee: Added 6 low resolution modes
     - Cirrus: Added 320x200x16 and 320x200x24 modes
-    - Bochs VBE: Added 320x200x15, 320x200x16 and 320x200x24 modes
 
 vgabios-0.9c : Jan 08 2025
   - Volker

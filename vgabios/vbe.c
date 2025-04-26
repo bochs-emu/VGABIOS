@@ -39,22 +39,6 @@
 
 ASM_START
 vbe_mode_list:
-;; 320 x 200 x 8
-.word 0x0150
-.word 320
-.word 200
-.byte 8
-.byte 0x04
-.word 320
-.word vbe_color_params_8bpp
-;; 320 x 240 x 8
-.word 0x0151
-.word 320
-.word 240
-.byte 8
-.byte 0x04
-.word 320
-.word vbe_color_params_8bpp
 ;; 640 x 400 x 8
 .word 0x0100 ;; mode
 .word 640    ;; xres
@@ -127,26 +111,10 @@ vbe_mode_list:
 .byte 0x06
 .word 640
 .word vbe_color_params_15bpp
-;; 320 x 240 x 15
-.word 0x0160
-.word 320
-.word 240
-.byte 15
-.byte 0x06
-.word 640
-.word vbe_color_params_15bpp
 ;; 320 x 200 x 16
 .word 0x010e
 .word 320
 .word 200
-.byte 16
-.byte 0x06
-.word 640
-.word vbe_color_params_16bpp
-;; 320 x 240 x 16
-.word 0x0170
-.word 320
-.word 240
 .byte 16
 .byte 0x06
 .word 640
@@ -312,6 +280,38 @@ vbe_mode_list:
 .byte 0x06
 .word 6400
 .word vbe_color_params_32bpp
+;; 320 x 200 x 8
+.word 0x0150
+.word 320
+.word 200
+.byte 8
+.byte 0x04
+.word 320
+.word vbe_color_params_8bpp
+;; 320 x 240 x 8
+.word 0x0151
+.word 320
+.word 240
+.byte 8
+.byte 0x04
+.word 320
+.word vbe_color_params_8bpp
+;; 320 x 240 x 15
+.word 0x0160
+.word 320
+.word 240
+.byte 15
+.byte 0x06
+.word 640
+.word vbe_color_params_15bpp
+;; 320 x 240 x 16
+.word 0x0170
+.word 320
+.word 240
+.byte 16
+.byte 0x06
+.word 640
+.word vbe_color_params_16bpp
 ;; 1280 x 768 x 16
 .word 0x0175
 .word 1280
@@ -1567,7 +1567,7 @@ vbe_mode_found:
 
  ;; ModeInfo helper function: return number of image pages
  ;; in  - si: Pointer to mode list
- ;; out - al: Number of images pages
+ ;; out - ax: Number of images pages
 mode_info_number_of_image_pages:
   call dispi_get_memory_64k
   cmp  byte ptr [si+6], #0x04
@@ -1578,8 +1578,7 @@ no_4bpp_mode:
   push dx
   push ax
   mov  ax, [si+8] ;; Bytes per scanline
-  mov  bx, [si+4] ;; Y Resolution
-  mul  bx
+  mul  word [si+4] ;; Y Resolution
   or   ax, ax
   jz   no_inc_dx
   inc  dx
@@ -1590,6 +1589,10 @@ no_inc_dx:
   div  bx
   pop  dx
   pop  bx
+  cmp  ax, #0x100
+  jb   no_clamp
+  mov  ax, #0x100
+no_clamp:
   ret
 
  ;; ModeInfo helper function: check if mode is supported by hw
@@ -1606,7 +1609,7 @@ mode_info_check_mode:
   cmp  [si+6], al
   ja   vbe_mode_unsup
   call mode_info_number_of_image_pages
-  or   al, al
+  or   ax, ax
   jz   vbe_mode_unsup
   stc
   ret
@@ -1993,7 +1996,7 @@ vbe_no_tty:
   mov  al, #0x0   ;; XXX size of bank in K
   stosb
   call mode_info_number_of_image_pages
-  dec  al
+  dec  ax
   stosb
   mov  al, #0x00
   stosb
