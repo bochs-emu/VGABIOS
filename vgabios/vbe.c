@@ -47,6 +47,14 @@ vbe_mode_list:
 .byte 0x04
 .word 320
 .word vbe_color_params_8bpp
+;; 320 x 240 x 8
+.word 0x0151
+.word 320
+.word 240
+.byte 8
+.byte 0x04
+.word 320
+.word vbe_color_params_8bpp
 ;; 640 x 400 x 8
 .word 0x0100 ;; mode
 .word 640    ;; xres
@@ -119,10 +127,26 @@ vbe_mode_list:
 .byte 0x06
 .word 640
 .word vbe_color_params_15bpp
+;; 320 x 240 x 15
+.word 0x0160
+.word 320
+.word 240
+.byte 15
+.byte 0x06
+.word 640
+.word vbe_color_params_15bpp
 ;; 320 x 200 x 16
 .word 0x010e
 .word 320
 .word 200
+.byte 16
+.byte 0x06
+.word 640
+.word vbe_color_params_16bpp
+;; 320 x 240 x 16
+.word 0x0170
+.word 320
+.word 240
 .byte 16
 .byte 0x06
 .word 640
