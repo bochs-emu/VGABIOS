@@ -992,6 +992,7 @@ banshee_8bpp_write_char:
   mov  ax, 8[bp] ;; xcurs
   shl  ax, #3
   push ax
+  xor  ax, ax
   mov  dx, 10[bp] ;; ycurs
   or   dx, dx
   jz   banshee_wc_set_start

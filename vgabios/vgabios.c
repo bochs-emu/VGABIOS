@@ -1969,6 +1969,7 @@ lin_wc_vga:
   mov  ax, 8[bp] ; xcurs
   shl  ax, #3
   push ax
+  xor  ax, ax
   mov  dx, 10[bp] ; ycurs
   or   dx, dx
   jz   lin_wc_set_start
