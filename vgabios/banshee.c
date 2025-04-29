@@ -1549,17 +1549,17 @@ banshee_vesa_no_8bpp:
   mov  al, #0x0   ;; XXX size of bank in K
   stosb
   call banshee_get_line_offset_entry
-  mov  bx, [si+4]
-  mul  bx ;; dx:ax=vramdisp
-  or   ax, ax
-  jz   banshee_vesa_01h_3
-  inc  dx
-banshee_vesa_01h_3:
-  mov  ax, #0x0100 ;; vram in 64k
-  mov  cx, dx
-  xor  dx, dx
-  div  cx
+  mov  bx, ax
+  mov  dx, #0x0100 ;; vram in 64k
+  xor  ax, ax
+  div  bx
+  xor dx, dx
+  div word [si+4] ;; Y Resolution
   dec  ax
+  cmp ax, #0x100
+  jb no_clamp
+  mov ax, #0xff
+no_clamp:
   stosb  ;; number of image pages = vramtotal/vramdisp-1
   mov  al, #0x00
   stosb
