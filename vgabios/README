@@ -107,9 +107,9 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
-vgabios-github-current : May 01 2025
+vgabios-github-current : May 03 2025
   - Volker
-    - Bochs VBE: Added 8 low resolution modes
+    - Bochs VBE: Added 10 low resolution modes
     - Banshee: Added 9 low resolution modes
     - Cirrus: Added low resolution modes 320x200x16 and 320x200x24
     - Banshee: Fixed calculation of the VBE number of image pages

@@ -312,6 +312,22 @@ vbe_mode_list:
 .byte 0x06
 .word 640
 .word vbe_color_params_16bpp
+;; 320 x 240 x 24
+.word 0x0171
+.word 320
+.word 240
+.byte 24
+.byte 0x06
+.word 960
+.word vbe_color_params_24bpp
+;; 320 x 240 x 32
+.word 0x0172
+.word 320
+.word 240
+.byte 32
+.byte 0x06
+.word 1280
+.word vbe_color_params_32bpp
 ;; 1280 x 768 x 16
 .word 0x0175
 .word 1280
