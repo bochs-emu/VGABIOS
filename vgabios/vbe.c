@@ -1592,16 +1592,16 @@ mode_info_number_of_image_pages:
   jne  no_4bpp_mode
   shr  ax, #2
 no_4bpp_mode:
-  mov dx, ax
-  xor ax, ax
-  div word [si+8] ;; Bytes per scanline
-  xor dx, dx
-  div word [si+4] ;; Y Resolution
-  cmp ax, #0x100
-  jb no_clamp
-  mov ax, #0x100
+  mov  dx, ax
+  xor  ax, ax
+  div  word [si+8] ;; Bytes per scanline
+  xor  dx, dx
+  div  word [si+4] ;; Y Resolution
+  cmp  ax, #0x100
+  jb   no_clamp
+  mov  ax, #0x100
 no_clamp:
-  pop dx
+  pop  dx
   ret
 
  ;; ModeInfo helper function: check if mode is supported by hw
