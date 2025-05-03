@@ -1586,30 +1586,22 @@ vbe_mode_found:
  ;; in  - si: Pointer to mode list
  ;; out - ax: Number of images pages
 mode_info_number_of_image_pages:
+  push dx
   call dispi_get_memory_64k
   cmp  byte ptr [si+6], #0x04
   jne  no_4bpp_mode
   shr  ax, #2
 no_4bpp_mode:
-  push bx
-  push dx
-  push ax
-  mov  ax, [si+8] ;; Bytes per scanline
-  mul  word [si+4] ;; Y Resolution
-  or   ax, ax
-  jz   no_inc_dx
-  inc  dx
-no_inc_dx:
-  mov  bx, dx
-  pop  ax
-  xor  dx, dx
-  div  bx
-  pop  dx
-  pop  bx
-  cmp  ax, #0x100
-  jb   no_clamp
-  mov  ax, #0x100
+  mov dx, ax
+  xor ax, ax
+  div word [si+8] ;; Bytes per scanline
+  xor dx, dx
+  div word [si+4] ;; Y Resolution
+  cmp ax, #0x100
+  jb no_clamp
+  mov ax, #0x100
 no_clamp:
+  pop dx
   ret
 
  ;; ModeInfo helper function: check if mode is supported by hw
