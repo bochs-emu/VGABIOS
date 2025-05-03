@@ -224,6 +224,14 @@ vbe_mode_list:
 .word 3840
 .word vbe_color_params_24bpp
 ;; BOCHS 'own' mode numbers
+;; 320 x 200 x 32
+.word 0x0140
+.word 320
+.word 200
+.byte 32
+.byte 0x06
+.word 1280
+.word vbe_color_params_32bpp
 ;; 640 x 400 x 32
 .word 0x0141 ;; mode
 .word 640    ;; xres
@@ -271,6 +279,54 @@ vbe_mode_list:
 .byte 32
 .byte 0x06
 .word 6400
+.word vbe_color_params_32bpp
+;; 320 x 200 x 8
+.word 0x0150
+.word 320
+.word 200
+.byte 8
+.byte 0x04
+.word 320
+.word vbe_color_params_8bpp
+;; 320 x 240 x 8
+.word 0x0151
+.word 320
+.word 240
+.byte 8
+.byte 0x04
+.word 320
+.word vbe_color_params_8bpp
+;; 320 x 240 x 15
+.word 0x0160
+.word 320
+.word 240
+.byte 15
+.byte 0x06
+.word 640
+.word vbe_color_params_15bpp
+;; 320 x 240 x 16
+.word 0x0170
+.word 320
+.word 240
+.byte 16
+.byte 0x06
+.word 640
+.word vbe_color_params_16bpp
+;; 320 x 240 x 24
+.word 0x0171
+.word 320
+.word 240
+.byte 24
+.byte 0x06
+.word 960
+.word vbe_color_params_24bpp
+;; 320 x 240 x 32
+.word 0x0172
+.word 320
+.word 240
+.byte 32
+.byte 0x06
+.word 1280
 .word vbe_color_params_32bpp
 ;; 1280 x 768 x 16
 .word 0x0175
@@ -1263,6 +1319,7 @@ vbe_8bpp_write_char:
   mov  ax, 8[bp] ;; xcurs
   shl  ax, #3
   push ax
+  xor  ax, ax
   mov  dx, 10[bp] ;; ycurs
   or   dx, dx
   jz   vbe_wc_set_start
@@ -1527,7 +1584,7 @@ vbe_mode_found:
 
  ;; ModeInfo helper function: return number of image pages
  ;; in  - si: Pointer to mode list
- ;; out - al: Number of images pages
+ ;; out - ax: Number of images pages
 mode_info_number_of_image_pages:
   push dx
   call dispi_get_memory_64k
@@ -1542,7 +1599,7 @@ no_4bpp_mode:
   div word [si+4] ;; Y Resolution
   cmp ax, #0x100
   jb no_clamp
-  mov ax, #0xff
+  mov ax, #0x100
 no_clamp:
   pop dx
   ret
@@ -1561,7 +1618,7 @@ mode_info_check_mode:
   cmp  [si+6], al
   ja   vbe_mode_unsup
   call mode_info_number_of_image_pages
-  or   al, al
+  or   ax, ax
   jz   vbe_mode_unsup
   stc
   ret
@@ -1948,7 +2005,7 @@ vbe_no_tty:
   mov  al, #0x0   ;; XXX size of bank in K
   stosb
   call mode_info_number_of_image_pages
-  dec  al
+  dec  ax
   stosb
   mov  al, #0x00
   stosb

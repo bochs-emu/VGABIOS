@@ -1969,6 +1969,7 @@ lin_wc_vga:
   mov  ax, 8[bp] ; xcurs
   shl  ax, #3
   push ax
+  xor  ax, ax
   mov  dx, 10[bp] ; ycurs
   or   dx, dx
   jz   lin_wc_set_start
@@ -4994,6 +4995,10 @@ vbe_get_dac_loop:
 vbebios_vsync_wait:
   push dx
   mov  dx, #VGAREG_ACTL_RESET
+vbebios_in_vsync:
+  in   al, dx
+  test al, #0x08
+  jnz  vbebios_in_vsync
 vbebios_wait_loop:
   in   al, dx
   test al, #0x08
