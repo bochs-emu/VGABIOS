@@ -900,16 +900,32 @@ ASM_END
   // Set active page 0
   biosfn_set_active_page(0x00);
 
-  // Write the fonts in memory
   if (textmode)
   {
 ASM_START
-    ;; copy and activate 8x16 font
-    mov  ax, #0x1104
+    ;; copy and activate font
+    push dx
+    call get_crtc_address
+    mov  al, #0x09
+    out  dx, al
+    inc  dx
+    in   al, dx
+    and  al, #0x1f
+    mov  dl, al
+    mov  al, #0x01 ;; 8x14 font
+    cmp  dl, #13
+    je   set_text_font
+    mov  al, #0x02 ;; 8x8 font
+    cmp  dl, #7
+    je   set_text_font
+    mov  al, #0x04 ;; 8x16 font
+set_text_font:
+    mov  ah, #0x11
     mov  bl, #0x00
     int  #0x10
     mov  bl, #0x00
     call biosfn_set_text_block_specifier
+    pop  dx
 ASM_END
   }
 
