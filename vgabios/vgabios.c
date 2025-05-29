@@ -116,11 +116,6 @@ static void biosfn_load_text_user_pat();
 static void biosfn_load_text_8_14_pat();
 static void biosfn_load_text_8_8_pat();
 static void biosfn_load_text_8_16_pat();
-static void biosfn_load_gfx_8_8_chars();
-static void biosfn_load_gfx_user_chars();
-static void biosfn_load_gfx_8_14_chars();
-static void biosfn_load_gfx_8_8_dd_chars();
-static void biosfn_load_gfx_8_16_chars();
 static void biosfn_write_string();
 extern Bit8u video_save_pointer_table[];
 
@@ -355,16 +350,12 @@ int10_test_1A:
   jmp   biosfn_group_1A
 int10_test_0B:
   cmp   ah, #0x0b
-  jne   int10_test_1103
+  jne   int10_test_11
   jmp   biosfn_group_0B
-int10_test_1103:
-  cmp   ax, #0x1103
-  jne   int10_test_1130
-  jmp   biosfn_set_text_block_specifier
-int10_test_1130:
-  cmp   ax, #0x1130
+int10_test_11:
+  cmp   ah, #0x11
   jne   int10_test_12
-  jmp   biosfn_get_font_info
+  jmp   biosfn_group_11
 int10_test_12:
   cmp   ah, #0x12
   jne   int10_test_10
@@ -689,21 +680,6 @@ static void int10_func(DI, SI, BP, SP, BX, DX, CX, AX, DS, ES, FLAGS)
        case 0x14:
         biosfn_load_text_8_16_pat(GET_AL(),GET_BL());
         break;
-       case 0x20:
-        biosfn_load_gfx_8_8_chars(ES,BP);
-        break;
-       case 0x21:
-        biosfn_load_gfx_user_chars(ES,BP,CX,GET_BL(),GET_DL());
-        break;
-       case 0x22:
-        biosfn_load_gfx_8_14_chars(GET_BL());
-        break;
-       case 0x23:
-        biosfn_load_gfx_8_8_dd_chars(GET_BL());
-        break;
-       case 0x24:
-        biosfn_load_gfx_8_16_chars(GET_BL());
-        break;
 #ifdef DEBUG
        default:
         unknown();
@@ -947,19 +923,15 @@ ASM_START
   push bx
   push dx
   mov  dl, _biosfn_set_video_mode.cheight + 2[bp]
-  cmp  dl, #0x08
-  jne  no_cheight8
   mov  bx, #_vgafont8
+  cmp  dl, #0x08
   je   set_fontptr
-no_cheight8:
-  cmp  dl, #0x0e
-  jne  no_cheight14
   mov  bx, #_vgafont14
+  cmp  dl, #0x0e
   je   set_fontptr
-no_cheight14:
+  mov  bx, #_vgafont16
   cmp  dl, #0x10
   jne  no_cheight
-  mov  bx, #_vgafont16
 set_fontptr:
   push ds
   xor  ax, ax
@@ -3037,6 +3009,40 @@ ASM_END
 
 // --------------------------------------------------------------------------------------------
 ASM_START
+biosfn_group_11:
+  cmp   al, #0x03
+  jne   int10_test_1120
+  jmp   biosfn_set_text_block_specifier
+int10_test_1120:
+  cmp   al, #0x20
+  jne   int10_test_1121
+  jmp   biosfn_load_gfx_8_8_chars
+int10_test_1121:
+  cmp   al, #0x21
+  jne   int10_test_1122
+  jmp   biosfn_load_gfx_user_chars
+int10_test_1122:
+  cmp   al, #0x22
+  jne   int10_test_1123
+  jmp   biosfn_load_gfx_8_14_chars
+int10_test_1123:
+  cmp   al, #0x23
+  jne   int10_test_1124
+  jmp   biosfn_load_gfx_8_8_dd_chars
+int10_test_1124:
+  cmp   al, #0x24
+  jne   int10_test_1130
+  jmp   biosfn_load_gfx_8_16_chars
+int10_test_1130:
+  cmp   al, #0x30
+  jne   int10_group_11_normal
+  jmp   biosfn_get_font_info
+int10_group_11_normal:
+  jmp   int10_normal
+ASM_END
+
+// --------------------------------------------------------------------------------------------
+ASM_START
 _get_font_access:
   mov dx, # VGAREG_SEQU_ADDRESS
   mov ax, #0x0100
@@ -3226,124 +3232,77 @@ static void biosfn_load_text_8_16_pat (AL,BL) Bit8u AL;Bit8u BL;
   }
 }
 
-static void biosfn_load_gfx_8_8_chars (ES,BP) Bit16u ES;Bit16u BP;
-{
 ASM_START
-  push bp
-  mov  bp, sp
+biosfn_load_gfx_8_8_chars:
   push ax
   push bx
   push ds
   xor  ax, ax
   mov  ds, ax
   mov  bx, #0x007c ;; INT 0x1F
-  mov  ax, 4[bp]
-  mov  [bx+2], ax
-  mov  ax, 6[bp]
-  mov  [bx], ax
+  mov  [bx], bp
+  mov  [bx+2], es
   mov  ax, #BIOSMEM_SEG
   mov  ds, ax
   mov  bx, #BIOSMEM_CHAR_HEIGHT
-  mov  al, #0x08
-  mov  [bx], al
+  mov  [bx], #0x08
   pop  ds
   pop  bx
   pop  ax
-  pop  bp
+  ret
 ASM_END
-}
 
-static void biosfn_load_gfx_user_chars (ES,BP,CX,BL,DL) Bit16u ES;Bit16u BP;Bit16u CX;Bit8u BL;Bit8u DL;
-{
-    Bit8u mode; Bit8u line;
-
-    /* set 0x43 INT pointer */
-    write_word(0x0, 0x43*4, BP);
-    write_word(0x0, 0x43*4+2, ES);
-
-    switch (BL) {
-     case 0:
-      write_bda_byte(BIOSMEM_NB_ROWS, DL-1);
-      break;
-     case 1:
-      write_bda_byte(BIOSMEM_NB_ROWS, 13);
-      break;
-     case 3:
-      write_bda_byte(BIOSMEM_NB_ROWS, 42);
-      break;
-     case 2:
-     default:
-      write_bda_byte(BIOSMEM_NB_ROWS, 24);
-      break;
-    }
-    write_bda_byte( BIOSMEM_CHAR_HEIGHT, CX);
-}
-
-static void biosfn_load_gfx_8_14_chars (BL) Bit8u BL;
-{
-    /* set 0x43 INT pointer */
 ASM_START
-    SET_INT_VECTOR(0x43, #0xC000, #_vgafont14)
+biosfn_load_gfx_user_chars:
+  push ds
+  xor  ax, ax
+  mov  ds, ax
+  mov  0x010c, bp ;; INT 0x43
+  mov  0x010e, es
+  pop  ds
+  mov  ah, cl
+  cmp  bl, #0x01
+  jae  set_text_rows
+  mov  al, dl
+  dec  al
+  jmp  set_text_rows_bda
+
+biosfn_load_gfx_8_14_chars:
+  SET_INT_VECTOR(0x43, #0xC000, #_vgafont14)
+  mov  ah, #14
+  jmp  set_text_rows
+
+biosfn_load_gfx_8_8_dd_chars:
+  SET_INT_VECTOR(0x43, #0xC000, #_vgafont8)
+  mov  ah, #8
+  jmp  set_text_rows
+
+biosfn_load_gfx_8_16_chars:
+  SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
+  mov  ah, #16
+set_text_rows:
+  mov  al, #13
+  cmp  bl, #0x01
+  je   set_text_rows_bda
+  mov  al, #42
+  cmp  bl, #0x03
+  je   set_text_rows_bda
+  mov  al, #24
+set_text_rows_bda:
+  push ds
+  push bx
+  push ax
+  mov  ax, #BIOSMEM_SEG
+  mov  ds, ax
+  pop  ax
+  mov  bx, #BIOSMEM_NB_ROWS
+  mov  [bx], al
+  mov  bx, #BIOSMEM_CHAR_HEIGHT
+  mov  [bx], ah
+  pop  bx
+  pop  ds
+  ret
 ASM_END
-
-    switch (BL) {
-     case 1:
-      write_bda_byte(BIOSMEM_NB_ROWS, 13);
-      break;
-     case 3:
-      write_bda_byte(BIOSMEM_NB_ROWS, 42);
-      break;
-     case 2:
-     default:
-      write_bda_byte(BIOSMEM_NB_ROWS, 24);
-      break;
-    }
-    write_bda_byte( BIOSMEM_CHAR_HEIGHT, 14);
-}
-
-static void biosfn_load_gfx_8_8_dd_chars (BL) Bit8u BL;
-{
-    /* set 0x43 INT pointer */
-ASM_START
-    SET_INT_VECTOR(0x43, #0xC000, #_vgafont8)
-ASM_END
-
-    switch (BL) {
-     case 1:
-      write_bda_byte(BIOSMEM_NB_ROWS, 13);
-      break;
-     case 3:
-      write_bda_byte(BIOSMEM_NB_ROWS, 42);
-      break;
-     case 2:
-     default:
-      write_bda_byte(BIOSMEM_NB_ROWS, 24);
-      break;
-    }
-    write_bda_byte( BIOSMEM_CHAR_HEIGHT, 8);
-}
-
-static void biosfn_load_gfx_8_16_chars (BL) Bit8u BL;
-{
-    /* set 0x43 INT pointer */
-ASM_START
-    SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
-ASM_END
-
-    switch (BL) {
-     case 1:
-      write_bda_byte(BIOSMEM_NB_ROWS, 13);
-      break;
-     case 3:
-      write_bda_byte(BIOSMEM_NB_ROWS, 42);
-      break;
-     case 2:
-     default:
-      write_bda_byte(BIOSMEM_NB_ROWS, 24);
-      break;
-    }
-    write_bda_byte( BIOSMEM_CHAR_HEIGHT, 16);
-}
 
 // --------------------------------------------------------------------------------------------
 ASM_START
