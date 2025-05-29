@@ -1147,58 +1147,7 @@ vga_compat_setup:
   out  dx, ax
   mov  dx, # VBE_DISPI_IOPORT_DATA
   in   ax, dx
-  push ax
-  dec  ax
-  push ax
-  mov  dx, # VGAREG_VGA_CRTC_ADDRESS
-  mov  ah, al
-  mov  al, #0x12
-  out  dx, ax
-  pop  ax
-  mov  al, #0x07
-  out  dx, al
-  inc  dx
-  in   al, dx
-  and  al, #0xbd
-  or   al, #0x10
-  test ah, #0x01
-  jz   bit8_clear
-  or   al, #0x02
-bit8_clear:
-  test ah, #0x02
-  jz   bit9_clear
-  or   al, #0x40
-bit9_clear:
-  out  dx, al
-  ;; set CRTC Y blanking start
-  dec  dx
-  pop  ax
-  push ax
-  mov  ah, al
-  mov  al, #0x15
-  out  dx, ax
-  pop  ax
-  mov  al, #0x07
-  out  dx, al
-  inc  dx
-  in   al, dx
-  and  al, #0xf7
-  test ah, #0x01
-  jz   bit8_clear2
-  or   al, #0x08
-bit8_clear2:
-  out  dx, al
-  dec  dx
-  mov  al, #0x09
-  out  dx, al
-  inc  dx
-  in   al, dx
-  and  al, #0xdf
-  test ah, #0x02
-  jz   bit9_clear2
-  or   al, #0x20
-bit9_clear2:
-  out  dx, al
+  call stdvga_set_scanlines
   ;; other settings
   mov  dx, # VGAREG_VGA_CRTC_ADDRESS
   mov  al, #0x09

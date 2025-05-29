@@ -826,10 +826,7 @@ static void biosfn_set_video_mode(mode) Bit8u mode;
   // Read the bios mode set control
   modeset_ctl=read_bda_byte(BIOSMEM_MODESET_CTL);
 
-  // Then we know the number of lines
-  // FIXME
-
-  set_vga_mode_hw(&video_param_table[vpti]);
+  set_vga_mode_hw(modeset_ctl, &video_param_table[vpti]);
 
 #ifdef BANSHEE
 ASM_START
@@ -961,7 +958,7 @@ _set_vga_mode_hw:
   push ds
   mov  ax, #0xc000
   mov  ds, ax
-  mov  bx, 4[bp]
+  mov  bx, 6[bp]
   push bx
   ;; Reset Attribute Ctrl flip-flop
   mov  dx, #VGAREG_ACTL_RESET
@@ -990,8 +987,17 @@ set_actl_regs:
   mov  dx, #VGAREG_SEQU_ADDRESS
   mov  ax, #0x0300
   out  dx, ax
-  mov  cx, #0x0004
+
+  mov  ah, 5[bx]
   mov  al, #0x01
+  test 4[bp], #0x10 ;; set if 400 lines mode
+  jnz  normal_cwidth
+  or   ah, #0x01
+normal_cwidth:
+  out  dx, ax
+  inc  bx
+  mov  cx, #0x0003
+  mov  al, #0x02
   cld
 set_sequ_regs:
   mov  ah, 5[bx]
@@ -1016,6 +1022,10 @@ set_grdc_regs:
   ;; Set the misc register
   mov  dx, #VGAREG_WRITE_MISC_OUTPUT
   mov  al, 9[bx]
+  test 4[bp], #0x10 ;; set if 400 lines mode
+  jnz  normal_clock
+  and  al, #0xf3
+normal_clock:
   out  dx, al
   test al, #0x01
   jz   crtc_mono
@@ -1037,6 +1047,22 @@ set_crtc_regs:
   inc  al
   inc  bx
   loop set_crtc_regs
+  mov  cl, 4[bp]
+  and  cl, #0x90
+  cmp  cl, #0x10
+  je   mode_400_lines
+  mov  bx, #0x08
+  cmp  al, #0x80
+  je   set_ch_lines
+  mov  ax, #0x015e
+  mov  bx, #0x0e
+  call stdvga_set_scanlines
+set_ch_lines:
+  push bx
+  call _set_scan_lines
+  inc  sp
+  inc  sp
+mode_400_lines:
   ;; Enable video
   mov  dx, #VGAREG_ACTL_ADDRESS
   mov  al, #0x20
@@ -4829,6 +4855,64 @@ get_crtc_address:
   mov  dx, #VGAREG_MDA_CRTC_ADDRESS
   add  dl, al
   pop  ax
+  ret
+
+;; in - ax:number of scanlines
+stdvga_set_scanlines:
+  push dx
+  call get_crtc_address
+  push ax
+  dec  ax
+  push ax
+  mov  ah, al
+  mov  al, #0x12
+  out  dx, ax
+  pop  ax
+  mov  al, #0x07
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0xbd
+  or   al, #0x10
+  test ah, #0x01
+  jz   bit8_clear
+  or   al, #0x02
+bit8_clear:
+  test ah, #0x02
+  jz   bit9_clear
+  or   al, #0x40
+bit9_clear:
+  out  dx, al
+  ;; set CRTC Y blanking start
+  dec  dx
+  pop  ax
+  push ax
+  mov  ah, al
+  mov  al, #0x15
+  out  dx, ax
+  pop  ax
+  mov  al, #0x07
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0xf7
+  test ah, #0x01
+  jz   bit8_clear2
+  or   al, #0x08
+bit8_clear2:
+  out  dx, al
+  dec  dx
+  mov  al, #0x09
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0xdf
+  test ah, #0x02
+  jz   bit9_clear2
+  or   al, #0x20
+bit9_clear2:
+  out  dx, al
+  pop  dx
   ret
 
 ;; out - ax:number of scanlines
