@@ -18,7 +18,6 @@
 //  License along with this library; if not, write to the Free Software
 //  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-//#define CIRRUS_VESA3_PMINFO
 #ifdef VBE
 #undef CIRRUS_VESA3_PMINFO
 #endif
@@ -526,7 +525,12 @@ no_cirrus:
 cirrus_display_info:
   push ds
   push si
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  push [cirrus_vesa_selC000_data]
+#else
   push cs
+#endif
   pop ds
   call cirrus_check
   mov si, #cirrus_not_installed
@@ -585,7 +589,7 @@ cirrus_set_video_mode:
   push bx
   push ds
 #ifdef CIRRUS_VESA3_PMINFO
- db 0x2e ;; cs:
+  seg  cs
   mov  si, [cirrus_vesa_sel0000_data]
 #else
   xor  si, si
@@ -615,7 +619,7 @@ cirrus_extbios:
   push bx
   and bx, #0x7F
   shl bx, 1
- db 0x2e ;; cs:
+  seg cs
   mov bp, cirrus_extbios_handlers[bx]
   pop bx
   push #cirrus_return
@@ -632,7 +636,7 @@ cirrus_vesa:
   xor bx, bx
   mov bl, al
   shl bx, 1
- db 0x2e ;; cs:
+  seg cs
   mov bp, cirrus_vesa_handlers[bx]
   pop bx
   push #cirrus_return
@@ -648,7 +652,12 @@ cirrus_call_debug_dump:
   push es
   push ds
   pusha
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  push [cirrus_vesa_selC000_data]
+#else
   push cs
+#endif
   pop ds
   call _int10_call_debugmsg
   popa
@@ -659,7 +668,12 @@ cirrus_ret_debug_dump:
   push es
   push ds
   pusha
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  push [cirrus_vesa_selC000_data]
+#else
   push cs
+#endif
   pop ds
   call _int10_ret_debugmsg
   popa
@@ -686,7 +700,12 @@ cirrus_set_video_mode_bda:
   push bx
   push cx
   push ds
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  push [cirrus_vesa_selC000_data]
+#else
   push cs
+#endif
   pop ds
   mov bx, [si+2]
   shr bx, #3
@@ -694,7 +713,7 @@ cirrus_set_video_mode_bda:
   shr cx, #4 ; cheight 16
   dec cx
 #ifdef CIRRUS_VESA3_PMINFO
- db 0x2e ;; cs:
+  seg cs
   mov si, [cirrus_vesa_sel0000_data]
 #else
   xor si, si
@@ -853,7 +872,7 @@ cirrus_vesa_pmbios_entry:
   xor bx, bx
   mov bl, al
   shl bx, 1
- db 0x2e ;; cs:
+  seg cs
   mov bp, cirrus_vesa_handlers[bx]
   pop bx
   push #cirrus_vesa_pmbios_return
@@ -872,7 +891,12 @@ cirrus_switch_mode:
   push ds
   push bx
   push dx
+#ifdef CIRRUS_VESA3_PMINFO
+  seg  cs
+  push [cirrus_vesa_selC000_data]
+#else
   push cs
+#endif
   pop ds
 
   call cirrus_set_vga_vclk
@@ -1036,7 +1060,7 @@ cirrus_pm_get_bda_word:
   push bx
   push si
 #ifdef CIRRUS_VESA3_PMINFO
- db 0x2e ;; cs:
+  seg  cs
   mov  si, [cirrus_vesa_sel0000_data]
 #else
   xor  si, si
@@ -1243,7 +1267,7 @@ cirrus_extbios_80h:
   in al, dx
   mov bx, #_cirrus_id_table
 c80h_1:
- db 0x2e ;; cs:
+  seg  cs
   mov ah, [bx]
   cmp ah, al
   jz c80h_2
@@ -1253,7 +1277,7 @@ c80h_1:
   inc bx
   jmp c80h_1
 c80h_2:
- db 0x2e ;; cs:
+  seg cs
   mov al, 0x1[bx]
   pop dx
   mov ah, #0x00
@@ -1316,8 +1340,17 @@ cirrus_extbios_A0h:
   mov bx, cirrus_extbios_A0h_callback
   mov si, #0xffff
   mov di, bx
+  // modified from the original, it was setting ds and es to bx without initializing bx.
+  push bx
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  mov bx, [cirrus_vesa_selC000_data]
+#else
+  mov bx, cs
+#endif
   mov ds, bx
   mov es, bx
+  pop bx
   ret
 
 cirrus_extbios_A0h_callback:
@@ -1411,7 +1444,12 @@ cv00_1:
   jnz  cv00_2 ; already set for VBE 2.0
   mov  ax, #cirrus_vesa_oemname
   stosw
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  mov  ax, [cirrus_vesa_selC000_data]
+#else
   mov  ax, cs
+#endif
   stosw
   jz   cv00_3
 cv00_2:
@@ -1428,7 +1466,12 @@ cv00_3:
   mov  ah, #0x00
   stosw
 
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  push [cirrus_vesa_selC000_data] ; build mode list
+#else
   push cs ; build mode list
+#endif
   pop  ds
   lea  di, 0x22[bp]
   mov  si, #_cirrus_vesa_modelist
@@ -1469,7 +1512,12 @@ cirrus_vesa_01h_1:
   push bx
   mov bp, di
   cld
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  push [cirrus_vesa_selC000_data]
+#else
   push cs
+#endif
   pop ds
   call cirrus_get_modeentry_nomask
 
@@ -1578,7 +1626,7 @@ cirrus_vesa_01h_6:
   jz cirrus_vesa_01h_7
   push di
   mov di, bp
- db 0x26 ;; es:
+  seg es
   mov ax, [di]
   or ax, #0x0080 ;; mode bit 7:LFB
   stosw
@@ -1601,7 +1649,7 @@ cirrus_vesa_01h_7:
   test cx, #0x4000 ;; LFB flag
   jz   cirrus_vesa_01h_9
   push cx
- db 0x26 ;; es:
+  seg es
   mov  cx, [di]
   test cx, #0x0080 ;; is LFB supported?
   jnz  cirrus_vesa_01h_8
@@ -1631,7 +1679,7 @@ cirrus_vesa_02h_legacy:
   or   al, #0x80
 cirrus_vesa_02h_legacy_noclear:
 #ifdef CIRRUS_VESA3_PMINFO
- db 0x2e ;; cs:
+  seg  cs
   cmp  byte ptr [cirrus_vesa_is_protected_mode], #0
   jnz  cirrus_vesa_02h_2
 #endif // CIRRUS_VESA3_PMINFO
@@ -1656,7 +1704,7 @@ cirrus_vesa_02h_4:
   SET_INT_VECTOR(0x43, #0xC000, #_vgafont16)
   push ds
 #ifdef CIRRUS_VESA3_PMINFO
- db 0x2e ;; cs:
+  seg cs
   mov si, [cirrus_vesa_sel0000_data]
 #else
   xor si, si
@@ -1671,7 +1719,7 @@ cirrus_vesa_02h_4:
 cirrus_vesa_03h:
   push ds
 #ifdef CIRRUS_VESA3_PMINFO
- db 0x2e ;; cs:
+  seg cs
   mov ax, [cirrus_vesa_sel0000_data]
 #else
   xor ax, ax
@@ -1882,7 +1930,12 @@ cirrus_vesa_07h_bl1_4bpp_2:
 cirrus_vesa_0ah:
   test bl, bl
   jnz cirrus_vesa_0ah_fail
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  mov di, [cirrus_vesa_selC000_data]
+#else
   mov di, #0xc000
+#endif
   mov es, di
   mov di, # cirrus_vesa_pm_start
   mov cx, # cirrus_vesa_pm_end
@@ -1904,9 +1957,16 @@ cirrus_vesa_10h_01:
   jne cirrus_vesa_10h_02
   push dx
   push ds
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  push [cirrus_vesa_sel0000_data]
+  pop ds
+  mov [0x4b9], bh
+#else
   mov dx, #0x40
   mov ds, dx
   mov [0xb9], bh
+#endif
   pop ds
   pop dx
   mov ax, #0x004f
@@ -1916,9 +1976,16 @@ cirrus_vesa_10h_02:
   jne cirrus_vesa_unimplemented
   push dx
   push ds
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  push [cirrus_vesa_sel0000_data]
+  pop ds
+  mov bh, [0x4b9]
+#else
   mov dx, #0x40
   mov ds, dx
   mov bh, [0xb9]
+#endif
   pop ds
   pop dx
   mov ax, #0x004f
@@ -2134,7 +2201,12 @@ cirrus_vesamode_to_mode:
   push ds
   push cx
   push si
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  push [cirrus_vesa_selC000_data]
+#else
   push cs
+#endif
   pop ds
   mov cx, #0xffff
   mov si, #_cirrus_vesa_modelist
@@ -2158,7 +2230,7 @@ cirrus_get_modeentry:
 cirrus_get_modeentry_nomask:
   mov si, #_cirrus_modes
 cgm_1:
- db 0x2e ;; cs:
+  seg cs
   mov ah, [si]
   cmp al, ah
   jz cgm_2
@@ -2390,7 +2462,7 @@ cirrus_get_start_addr:
   ret
 
 cirrus_clear_vram:
- db 0x2e ;; cs:
+  seg  cs
   cmp  [si+6], #0x04 ;; bpp
   ja   clear_vram_linear
   push ax
@@ -2423,7 +2495,12 @@ cirrus_clear_vram_1:
   mov dx, #0x3ce
   out dx, ax
   push ax
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  mov cx, [cirrus_vesa_selA000_data]
+#else
   mov cx, #0xa000
+#endif
   mov es, cx
   xor di, di
   xor ax, ax
@@ -2559,6 +2636,7 @@ ASM_END
 
 #ifdef CIRRUS_VESA3_PMINFO
 ASM_START
+.align 4 /* ensure 'PMID' can be read as a word. */
 cirrus_vesa_pminfo:
   /* + 0 */
   .byte 0x50,0x4d,0x49,0x44 ;; signature[4]

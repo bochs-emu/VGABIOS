@@ -127,7 +127,12 @@ ASM_START
 
 MACRO SET_INT_VECTOR
   push ds
+#ifndef CIRRUS_VESA3_PMINFO
+  seg cs
+  mov ax, [cirrus_vesa_sel0000_data]
+#else
   xor ax, ax
+#endif
   mov ds, ax
   mov ax, ?3
   mov ?1*4, ax
@@ -4969,7 +4974,12 @@ strcpy:
   push cx
   push ds
   push di
+#ifdef CIRRUS_VESA3_PMINFO
+  seg cs
+  mov  ax, [cirrus_vesa_selC000_data]
+#else
   mov  ax, cs
+#endif
   mov  ds, ax
   xor  cx, cx
 strcpy_loop:
