@@ -127,7 +127,7 @@ ASM_START
 
 MACRO SET_INT_VECTOR
   push ds
-#ifndef CIRRUS_VESA3_PMINFO
+#ifdef CIRRUS_VESA3_PMINFO
   seg cs
   mov ax, [cirrus_vesa_sel0000_data]
 #else
