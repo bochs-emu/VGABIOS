@@ -1888,6 +1888,10 @@ cirrus_vesa_07h_bl0:
   push dx
   call cirrus_get_bpp_bytes
   jnc  cirrus_vesa_07h_bl0_4bpp
+  cmp  al, #3
+  jne  no_24bpp
+  and  cx, #0xfffc ;; special case for 24 bpp
+no_24bpp:
   mov  bl, al
   xor  bh, bh
   mov  ax, cx
