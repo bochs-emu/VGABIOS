@@ -117,7 +117,7 @@ vgabios-github-current : Nov 25 2025
     - Cirrus: Added 32-bpp modes 0x76 (640x480) and 0x72 (800x600) based on the
       specs (no VESA mode numbers yet)
     - Cirrus: Fixed 24-bpp scrolling test of vbetest 5.1a
-    - Show 'not installed' messages in red color (Cirrus and VBE)
+    - Show 'not installed' messages in red color (all extensions)
   - Emilio Silva
     - Cirrus: Improved the VESA3 protected mode support and added binary with it
       (function 0x00 still reporting version 2 / no extended information

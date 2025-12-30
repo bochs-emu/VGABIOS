@@ -43,13 +43,10 @@ agp_msg:
 .ascii "AGP"
 .byte 0x00
 
+banshee_not_installed:
+.ascii " Banshee-compatible VGA not"
 detected_msg:
 .ascii " detected"
-.byte 0x0d,0x0a
-.byte 0x0d,0x0a,0x00
-
-banshee_not_installed:
-.ascii " Banshee-compatible VGA not detected"
 .byte 0x0d,0x0a
 .byte 0x0d,0x0a,0x00
 
@@ -545,11 +542,15 @@ banshee_display_info:
   push si
   push cs
   pop  ds
-  mov  si, #threedfx_msg
-  call display_string
   call banshee_detect
   mov  si, #banshee_not_installed
-  jc   banshee_show_msg
+  jc   banshee_msg_notinstalled
+  push ax
+  push bx
+  mov  si, #threedfx_msg
+  call display_string
+  pop  bx
+  pop  ax
   mov  si, #banshee_msg
   cmp  al, #0x03
   je   is_banshee
@@ -572,8 +573,11 @@ is_banshee:
 is_pci:
   call display_string
   mov  si, #detected_msg
-banshee_show_msg:
-  call display_string
+  mov  bl, #0x0b
+  db   0xa9 ;; skip next opcode (TEST AX, #0x0cb3)
+banshee_msg_notinstalled:
+  mov  bl, #0x0c
+  call display_string_color
   pop  si
   pop  ds
   ret

@@ -573,7 +573,8 @@ cirrus_display_info:
   mov si, #cirrus_not_installed
   jnz cirrus_msgnotinstalled
   mov si, #cirrus_installed
-
+  mov  bl, #0x0b
+  db   0xa9 ;; skip next opcode (TEST AX, #0x0cb3)
 cirrus_msgnotinstalled:
   mov  bl, #0x0c
   call display_string_color
