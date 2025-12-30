@@ -575,9 +575,10 @@ cirrus_display_info:
   mov si, #cirrus_installed
 
 cirrus_msgnotinstalled:
-  call _display_string
-  pop si
-  pop ds
+  mov  bl, #0x0c
+  call display_string_color
+  pop  si
+  pop  ds
   ret
 
 cirrus_check:

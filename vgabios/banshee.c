@@ -546,7 +546,7 @@ banshee_display_info:
   push cs
   pop  ds
   mov  si, #threedfx_msg
-  call _display_string
+  call display_string
   call banshee_detect
   mov  si, #banshee_not_installed
   jc   banshee_show_msg
@@ -556,7 +556,7 @@ banshee_display_info:
   mov  si, #voodoo3_msg
 is_banshee:
   push bx
-  call _display_string
+  call display_string
   pop  bx
   mov  si, #pci_msg
   mov  cx, bx
@@ -570,10 +570,10 @@ is_banshee:
   jz   is_pci
   mov  si, #agp_msg
 is_pci:
-  call _display_string
+  call display_string
   mov  si, #detected_msg
 banshee_show_msg:
-  call _display_string
+  call display_string
   pop  si
   pop  ds
   ret

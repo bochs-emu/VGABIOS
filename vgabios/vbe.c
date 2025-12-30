@@ -1630,12 +1630,13 @@ vbe_display_info:
   mov  ax, #0xc000
   mov  ds, ax
   mov  si, #vbebios_info_string
-  jmp  _display_string
+  jmp  display_string
 no_vbe_flag:
   mov  ax, #0xc000
   mov  ds, ax
   mov  si, #no_vbebios_info_string
-  jmp  _display_string
+  mov  bl, #0x0c
+  jmp  display_string_color
 
 ;; set VBE mode helper function
   ; in  - bx: requested VBE mode, si: pointer to mode list

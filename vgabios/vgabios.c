@@ -567,21 +567,21 @@ display_info:
  mov ax,#0xc000
  mov ds,ax
  mov si,#vgabios_name
- call _display_string
+ call display_string
  mov si,#vgabios_version
- call _display_string
+ call display_string
 
  mov si,#vgabios_license
- call _display_string
+ call display_string
  mov si,#vgabios_website
- call _display_string
- ret
-ASM_END
 
-static void display_string()
-{
- // Get length of string
-ASM_START
+display_string:
+ mov  bl, #0x0b
+display_string_color:
+ xor  bh, bh
+ push bx
+
+ ;; Get length of string
  mov ax,ds
  mov es,ax
  mov di,si
@@ -601,11 +601,12 @@ ASM_START
 
  pop cx
  mov ax,#0x1301
- mov bx,#0x000b
+ pop bx
  mov bp,si
  int #0x10
+ ret
 ASM_END
-}
+
 
 // --------------------------------------------------------------------------------------------
 #if defined(DEBUG) || defined(CIRRUS_DEBUG) || defined(BANSHEE_DEBUG)
