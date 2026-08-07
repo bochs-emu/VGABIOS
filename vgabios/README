@@ -107,7 +107,7 @@ For any information on Qemu, visit the website http://wiki.qemu.org/
 
 History
 -------
-vgabios-github-current : Nov 25 2025
+vgabios-0.9d : Aug 07 2026
   - Volker
     - Consider the mode-set option bits 4 and 7 when setting VGA mode
     - Bochs VBE / Banshee: Fixed calculation of the VBE number of image pages
